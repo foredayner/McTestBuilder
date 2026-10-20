@@ -105,7 +105,7 @@ public class AiSettingsScreen extends Screen {
         this.apiKeyField.setMaxLength(512);
         this.apiKeyField.setText(this.draft.apiKey);
         this.apiKeyField.setPlaceholder(Text.literal("sk-..."));
-        this.apiKeyField.addFormatter(this::maskApiKey);
+        this.apiKeyField.setRenderTextProvider(this::maskApiKey); // 1.21.4 name of addFormatter
         this.addSelectableChild(this.apiKeyField);
 
         this.speedSlider = new BuildSpeedSlider(x, this.panelY + 248, fieldWidth, this.draft.ticksPerBlock);
