@@ -18,7 +18,15 @@ jobs:
       - name: Build
         run: |
           chmod +x gradlew
-          ./gradlew build --stacktrace
+          set -o pipefail
+          ./gradlew build 2>&1 | tee build.log
+      - name: Report build errors
+        if: failure()
+        run: |
+          # Compiler errors and Gradle's summary as one annotation (readable through the API).
+          grep -E "error:|warning: \[removal\]|What went wrong|Could not|> " -A2 build.log | head -150 > errors.txt || true
+          msg=$(sed -e 's/%/%25/g' errors.txt | awk '{printf "%s%%0A", $0}')
+          echo "::error title=build errors::${msg}"
       - name: Upload mod jar
         uses: actions/upload-artifact@v4
         with:
