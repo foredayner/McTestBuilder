@@ -73,9 +73,9 @@ public class AiSettingsScreen extends Screen {
         int presetY = this.panelY + 78;
 
         this.providerButton = CyclingButtonWidget.builder(
-                (AiProvider provider) -> Text.literal(provider.getDisplayName()),
-                this.draft.provider
+                (AiProvider provider) -> Text.literal(provider.getDisplayName())
             )
+            .initially(this.draft.provider)
             .values(Arrays.asList(AiProvider.values()))
             .build(x, this.panelY + 52, fieldWidth, 20, Text.literal("Provider"), (button, provider) -> {
                 this.draft.provider = provider;
@@ -141,8 +141,9 @@ public class AiSettingsScreen extends Screen {
         List<String> presets = getModelPresets(this.draft.provider);
         String initial = presets.contains(this.draft.modelName) ? this.draft.modelName : presets.get(0);
 
-        return CyclingButtonWidget.builder((String model) -> Text.literal(model), initial)
+        return CyclingButtonWidget.builder((String model) -> Text.literal(model))
             .values(presets)
+            .initially(initial)
             .build(x, y, width, 20, Text.literal("Model Preset"), (button, model) -> this.modelField.setText(model));
     }
 

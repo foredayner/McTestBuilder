@@ -110,7 +110,7 @@ public final class AiNetworking {
     }
 
     private static void runOnServerThread(ServerPlayerEntity player, Runnable action) {
-        MinecraftServer server = player.getEntityWorld().getServer();
+        MinecraftServer server = player.getServer();
         if (server == null) {
             return;
         }

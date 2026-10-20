@@ -25,7 +25,7 @@ public class AiBuildAssistantClient implements ClientModInitializer {
                 "key.minecraft-ai-build-assistant.open_ai_ui",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_O,
-                KeyBinding.Category.MISC
+                "key.categories.misc"
             )
         );
 

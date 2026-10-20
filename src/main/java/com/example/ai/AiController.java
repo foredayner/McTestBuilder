@@ -45,7 +45,7 @@ public class AiController {
         }
 
         try {
-            ServerWorld world = (ServerWorld) player.getEntityWorld();
+            ServerWorld world = player.getServerWorld();
             BlockPos origin = player.getBlockPos();
 
             debug("[DEBUG] Initializing MinecraftAI...");
@@ -135,7 +135,7 @@ public class AiController {
     }
 
     private static void runOnServer(ServerPlayerEntity player, Runnable action) {
-        MinecraftServer server = player.getEntityWorld().getServer();
+        MinecraftServer server = player.getServer();
         if (server != null) {
             server.execute(action);
         }

@@ -1,6 +1,5 @@
 package com.example.client;
 
-import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -147,16 +146,16 @@ public class BlockPickerScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubled) {
-        if (click.button() == 0) {
-            String blockId = blockAt(click.x(), click.y());
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            String blockId = blockAt(mouseX, mouseY);
             if (blockId != null) {
                 selectBlock(blockId);
                 return true;
             }
         }
 
-        return super.mouseClicked(click, doubled);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override

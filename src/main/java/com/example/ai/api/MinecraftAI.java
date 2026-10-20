@@ -2,9 +2,6 @@ package com.example.ai.api;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
-import net.minecraft.command.permission.LeveledPermissionPredicate;
-import net.minecraft.command.permission.PermissionLevel;
-import net.minecraft.command.permission.PermissionPredicate;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
@@ -56,12 +53,8 @@ public class MinecraftAI {
             return false;
         }
 
-        PermissionPredicate permissions = player.getPermissions();
-        if (permissions instanceof LeveledPermissionPredicate leveled) {
-            return leveled.getLevel().isAtLeast(PermissionLevel.GAMEMASTERS);
-        }
-
-        return false;
+        // 1.21.4: plain permission levels (2 = game masters: /setblock, /fill).
+        return player.hasPermissionLevel(2);
     }
     
     public static String getWorldInfo(Number radius) {
@@ -469,7 +462,7 @@ public class MinecraftAI {
             return;
         }
 
-        MinecraftServer server = actor.getEntityWorld().getServer();
+        MinecraftServer server = actor.getServer();
         if (server == null) {
             return;
         }
@@ -529,4 +522,4 @@ public class MinecraftAI {
     public static BlockPos getOrigin() {
         return origin;
     }
-}
+}

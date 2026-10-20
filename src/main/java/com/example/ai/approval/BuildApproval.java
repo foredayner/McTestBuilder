@@ -40,7 +40,7 @@ public final class BuildApproval {
             return;
         }
 
-        ServerWorld world = (ServerWorld) player.getEntityWorld();
+        ServerWorld world = player.getServerWorld();
         BlockPos origin = pendingOrigin != null ? pendingOrigin : player.getBlockPos();
 
         if (!MinecraftAI.canExecuteBuildCommands(player)) {
