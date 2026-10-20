@@ -38,7 +38,13 @@ jobs:
             build/libs/*.jar
             !build/libs/*-sources.jar
       - name: Keep only the mod jar
-        run: rm -f build/libs/*-sources.jar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -f build/libs/*-sources.jar
+          for a in $(gh release view mc1.21.4-latest --json assets -q '.assets[].name' 2>/dev/null | grep -- '-sources.jar$'); do
+            gh release delete-asset mc1.21.4-latest "$a" -y
+          done
       - name: Publish to the "latest" release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
