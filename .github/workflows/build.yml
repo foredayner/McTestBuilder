@@ -37,6 +37,8 @@ jobs:
           path: |
             build/libs/*.jar
             !build/libs/*-sources.jar
+      - name: Keep only the mod jar
+        run: rm -f build/libs/*-sources.jar
       - name: Publish to the "latest" release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
@@ -48,6 +50,4 @@ jobs:
           body: |
             Minecraft 1.21.4 / Fabric port of Minecraft-AI-Build-Assistant (original: Fyzugx-Lab, CC0).
             Built automatically from `${{ github.sha }}`. See PORT-1.21.4.md for what changed and how to install.
-          files: |
-            build/libs/*.jar
-            !build/libs/*-sources.jar
+          files: build/libs/*.jar
