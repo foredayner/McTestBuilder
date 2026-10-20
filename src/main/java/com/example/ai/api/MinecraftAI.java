@@ -474,7 +474,7 @@ public class MinecraftAI {
 
         ServerCommandSource source = actor.getCommandSource().withSilent();
         try {
-            server.getCommandManager().parseAndExecute(source, command);
+            server.getCommandManager().executeWithPrefix(source, command); // 1.21.4 name of parseAndExecute
         } catch (Exception exception) {
             System.out.println("[ERROR] Build command failed: /" + command + " -> " + exception.getMessage());
         }

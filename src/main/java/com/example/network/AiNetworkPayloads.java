@@ -80,17 +80,31 @@ public final class AiNetworkPayloads {
         int openAiWebSearchEnabled
     ) implements CustomPayload {
         public static final CustomPayload.Id<AiSettingsSyncC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "settings_sync"));
-        public static final PacketCodec<RegistryByteBuf, AiSettingsSyncC2SPayload> CODEC = PacketCodec.tuple(
-            PacketCodecs.STRING, AiSettingsSyncC2SPayload::provider,
-            PacketCodecs.STRING, AiSettingsSyncC2SPayload::modelName,
-            PacketCodecs.STRING, AiSettingsSyncC2SPayload::apiUrl,
-            PacketCodecs.STRING, AiSettingsSyncC2SPayload::apiKey,
-            PacketCodecs.VAR_INT, AiSettingsSyncC2SPayload::ticksPerBlock,
-            PacketCodecs.STRING, AiSettingsSyncC2SPayload::forbiddenBlocksPath,
-            PacketCodecs.STRING, AiSettingsSyncC2SPayload::forbiddenBlocksData,
-            PacketCodecs.VAR_INT, AiSettingsSyncC2SPayload::debugLogEnabled,
-            PacketCodecs.VAR_INT, AiSettingsSyncC2SPayload::openAiWebSearchEnabled,
-            AiSettingsSyncC2SPayload::new
+        // 1.21.4's PacketCodec.tuple stops at 6 fields, so the 9 fields are written by hand
+        // in the same order and encodings the 1.21.11 tuple used.
+        public static final PacketCodec<RegistryByteBuf, AiSettingsSyncC2SPayload> CODEC = PacketCodec.of(
+            (payload, buf) -> {
+                PacketCodecs.STRING.encode(buf, payload.provider());
+                PacketCodecs.STRING.encode(buf, payload.modelName());
+                PacketCodecs.STRING.encode(buf, payload.apiUrl());
+                PacketCodecs.STRING.encode(buf, payload.apiKey());
+                PacketCodecs.VAR_INT.encode(buf, payload.ticksPerBlock());
+                PacketCodecs.STRING.encode(buf, payload.forbiddenBlocksPath());
+                PacketCodecs.STRING.encode(buf, payload.forbiddenBlocksData());
+                PacketCodecs.VAR_INT.encode(buf, payload.debugLogEnabled());
+                PacketCodecs.VAR_INT.encode(buf, payload.openAiWebSearchEnabled());
+            },
+            buf -> new AiSettingsSyncC2SPayload(
+                PacketCodecs.STRING.decode(buf),
+                PacketCodecs.STRING.decode(buf),
+                PacketCodecs.STRING.decode(buf),
+                PacketCodecs.STRING.decode(buf),
+                PacketCodecs.VAR_INT.decode(buf),
+                PacketCodecs.STRING.decode(buf),
+                PacketCodecs.STRING.decode(buf),
+                PacketCodecs.VAR_INT.decode(buf),
+                PacketCodecs.VAR_INT.decode(buf)
+            )
         );
 
         @Override
