@@ -416,10 +416,10 @@ public class AiPromptScreen extends Screen {
         }
         y += 6;
         // Fit both pictures and the four info lines between the request text and the buttons.
-        int room = bottom - (y + detailScroll) - (LINE + 3) - 8 - 5 * LINE - 6;
+        int room = bottom - (y + detailScroll) - (LINE + 3) - 8 - 3 * LINE - 4;
         int img = Math.max(48, Math.min(Math.min(140, (width - 8) / 2), room));
-        ctx.drawText(this.textRenderer, "위에서 (앞쪽이 위)", x, y, SUBTITLE, false);
-        ctx.drawText(this.textRenderer, "정면에서", x + img + 8, y, SUBTITLE, false);
+        ctx.drawText(this.textRenderer, ellipsize("위에서 (앞쪽이 위)", img), x, y, SUBTITLE, false);
+        ctx.drawText(this.textRenderer, ellipsize("정면에서", img), x + img + 8, y, SUBTITLE, false);
         y += LINE + 3;
         outline(ctx, x, y, x + img, y + img, CARD_BORDER);
         ctx.fill(x + 1, y + 1, x + img - 1, y + img - 1, 0xFF15130F);
@@ -432,12 +432,11 @@ public class AiPromptScreen extends Screen {
             "크기: " + p.sizeX + " × " + p.sizeY + " × " + p.sizeZ + " (가로 × 높이 × 세로), "
                 + ("object".equals(r.kind) ? "조각 " + p.blocks + "개" : "블록 " + p.blocks + "개"),
             "만든 날: " + DATE.format(new Date(r.createdAt)),
-            "AI: " + r.provider + " / " + r.model,
-            "여기에 배치: 내 앞에, 지금 바라보는 방향으로 놓입니다. 되돌리기로 취소할 수 있어요."
+            "AI: " + r.provider + " / " + r.model
         };
         for (String s : info) {
             for (OrderedText line : this.textRenderer.wrapLines(Text.literal(s), width)) {
-                ctx.drawText(this.textRenderer, line, x, y, s.startsWith("여기에") ? DIM : TEXT, false);
+                ctx.drawText(this.textRenderer, line, x, y, TEXT, false);
                 y += LINE;
             }
         }
