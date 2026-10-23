@@ -142,7 +142,9 @@ public class AibGameTests implements FabricGameTest {
         var parts = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib"));
         check(parts.size() == 22, "22 parts, got " + parts.size());
         for (var part : parts) {
-            check(part.getWidth() > 0.5f && part.getHeight() > 0.5f, "display culling box is set: " + part.getWidth());
+            // The culling box is display data, not the entity's own size: read it back as NBT.
+            var nbt = part.writeNbt(new net.minecraft.nbt.NbtCompound());
+            check(nbt.getFloat("width") > 0.5f && nbt.getFloat("height") > 0.5f, "display culling box is set: " + nbt.getFloat("width"));
         }
         context.complete();
     }
