@@ -45,6 +45,13 @@ class MinecraftAITest {
         assertTrue(cmd.contains("Tags:[\"aib\",\"aib_1\"]"), cmd);
         assertTrue(cmd.contains("left_rotation:[0.000000f,0.000000f,0.000000f,1.000000f]"), cmd);
 
+        // Inside an object standing on the ground (floor 0) the entity stops at the ground, so it
+        // is lit by the air block above the ground, not by the dirt under it.
+        String onGround = MinecraftAI.summonCommand(part, new BlockPos(10, 64, -3), 0, "aib_1", 0);
+        assertTrue(onGround.startsWith("summon minecraft:block_display 10.5000 64.0000 -2.5000 "), onGround);
+        assertTrue(onGround.contains("translation:[-0.5000f,0.0000f,-0.5000f]"), onGround);
+        assertTrue(onGround.contains("width:1.5000f,height:1.0000f"), onGround);
+
         // One quarter turn: a part 2 blocks north ends up 2 blocks east.
         BuildPlan.Part north = new BuildPlan.Part("minecraft:stone", 0, 0, -2, 1, 1, 1, 0, 0, 0);
         String turned = MinecraftAI.summonCommand(north, BlockPos.ORIGIN, 1, "t");

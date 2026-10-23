@@ -126,6 +126,7 @@ public class AibClientGameTest implements FabricClientGameTest {
             game.getServer().runCommand("execute as @a at @s run tp @s ~1 ~1 ~-5 0 15");
             context.waitTicks(10);
             game.getClientWorld().waitForChunksRender();
+            context.runOnClient(client -> client.inGameHud.getChatHud().clear(false));
             context.takeScreenshot("14_scaled_apples");
 
             // Small window: the settings form must scroll, nothing may overlap.

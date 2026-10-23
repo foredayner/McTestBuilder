@@ -500,6 +500,16 @@ public class MinecraftAI {
 
     /** /summon command for one part at {@code at}, the object turned {@code turns} quarter turns clockwise. */
     static String summonCommand(BuildPlan.Part part, BlockPos at, int turns, String tag) {
+        double r = Math.sqrt(part.sx * part.sx + part.sy * part.sy + part.sz * part.sz) / 2;
+        return summonCommand(part, at, turns, tag, part.y - r);
+    }
+
+    /**
+     * @param floor relative height the entity may not go below: the bottom of the whole object.
+     *              The game lights a display entity by the block it stands in, so an entity
+     *              pushed into the ground would draw its part black.
+     */
+    static String summonCommand(BuildPlan.Part part, BlockPos at, int turns, String tag, double floor) {
         double cx = part.x;
         double cz = part.z;
         for (int i = 0; i < Math.floorMod(turns, 4); i++) {
@@ -517,14 +527,18 @@ public class MinecraftAI {
         // The game hides a display entity when its culling box (width x height, standing on the
         // entity position) is off screen; the default box is empty, so a big part would vanish
         // as soon as its centre left the screen. Stand the entity at the bottom of a box that
-        // holds the whole part (any rotation) and lift the model back up by the same amount.
+        // holds the whole part (any rotation), but not below the object's bottom, and lift the
+        // model back up by the same amount.
         double r = Math.sqrt(part.sx * part.sx + part.sy * part.sy + part.sz * part.sz) / 2;
+        double base = Math.min(part.y, Math.max(part.y - r, floor));
+        double drop = part.y - base;
+        double boxH = part.y + r - base;
         return String.format(Locale.ROOT,
             "summon minecraft:block_display %.4f %.4f %.4f {block_state:%s,transformation:{left_rotation:[%.6ff,%.6ff,%.6ff,%.6ff],"
                 + "right_rotation:[0f,0f,0f,1f],translation:[%.4ff,%.4ff,%.4ff],scale:[%.4ff,%.4ff,%.4ff]},"
                 + "width:%.4ff,height:%.4ff,Tags:[\"aib\",\"%s\"]}",
-            at.getX() + cx, at.getY() + part.y - r, at.getZ() + cz, blockStateNbt(block),
-            q.x, q.y, q.z, q.w, -half.x, -half.y + r, -half.z, part.sx, part.sy, part.sz, 2 * r, 2 * r, tag);
+            at.getX() + cx, at.getY() + base, at.getZ() + cz, blockStateNbt(block),
+            q.x, q.y, q.z, q.w, -half.x, -half.y + drop, -half.z, part.sx, part.sy, part.sz, 2 * r, boxH, tag);
     }
 
     /** World-aligned box around all parts: {minX, minY, minZ, maxX, maxY, maxZ}, relative to at. */
@@ -674,8 +688,9 @@ public class MinecraftAI {
         }
         // Object parts appear a few at a time so a model pops in quickly but visibly.
         List<String> batch = new ArrayList<>();
+        double floor = plan.parts.isEmpty() ? 0 : plan.partBounds()[1];
         for (BuildPlan.Part part : plan.parts) {
-            batch.add(summonCommand(part, at, turns, tag));
+            batch.add(summonCommand(part, at, turns, tag, floor));
             count++;
             if (batch.size() == 8) {
                 List<String> run = List.copyOf(batch);

@@ -144,7 +144,7 @@ public class AibGameTests implements FabricGameTest {
         for (var part : parts) {
             // The culling box is display data, not the entity's own size: read it back as NBT.
             var nbt = part.writeNbt(new net.minecraft.nbt.NbtCompound());
-            check(nbt.getFloat("width") > 0.5f && nbt.getFloat("height") > 0.5f, "display culling box is set: " + nbt.getFloat("width"));
+            check(nbt.getFloat("width") > 0.2f && nbt.getFloat("height") > 0.2f, "display culling box is set: " + nbt.getFloat("width"));
         }
         context.complete();
     }
