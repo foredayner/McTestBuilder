@@ -466,14 +466,37 @@ public class AiPromptScreen extends Screen {
             ctx.fill(l + 3, y, r - 3, y + ROW - 3, PAPER);
             ctx.fill(l + 3, y + ROW - 4, r - 3, y + ROW - 3, PARCHMENT_LINE);
             inset(ctx, l + 6, y + 3, l + ROW + 2, y + ROW - 6, 0xFFE8C48A);
-            ctx.drawItem(new ItemStack(Items.ARMOR_STAND), l + 12, y + 8);
-            String name = n.name == null || n.name.isBlank() ? "(이름 없는 소품)" : n.name;
+            BuildRecord source = recordForTag(n.tag);
+            if (source != null) {
+                BuildPreview p = BuildPreview.of(source);
+                BuildPreview.draw(ctx, p.top, p.topW, p.topH, l + 8, y + 5, ROW - 10, ROW - 14);
+            } else {
+                ctx.drawItem(new ItemStack(Items.ARMOR_STAND), l + 12, y + 8); // not in my 보관함 (deleted, or another player's)
+            }
+            String name = n.name == null || n.name.isBlank()
+                ? (source != null ? source.prompt.replace('\n', ' ') : "(이름 없는 소품)") : n.name;
             int textX = l + ROW + 10;
             ctx.drawText(this.textRenderer, ellipsize(name, r - textX - 64), textX, y + 7, INK, false);
             String info = String.format(java.util.Locale.ROOT, "%.0f블록 거리 · (%.0f, %.0f, %.0f) · 조각 %d개",
                 n.distance, n.x, n.y, n.z, n.parts);
             ctx.drawText(this.textRenderer, ellipsize(info, r - textX - 64), textX, y + 21, INK_SOFT, false);
         }
+    }
+
+    /** Placed objects are tagged "aib_<record id>" or "aib_<record id>_<time>": find that record. */
+    private static BuildRecord recordForTag(String tag) {
+        if (tag == null || !tag.startsWith("aib_")) {
+            return null;
+        }
+        String rest = tag.substring(4);
+        int cut = rest.indexOf('_');
+        String id = cut < 0 ? rest : rest.substring(0, cut);
+        for (BuildRecord r : BuildHistory.list()) {
+            if (r.id.equals(id)) {
+                return r;
+            }
+        }
+        return null;
     }
 
     private void renderDetail(DrawContext ctx, BuildRecord r) {
