@@ -20,6 +20,21 @@ public final class AiApiEndpoints {
         return resolveEndpoint(apiUrl, OPENAI_RESPONSES_PATH, "https://api.openai.com");
     }
 
+    /** Anthropic Messages API: https://api.anthropic.com -> .../v1/messages (also accepts .../v1). */
+    public static String resolveAnthropicMessagesUrl(String apiUrl) {
+        String base = apiUrl == null || apiUrl.isBlank() ? "https://api.anthropic.com" : apiUrl.trim();
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (base.endsWith("/v1/messages")) {
+            return base;
+        }
+        if (base.endsWith("/v1")) {
+            return base + "/messages";
+        }
+        return base + "/v1/messages";
+    }
+
     public static String resolveOllamaGenerateUrl(String apiUrl) {
         return resolveEndpoint(apiUrl, OLLAMA_GENERATE_PATH, "http://localhost:11434");
     }

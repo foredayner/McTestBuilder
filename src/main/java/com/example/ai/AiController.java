@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 public class AiController {
 
     /** One build request, kept across automatic retries. */
-    private record BuildRequest(String userPrompt, String basePrompt, boolean webSearch, long startTime) {
+    private record BuildRequest(String userPrompt, AiPrompt basePrompt, boolean webSearch, long startTime) {
     }
 
     public static void requestBuild(ServerPlayerEntity player, String prompt) {
@@ -40,10 +40,10 @@ public class AiController {
     public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch, boolean objectMode) {
         long startTime = System.currentTimeMillis();
         AiBuilderConfig config = AiBuilderConfig.get();
-        boolean webSearch = config.provider == AiProvider.OPENAI
+        boolean webSearch = config.provider.supportsWebSearch()
             && (useWebSearch || config.openAiWebSearchEnabled);
 
-        if (webSearch && !OpenAiWebSearchSupport.isModelSupported(config.modelName)) {
+        if (webSearch && config.provider == AiProvider.OPENAI && !OpenAiWebSearchSupport.isModelSupported(config.modelName)) {
             String message = OpenAiWebSearchSupport.unsupportedModelMessage(config.modelName);
             debug("[ERROR] " + message);
             AiNetworking.sendLog(player, "[AI] Error: " + message);
@@ -54,7 +54,7 @@ public class AiController {
         debug("[TIMER] ===== AI BUILD START =====");
         debug("[INPUT] Prompt: " + prompt);
         if (webSearch) {
-            debug("[WEB] OpenAI web search enabled for this request");
+            debug("[WEB] Web search enabled for this request");
             AiNetworking.sendDebugLog(player, "[AI] Web search enabled");
         }
 
@@ -70,9 +70,9 @@ public class AiController {
             debug("[DEBUG] World info:\n" + worldInfo);
 
             debug("[DEBUG] Building prompt...");
-            String promptText = objectMode
-                ? buildObjectPrompt(prompt)
-                : buildPrompt(prompt, worldInfo, webSearch);
+            AiPrompt promptText = objectMode
+                ? objectPrompt(prompt)
+                : buildingPrompt(prompt, worldInfo, webSearch);
 
             debug("[DEBUG] Sending to AI provider...");
             AiNetworking.sendDebugLog(player, "[AI] Requesting from AI model (" + config.provider.getDisplayName() + ")...");
@@ -86,7 +86,7 @@ public class AiController {
         }
     }
 
-    private static void sendToAi(ServerPlayerEntity player, BuildRequest req, String promptText, int attempt) {
+    private static void sendToAi(ServerPlayerEntity player, BuildRequest req, AiPrompt promptText, int attempt) {
         var request = AiHttpService.buildRequest(promptText, req.webSearch());
         AiHttpService.client().sendAsync(request, HttpResponse.BodyHandlers.ofString())
             .thenAccept(response -> runOnServer(player, () -> handleAiResponse(player, response, req, attempt)))
@@ -116,7 +116,7 @@ public class AiController {
             debug("[DEBUG] Response size: " + rawBody.length() + " chars");
 
             if (webSearch) {
-                for (String query : AiHttpService.extractOpenAiWebSearchQueries(rawBody)) {
+                for (String query : AiHttpService.extractWebSearchQueries(rawBody, provider)) {
                     debug("[WEB] Search query: " + query);
                     AiNetworking.sendDebugLog(player, "[AI] Web search: " + query);
                 }
@@ -230,19 +230,20 @@ public class AiController {
     }
 
     /** The prompt the game sends for a request, made where the player stands now. */
-    public static String promptFor(ServerPlayerEntity player, String userPrompt, boolean objectMode) {
+    public static AiPrompt promptFor(ServerPlayerEntity player, String userPrompt, boolean objectMode) {
         MinecraftAI.init(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player.getPitch());
         return objectMode
-            ? buildObjectPrompt(userPrompt)
-            : buildPrompt(userPrompt, MinecraftAI.getWorldInfo(30, player.getYaw(), player.getPitch()), false);
+            ? objectPrompt(userPrompt)
+            : buildingPrompt(userPrompt, MinecraftAI.getWorldInfo(30, player.getYaw(), player.getPitch()), false);
     }
 
-    public static String fixPrompt(String basePrompt, String badCode, String error) {
-        return basePrompt
+    /** The same request again, with the error and the failed script, asking for a fixed script. */
+    public static AiPrompt fixPrompt(AiPrompt base, String badCode, String error) {
+        return new AiPrompt(base.system(), base.user()
             + "\n\nYOUR PREVIOUS SCRIPT FAILED. Fix it.\n"
             + "Error:\n" + truncate(error, 1500) + "\n\n"
             + "Previous script:\n" + truncate(badCode, 6000) + "\n\n"
-            + "Return the complete corrected Groovy script only. No markdown, no comments, no explanation.\n";
+            + "Return the complete corrected Groovy script only. No markdown, no explanation.\n");
     }
 
     private static String truncate(String text, int max) {
@@ -338,10 +339,9 @@ public class AiController {
         }
         """;
 
-    static String buildObjectPrompt(String userPrompt) {
-        return """
+    /** Instructions for objects: the same for every request (cached by Claude). */
+    static final String OBJECT_SYSTEM = """
             You are an expert modeller of cute, detailed Minecraft props and characters. Write ONLY executable Groovy using the `ai` API.
-            Object request: %s
 
             Build ONE object out of display-entity pieces (not whole blocks). Smooth shapes are drawn on a fine
             1/16-block grid (one texture pixel), and touching pieces of the same block are merged automatically.
@@ -400,14 +400,23 @@ public class AiController {
             %s
             %s
             %s
-            """.formatted(userPrompt, EXAMPLE_DUCK.strip(), EXAMPLE_LAMP.strip(), EXAMPLE_CHAIR.strip());
+            """.formatted(EXAMPLE_DUCK.strip(), EXAMPLE_LAMP.strip(), EXAMPLE_CHAIR.strip());
+
+    public static AiPrompt objectPrompt(String userPrompt) {
+        return new AiPrompt(OBJECT_SYSTEM, "Object request: " + userPrompt + "\nWrite the Groovy script for it now.");
     }
 
-    static String buildPrompt(String userPrompt, String worldInfo, boolean webSearchEnabled) {
+    /** Instructions for buildings (fixed part) + the request and the terrain around the player. */
+    public static AiPrompt buildingPrompt(String userPrompt, String worldInfo, boolean webSearchEnabled) {
+        String user = "Build request: " + userPrompt + "\n\nWorld Information:\n" + worldInfo
+            + "\n\nWrite the Groovy script for it now.";
+        return new AiPrompt(buildingSystem(webSearchEnabled), user);
+    }
+
+    static String buildingSystem(boolean webSearchEnabled) {
         StringBuilder prompt = new StringBuilder();
 
-        prompt.append("You are a Minecraft architect. Write ONLY executable Groovy using the `ai` API.\n");
-        prompt.append("Build request: ").append(userPrompt).append("\n\n");
+        prompt.append("You are a Minecraft architect. Write ONLY executable Groovy using the `ai` API.\n\n");
 
         prompt.append("Absolute instructions:\n");
         prompt.append("1. Prioritize building quality above all else. (Never build flat. Focus on depth, 3D layering, overhangs, and mixing blocks for realistic texture).\n");
@@ -426,8 +435,7 @@ public class AiController {
         prompt.append("- Windows on the outer walls of every room, light inside (lanterns, glowstone), and a few pieces of furniture.\n");
         prompt.append("- Clear the inside with air (clearArea) so terrain does not stay inside the rooms.\n\n");
 
-        prompt.append("World Information:\n");
-        prompt.append(worldInfo).append("\n\n");
+        prompt.append("The request and the World Information (terrain around the player) come in the next message.\n\n");
 
         prompt.append("API signatures (exact order; all x/y/z relative to player feet):\n");
         prompt.append("Build:\n");

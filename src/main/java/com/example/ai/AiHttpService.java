@@ -29,15 +29,140 @@ public final class AiHttpService {
     }
 
     public static HttpRequest buildRequest(String promptText, boolean useWebSearch) {
+        return buildRequest(new AiPrompt("", promptText), useWebSearch);
+    }
+
+    public static HttpRequest buildRequest(AiPrompt prompt, boolean useWebSearch) {
         AiBuilderConfig config = AiBuilderConfig.get();
 
         return switch (config.provider) {
-            case OLLAMA -> buildOllamaRequest(config, promptText);
+            case OLLAMA -> buildOllamaRequest(config, prompt.full());
             case OPENAI -> useWebSearch
-                ? buildOpenAiResponsesRequest(config, promptText)
-                : buildOpenAiRequest(config, promptText);
-            case CUSTOM -> buildCustomRequest(config, promptText);
+                ? buildOpenAiResponsesRequest(config, prompt.full())
+                : buildOpenAiRequest(config, prompt.full());
+            case CLAUDE -> buildClaudeRequest(config, prompt, useWebSearch);
+            case CUSTOM -> buildCustomRequest(config, prompt.full());
         };
+    }
+
+    /** Most web searches Claude may run for one build. */
+    private static final int CLAUDE_MAX_SEARCHES = 3;
+
+    /**
+     * Anthropic Messages API. The fixed instructions go in a system prompt marked for caching, so
+     * repeated requests (and fix-up retries) pay much less for them.
+     */
+    private static HttpRequest buildClaudeRequest(AiBuilderConfig config, AiPrompt prompt, boolean useWebSearch) {
+        String apiKey = AiApiEndpoints.normalizeApiKey(config.apiKey);
+        if (apiKey.isBlank()) {
+            throw new IllegalStateException("Claude API key is required (Settings > API 키)");
+        }
+        JsonObject body = new JsonObject();
+        body.addProperty("model", config.modelName);
+        body.addProperty("max_tokens", 16000);
+        if (prompt.system() != null && !prompt.system().isBlank()) {
+            JsonArray system = new JsonArray();
+            JsonObject block = new JsonObject();
+            block.addProperty("type", "text");
+            block.addProperty("text", prompt.system());
+            JsonObject cache = new JsonObject();
+            cache.addProperty("type", "ephemeral");
+            block.add("cache_control", cache);
+            system.add(block);
+            body.add("system", system);
+        }
+        JsonArray messages = new JsonArray();
+        JsonObject user = new JsonObject();
+        user.addProperty("role", "user");
+        user.addProperty("content", prompt.user());
+        messages.add(user);
+        body.add("messages", messages);
+        if (useWebSearch) {
+            JsonArray tools = new JsonArray();
+            JsonObject search = new JsonObject();
+            search.addProperty("type", "web_search_20250305");
+            search.addProperty("name", "web_search");
+            search.addProperty("max_uses", CLAUDE_MAX_SEARCHES);
+            tools.add(search);
+            body.add("tools", tools);
+        }
+        return HttpRequest.newBuilder()
+            .uri(URI.create(AiApiEndpoints.resolveAnthropicMessagesUrl(config.apiUrl)))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .header("x-api-key", apiKey)
+            .header("anthropic-version", "2023-06-01")
+            .timeout(Duration.ofSeconds(300))
+            .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+            .build();
+    }
+
+    /** The text of a Claude reply (web search blocks and citations are skipped). */
+    private static String extractClaudeContent(JsonObject root) {
+        if (!root.has("content") || !root.get("content").isJsonArray()) {
+            throw new IllegalStateException("No content in Claude response");
+        }
+        StringBuilder text = new StringBuilder();
+        for (JsonElement element : root.getAsJsonArray("content")) {
+            if (element.isJsonObject()) {
+                JsonObject block = element.getAsJsonObject();
+                if (block.has("type") && "text".equals(block.get("type").getAsString()) && block.has("text")) {
+                    text.append(block.get("text").getAsString());
+                }
+            }
+        }
+        if (text.isEmpty()) {
+            throw new IllegalStateException("Claude returned no text"
+                + (root.has("stop_reason") ? " (stop_reason " + root.get("stop_reason").getAsString() + ")" : ""));
+        }
+        return text.toString();
+    }
+
+    /** Search queries in a reply: OpenAI web_search_call items or Claude server_tool_use blocks. */
+    public static List<String> extractWebSearchQueries(String rawBody, AiProvider provider) {
+        if (provider != AiProvider.CLAUDE) {
+            return extractOpenAiWebSearchQueries(rawBody);
+        }
+        List<String> queries = new ArrayList<>();
+        try {
+            JsonObject root = JsonParser.parseString(rawBody).getAsJsonObject();
+            if (root.has("content") && root.get("content").isJsonArray()) {
+                for (JsonElement element : root.getAsJsonArray("content")) {
+                    if (!element.isJsonObject()) {
+                        continue;
+                    }
+                    JsonObject block = element.getAsJsonObject();
+                    if (block.has("type") && "server_tool_use".equals(block.get("type").getAsString())
+                        && block.has("input") && block.get("input").isJsonObject()
+                        && block.getAsJsonObject("input").has("query")) {
+                        queries.add(block.getAsJsonObject("input").get("query").getAsString());
+                    }
+                }
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return queries;
+    }
+
+    /** Tokens used by one reply: {input, output, cache read, cache write}; zeros if not reported. */
+    public static int[] usage(String rawBody) {
+        int[] out = new int[4];
+        try {
+            JsonObject root = JsonParser.parseString(rawBody).getAsJsonObject();
+            if (root.has("usage") && root.get("usage").isJsonObject()) {
+                JsonObject u = root.getAsJsonObject("usage");
+                out[0] = intOf(u, "input_tokens") + intOf(u, "prompt_tokens");
+                out[1] = intOf(u, "output_tokens") + intOf(u, "completion_tokens");
+                out[2] = intOf(u, "cache_read_input_tokens");
+                out[3] = intOf(u, "cache_creation_input_tokens");
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return out;
+    }
+
+    private static int intOf(JsonObject o, String key) {
+        return o.has(key) && o.get(key).isJsonPrimitive() ? o.get(key).getAsInt() : 0;
     }
 
     public static String extractResponseBody(String rawBody, AiProvider provider) {
@@ -58,6 +183,7 @@ public final class AiHttpService {
             case OPENAI -> root.has("output")
                 ? extractOpenAiResponsesContent(root)
                 : extractOpenAiMessageContent(root);
+            case CLAUDE -> extractClaudeContent(root);
         };
     }
 
@@ -126,6 +252,7 @@ public final class AiHttpService {
             case OPENAI -> useWebSearch
                 ? AiApiEndpoints.resolveOpenAiResponsesUrl(apiUrl)
                 : AiApiEndpoints.resolveOpenAiChatCompletionsUrl(apiUrl);
+            case CLAUDE -> AiApiEndpoints.resolveAnthropicMessagesUrl(apiUrl);
             case CUSTOM -> apiUrl;
         };
     }

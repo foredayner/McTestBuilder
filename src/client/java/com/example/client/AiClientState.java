@@ -218,7 +218,7 @@ public final class AiClientState {
     }
 
     public static void toggleSessionWebSearch() {
-        if (AiBuilderConfig.get().provider != AiProvider.OPENAI) {
+        if (!AiBuilderConfig.get().provider.supportsWebSearch()) {
             return;
         }
         sessionWebSearch = !sessionWebSearch;
@@ -227,12 +227,12 @@ public final class AiClientState {
 
     public static boolean willUseWebSearch() {
         AiBuilderConfig config = AiBuilderConfig.get();
-        return config.provider == AiProvider.OPENAI
+        return config.provider.supportsWebSearch()
             && (config.openAiWebSearchEnabled || sessionWebSearch);
     }
 
     public static boolean isWebSearchAvailable() {
-        return AiBuilderConfig.get().provider == AiProvider.OPENAI;
+        return AiBuilderConfig.get().provider.supportsWebSearch();
     }
 
     public static void sendPromptText(String prompt) {

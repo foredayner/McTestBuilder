@@ -68,6 +68,8 @@ public class AibModelBench implements FabricClientGameTest {
         long ms;
         int inputTokens;
         int outputTokens;
+        int cacheRead;
+        int cacheWrite;
         String error;
         String failure;
     }
@@ -84,11 +86,12 @@ public class AibModelBench implements FabricClientGameTest {
         long totalMs;
         int inputTokens;
         int outputTokens;
+        int cacheReadTokens;
+        int cacheWriteTokens;
         List<Call> attempts = new ArrayList<>();
     }
 
-    private String route = "compat";
-    private String compatError;
+    private String route = "claude";
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -104,8 +107,11 @@ public class AibModelBench implements FabricClientGameTest {
         }
 
         AiBuilderConfig config = AiBuilderConfig.get();
-        config.provider = AiProvider.OPENAI;
-        config.apiUrl = "https://api.anthropic.com/v1";
+        // "claude" = the mod's own Claude connection (default); "compat" = OpenAI-compatible endpoint.
+        boolean compat = "compat".equals(System.getenv("AIB_BENCH_PROVIDER"));
+        config.provider = compat ? AiProvider.OPENAI : AiProvider.CLAUDE;
+        config.apiUrl = compat ? "https://api.anthropic.com/v1" : "https://api.anthropic.com";
+        route = compat ? "openai-compatible" : "claude";
         config.apiKey = key.trim();
         config.openAiWebSearchEnabled = false;
         config.autoRetries = RETRIES;
@@ -161,16 +167,18 @@ public class AibModelBench implements FabricClientGameTest {
         r.id = c.id();
         r.prompt = c.prompt();
         r.object = c.object();
-        String base = game.getServer().computeOnServer(server ->
+        com.example.ai.AiPrompt base = game.getServer().computeOnServer(server ->
             AiController.promptFor(server.getPlayerManager().getPlayerList().get(0), c.prompt(), c.object()));
-        String prompt = base;
+        com.example.ai.AiPrompt prompt = base;
         long start = System.currentTimeMillis();
         for (int attempt = 0; attempt <= RETRIES; attempt++) {
             Call call = new Call();
             r.attempts.add(call);
             r.calls++;
-            String code = ask(prompt, model, key, call);
+            String code = ask(prompt, call);
             r.inputTokens += call.inputTokens;
+            r.cacheReadTokens += call.cacheRead;
+            r.cacheWriteTokens += call.cacheWrite;
             r.outputTokens += call.outputTokens;
             if (code == null) {
                 r.finalFailure = "API: " + call.error;
@@ -194,73 +202,27 @@ public class AibModelBench implements FabricClientGameTest {
         return r;
     }
 
-    /** Send one prompt; returns the cleaned script, or null with call.error set. */
-    private String ask(String prompt, String model, String key, Call call) {
+    /** Send one prompt the way the game does; returns the cleaned script, or null with call.error set. */
+    private String ask(com.example.ai.AiPrompt prompt, Call call) {
         long t = System.currentTimeMillis();
+        call.route = route;
         try {
-            if ("compat".equals(route)) {
-                call.route = "openai-compatible";
-                HttpRequest request = AiHttpService.buildRequest(prompt, false);
-                HttpResponse<String> response = AiHttpService.client().send(request, HttpResponse.BodyHandlers.ofString());
-                call.status = response.statusCode();
-                call.ms = System.currentTimeMillis() - t;
-                if (response.statusCode() / 100 == 2) {
-                    JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
-                    if (root.has("usage") && root.get("usage").isJsonObject()) {
-                        JsonObject u = root.getAsJsonObject("usage");
-                        call.inputTokens = u.has("prompt_tokens") ? u.get("prompt_tokens").getAsInt() : 0;
-                        call.outputTokens = u.has("completion_tokens") ? u.get("completion_tokens").getAsInt() : 0;
-                    }
-                    return AiCodeSanitizer.sanitize(AiHttpService.extractResponseBody(response.body(), AiProvider.OPENAI));
-                }
-                // The compatible endpoint refused: note it once, then measure through the native API.
-                compatError = "HTTP " + response.statusCode() + ": " + clip(response.body(), 600);
-                route = "native";
-                t = System.currentTimeMillis();
-            }
-            call.route = "native-messages";
-            JsonObject body = new JsonObject();
-            body.addProperty("model", model);
-            body.addProperty("max_tokens", 16000);
-            JsonArray messages = new JsonArray();
-            JsonObject user = new JsonObject();
-            user.addProperty("role", "user");
-            user.addProperty("content", prompt);
-            messages.add(user);
-            body.add("messages", messages);
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("https://api.anthropic.com/v1/messages"))
-                .header("content-type", "application/json")
-                .header("x-api-key", key)
-                .header("anthropic-version", "2023-06-01")
-                .timeout(Duration.ofSeconds(300))
-                .POST(HttpRequest.BodyPublishers.ofString(body.toString()));
-            // Keys that are not scoped to one workspace must say which workspace to bill.
-            String workspace = System.getenv("ANTHROPIC_WORKSPACE_ID");
-            if (workspace != null && !workspace.isBlank()) {
-                builder.header("anthropic-workspace-id", workspace.trim());
-            }
-            HttpRequest request = builder.build();
+            HttpRequest request = AiHttpService.buildRequest(prompt, false);
             HttpResponse<String> response = AiHttpService.client().send(request, HttpResponse.BodyHandlers.ofString());
             call.status = response.statusCode();
             call.ms = System.currentTimeMillis() - t;
+            int[] usage = AiHttpService.usage(response.body());
+            call.inputTokens = usage[0];
+            call.outputTokens = usage[1];
+            call.cacheRead = usage[2];
+            call.cacheWrite = usage[3];
+            AiProvider provider = AiBuilderConfig.get().provider;
             if (response.statusCode() / 100 != 2) {
-                call.error = "HTTP " + response.statusCode() + ": " + clip(response.body(), 600);
+                call.error = AiHttpService.extractHttpErrorMessage(response.body(), response.statusCode(), provider)
+                    + " | " + clip(response.body(), 400);
                 return null;
             }
-            JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
-            if (root.has("usage")) {
-                JsonObject u = root.getAsJsonObject("usage");
-                call.inputTokens = u.has("input_tokens") ? u.get("input_tokens").getAsInt() : 0;
-                call.outputTokens = u.has("output_tokens") ? u.get("output_tokens").getAsInt() : 0;
-            }
-            StringBuilder text = new StringBuilder();
-            for (var part : root.getAsJsonArray("content")) {
-                JsonObject o = part.getAsJsonObject();
-                if ("text".equals(o.get("type").getAsString())) {
-                    text.append(o.get("text").getAsString());
-                }
-            }
-            return AiCodeSanitizer.sanitize(text.toString());
+            return AiCodeSanitizer.sanitize(AiHttpService.extractResponseBody(response.body(), provider));
         } catch (Exception e) {
             call.ms = System.currentTimeMillis() - t;
             call.error = e.getClass().getSimpleName() + ": " + e.getMessage();
@@ -309,7 +271,7 @@ public class AibModelBench implements FabricClientGameTest {
 
     private void write(List<Result> results) {
         JsonObject out = new JsonObject();
-        out.addProperty("compatEndpoint", compatError == null ? "ok" : compatError);
+        out.addProperty("route", route);
         out.add("results", GSON.toJsonTree(results));
         try {
             Files.writeString(OUT.resolve("results.json"), GSON.toJson(out), StandardCharsets.UTF_8);

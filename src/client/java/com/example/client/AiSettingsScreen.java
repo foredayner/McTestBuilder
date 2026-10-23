@@ -38,6 +38,9 @@ public class AiSettingsScreen extends Screen {
     private static final List<String> OPENAI_MODELS = List.of(
         "gpt-4.1-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "gpt-5"
     );
+    private static final List<String> CLAUDE_MODELS = List.of(
+        "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"
+    );
     private static final List<Integer> KEEP_ALIVE = List.of(5, 30, 120, -1);
 
     private final Screen parent;
@@ -144,7 +147,7 @@ public class AiSettingsScreen extends Screen {
             .build(x, at(320), w, 20, Text.literal("디버그 로그"), (button, enabled) -> this.draft.debugLogEnabled = enabled));
 
         this.webSearchToggle = scrolledChild(CyclingButtonWidget.onOffBuilder(this.draft.openAiWebSearchEnabled)
-            .build(x, at(344), w, 20, Text.literal("OpenAI 웹 검색 (기본값)"), (button, enabled) -> this.draft.openAiWebSearchEnabled = enabled));
+            .build(x, at(344), w, 20, Text.literal("웹 검색 (기본값)"), (button, enabled) -> this.draft.openAiWebSearchEnabled = enabled));
 
         int buttonY = this.panelY + this.panelHeight - 26;
         int buttonWidth = (w - 8) / 2;
@@ -193,7 +196,7 @@ public class AiSettingsScreen extends Screen {
     /** Provider-dependent rows, and anything scrolled outside the visible area, are hidden. */
     private void updateVisibility() {
         boolean ollama = this.draft.provider == AiProvider.OLLAMA;
-        boolean openAi = this.draft.provider == AiProvider.OPENAI;
+        boolean openAi = this.draft.provider.supportsWebSearch();
         for (ClickableWidget widget : this.scrolled) {
             boolean shown = widget.getY() >= viewTop() && widget.getY() + widget.getHeight() <= viewBottom();
             if (widget == this.apiKeyField) {
@@ -256,6 +259,7 @@ public class AiSettingsScreen extends Screen {
         return switch (provider) {
             case OLLAMA -> OLLAMA_MODELS;
             case OPENAI -> OPENAI_MODELS;
+            case CLAUDE -> CLAUDE_MODELS;
             case CUSTOM -> List.of("custom-model");
         };
     }
@@ -365,6 +369,8 @@ public class AiSettingsScreen extends Screen {
         label(ctx, "AI가 쓰면 안 되는 블록 고르기", x, at(284), LABEL_COLOR);
         if (this.draft.provider == AiProvider.OPENAI) {
             label(ctx, "웹 검색은 gpt-4o / gpt-4.1 / gpt-5 전용", x, at(368), LABEL_COLOR);
+        } else if (this.draft.provider == AiProvider.CLAUDE) {
+            label(ctx, "웹 검색은 검색 1회마다 추가 요금 (최대 3회)", x, at(368), LABEL_COLOR);
         }
         ctx.disableScissor();
 
