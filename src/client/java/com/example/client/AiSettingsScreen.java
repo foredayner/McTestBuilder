@@ -156,7 +156,7 @@ public class AiSettingsScreen extends Screen {
 
         for (TextFieldWidget field : List.of(this.modelField, this.apiUrlField, this.apiKeyField)) {
             field.setDrawsBackground(false);
-            field.setEditableColor(WoodUi.INK);
+            field.setEditableColor(WoodUi.PAPER);
         }
         updateVisibility();
     }
@@ -165,8 +165,7 @@ public class AiSettingsScreen extends Screen {
     private void paintFields(DrawContext ctx) {
         for (TextFieldWidget field : List.of(this.modelField, this.apiUrlField, this.apiKeyField)) {
             if (field.visible) {
-                WoodUi.inset(ctx, field.getX() - 5, field.getY() - 6, field.getX() + field.getWidth() + 5, field.getY() + 14,
-                    field.isFocused() ? 0xFFFFFBEF : WoodUi.PAPER);
+                WoodUi.well(ctx, field.getX() - 5, field.getY() - 6, field.getX() + field.getWidth() + 5, field.getY() + 14, field.isFocused());
             }
         }
     }

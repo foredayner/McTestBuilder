@@ -175,7 +175,7 @@ public class AiPromptScreen extends Screen {
         int fy = bottom() - 20;
         this.promptField = new TextFieldWidget(this.textRenderer, left() + 5, fy + 6, right() - left() - 78, 12, Text.literal(""));
         this.promptField.setDrawsBackground(false);
-        this.promptField.setEditableColor(INK);
+        this.promptField.setEditableColor(PAPER);
         this.promptField.setMaxLength(220); // the chat command that carries it is limited to 256 characters
         this.promptField.setPlaceholder(Text.literal(object ? "만들 소품을 적어 주세요…" : "지을 건물을 적어 주세요…"));
         this.promptField.setText(this.draftPrompt);
@@ -212,7 +212,7 @@ public class AiPromptScreen extends Screen {
 
         int l = left(), r = right(), t = chatTop(), b = chatBottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);
-        inset(ctx, l, bottom() - 20, r - 68, bottom() - 2, PAPER);
+        well(ctx, l, bottom() - 20, r - 68, bottom() - 2, this.promptField != null && this.promptField.isFocused());
 
         List<AiClientState.Entry> entries = new ArrayList<>(AiClientState.getEntries());
         if (entries.isEmpty()) {

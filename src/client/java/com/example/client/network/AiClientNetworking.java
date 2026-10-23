@@ -40,7 +40,7 @@ public final class AiClientNetworking {
                 try {
                     BuildRecord record = BuildRecord.fromGzip(payload.data());
                     BuildHistory.save(record);
-                    AiClientState.addLog("[History] Saved to the History tab.");
+                    AiClientState.addLog("[History] 보관함에 저장했어요.");
                 } catch (RuntimeException exception) {
                     AiClientState.addLog("[History] Could not save this build: " + exception.getMessage());
                 }

@@ -25,6 +25,9 @@ public final class WoodUi {
     public static final int TAG = 0xFFE07B2C;
     public static final int LEAF = 0xFF6E8B3D;
     public static final int LEAF_PAPER = 0xFFEAF4D2;
+    /** Text inputs: a dark carved-wood plate with cream letters (vanilla always draws a text shadow). */
+    public static final int WELL = 0xFF6B3A1A;
+    public static final int WELL_FOCUS = 0xFF7E4823;
 
     private WoodUi() {
     }
@@ -49,6 +52,13 @@ public final class WoodUi {
         ctx.fill(l, t, r, b, PARCHMENT_LINE);
         ctx.fill(l, t, r - 1, b - 1, INK_SOFT);
         ctx.fill(l + 1, t + 1, r - 1, b - 1, fill);
+    }
+
+    /** Dark wooden plate behind a text field. */
+    public static void well(DrawContext ctx, int l, int t, int r, int b, boolean focused) {
+        ctx.fill(l, t, r, b, OUTLINE);
+        ctx.fill(l + 1, t + 1, r - 1, b - 1, focused ? WELL_FOCUS : WELL);
+        ctx.fill(l + 1, t + 1, r - 1, t + 2, 0xFF4A2511);
     }
 
     /** The big window: thick wooden frame with corner pegs around a parchment page. */
