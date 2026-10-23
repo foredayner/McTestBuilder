@@ -406,7 +406,7 @@ public class AiPromptScreen extends Screen {
             renderNearby(ctx);
             return;
         }
-        ctx.drawText(this.textRenderer, "만든 건물과 소품을 다시 꺼내 놓을 수 있어요", left() + 2, top() + 5, INK_SOFT, false);
+        ctx.drawText(this.textRenderer, ellipsize("만든 건물과 소품을 다시 꺼내 놓을 수 있어요", right() - left() - 170), left() + 2, top() + 5, INK_SOFT, false);
         int l = left(), r = right(), t = listTop(), b = bottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);
         List<BuildRecord> records = filtered();
@@ -448,8 +448,8 @@ public class AiPromptScreen extends Screen {
 
     /** Objects placed around me, nearest first, each with a 지우기 button (added in buildHistory). */
     private void renderNearby(DrawContext ctx) {
-        ctx.drawText(this.textRenderer, "주변 " + (int) com.example.ai.build.ObjectService.NEARBY_RADIUS
-            + "블록 안에 놓인 소품 · 조준하고 Delete 두 번으로도 지울 수 있어요", left() + 2, top() + 5, INK_SOFT, false);
+        ctx.drawText(this.textRenderer, ellipsize("주변 " + (int) com.example.ai.build.ObjectService.NEARBY_RADIUS
+            + "블록 안의 소품 · 조준 후 Delete 두 번으로도 지워요", right() - left() - 170), left() + 2, top() + 5, INK_SOFT, false);
         int l = left(), r = right(), t = listTop(), b = bottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);
         List<com.example.ai.build.ObjectService.Nearby> list = AiClientState.getNearby();
