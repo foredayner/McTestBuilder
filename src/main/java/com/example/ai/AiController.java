@@ -146,33 +146,16 @@ public class AiController {
      */
     private static void planAndApprove(ServerPlayerEntity player, BuildRequest req, String aiCode, int attempt) {
         BlockPos origin = player.getBlockPos();
-        MinecraftAI.init(player.getServerWorld(), origin, player.getYaw(), player.getPitch(), player);
-        BuildPlan plan = new BuildPlan();
-        plan.facing = BuildPlan.normalizeFacing(MinecraftAI.getFacing());
-
-        // 1) Review the code (no AI call), 2) dry run, 3) check what it would place.
-        ScriptExecutor.ExecutionResult result = null;
-        String failure;
-        List<String> review = ScriptLinter.lint(aiCode);
-        if (!review.isEmpty()) {
-            failure = "Code review found problems:\n- " + String.join("\n- ", review);
-            AiNetworking.sendLog(player, "[Review] " + review.size() + " problem(s) found before running:\n- " + String.join("\n- ", review));
+        Evaluation eval = evaluate(player, aiCode);
+        BuildPlan plan = eval.plan();
+        ScriptExecutor.ExecutionResult result = eval.result();
+        String failure = eval.failure();
+        if (!eval.review().isEmpty()) {
+            AiNetworking.sendLog(player, "[Review] " + eval.review().size() + " problem(s) found before running:\n- " + String.join("\n- ", eval.review()));
         } else {
             AiNetworking.sendDebugLog(player, "[Review] Code check passed.");
-            MinecraftAI.startRecording(plan);
-            try {
-                result = ScriptExecutor.executeScript(aiCode);
-            } finally {
-                MinecraftAI.stopRecording();
-            }
-            failure = !result.success() ? result.message()
-                : plan.isEmpty() ? "The script ran but placed nothing. Use the ai.place* / ai.addPart functions." : null;
-            if (failure == null) {
-                List<String> planProblems = plan.problems();
-                if (!planProblems.isEmpty()) {
-                    failure = "The build plan has problems:\n- " + String.join("\n- ", planProblems);
-                    AiNetworking.sendLog(player, "[Review] " + failure);
-                }
+            if (failure != null && failure.startsWith(PLAN_PROBLEMS)) {
+                AiNetworking.sendLog(player, "[Review] " + failure);
             }
         }
         if (failure == null) {
@@ -203,7 +186,57 @@ public class AiController {
         }
     }
 
-    private static String fixPrompt(String basePrompt, String badCode, String error) {
+    private static final String PLAN_PROBLEMS = "The build plan has problems:";
+
+    /** What checking one AI script gave: the recorded plan, or why it was rejected (failure != null). */
+    public record Evaluation(BuildPlan plan, String failure, List<String> review, ScriptExecutor.ExecutionResult result) {
+        public boolean ok() {
+            return failure == null;
+        }
+    }
+
+    /**
+     * 1) Review the code (no AI call), 2) dry run it in recording mode, 3) check what it would
+     * place. Nothing touches the world. Used by the game and by the model benchmark.
+     */
+    public static Evaluation evaluate(ServerPlayerEntity player, String aiCode) {
+        MinecraftAI.init(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player.getPitch(), player);
+        BuildPlan plan = new BuildPlan();
+        plan.facing = BuildPlan.normalizeFacing(MinecraftAI.getFacing());
+
+        ScriptExecutor.ExecutionResult result = null;
+        String failure;
+        List<String> review = ScriptLinter.lint(aiCode);
+        if (!review.isEmpty()) {
+            failure = "Code review found problems:\n- " + String.join("\n- ", review);
+        } else {
+            MinecraftAI.startRecording(plan);
+            try {
+                result = ScriptExecutor.executeScript(aiCode);
+            } finally {
+                MinecraftAI.stopRecording();
+            }
+            failure = !result.success() ? result.message()
+                : plan.isEmpty() ? "The script ran but placed nothing. Use the ai.place* / ai.addPart functions." : null;
+            if (failure == null) {
+                List<String> planProblems = plan.problems();
+                if (!planProblems.isEmpty()) {
+                    failure = PLAN_PROBLEMS + "\n- " + String.join("\n- ", planProblems);
+                }
+            }
+        }
+        return new Evaluation(plan, failure, review, result);
+    }
+
+    /** The prompt the game sends for a request, made where the player stands now. */
+    public static String promptFor(ServerPlayerEntity player, String userPrompt, boolean objectMode) {
+        MinecraftAI.init(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player.getPitch());
+        return objectMode
+            ? buildObjectPrompt(userPrompt, MinecraftAI.getFacing())
+            : buildPrompt(userPrompt, MinecraftAI.getWorldInfo(30, player.getYaw(), player.getPitch()), false);
+    }
+
+    public static String fixPrompt(String basePrompt, String badCode, String error) {
         return basePrompt
             + "\n\nYOUR PREVIOUS SCRIPT FAILED. Fix it.\n"
             + "Error:\n" + truncate(error, 1500) + "\n\n"

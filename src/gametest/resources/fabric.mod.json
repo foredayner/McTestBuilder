@@ -6,7 +6,7 @@
   "environment": "*",
   "entrypoints": {
     "fabric-gametest": ["com.example.gametest.AibGameTests"],
-    "fabric-client-gametest": ["com.example.client.AibClientGameTest"]
+    "fabric-client-gametest": ["com.example.client.AibClientGameTest", "com.example.client.AibModelBench"]
   },
   "depends": {
     "minecraft-ai-build-assistant": "*",

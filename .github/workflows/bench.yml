@@ -1,0 +1,64 @@
+name: model bench
+
+# Real AI calls through the mod's pipeline, with pictures of what each model built.
+# Needs the ANTHROPIC_API_KEY repository secret. Start it from the Actions tab
+# (Run workflow) or by pushing to the "bench" branch.
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: Comma-separated model ids
+        default: claude-haiku-5-5
+  push:
+    branches: [bench]
+
+permissions:
+  contents: write
+
+jobs:
+  bench:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Check the key is there
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::error::ANTHROPIC_API_KEY secret is missing"; exit 1; fi
+          echo "key present (${#ANTHROPIC_API_KEY} chars)"
+      - name: Run the benchmark in a real client
+        id: bench
+        continue-on-error: true
+        uses: modmuss50/xvfb-action@v1
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AIB_BENCH_ONLY: "1"
+          AIB_BENCH_MODELS: ${{ github.event.inputs.models || 'claude-haiku-5-5' }}
+        with:
+          run: |
+            chmod +x gradlew
+            mkdir -p build/clientgametest
+            echo "eula=true" > build/clientgametest/eula.txt
+            ./gradlew runClientGametest --stacktrace
+      - name: Publish results to the bench-results branch
+        if: always()
+        run: |
+          out=$(mktemp -d)
+          cp -r build/clientgametest/bench "$out/" 2>/dev/null || true
+          cp -r build/clientgametest/screenshots "$out/" 2>/dev/null || true
+          mkdir -p "$out/logs"
+          # Never publish the key: drop any line that could contain it.
+          grep -v -i "x-api-key\|authorization\|sk-ant" build/clientgametest/logs/latest.log > "$out/logs/client.log" 2>/dev/null || true
+          echo "${GITHUB_SHA} bench=${{ steps.bench.outcome }} models=${{ github.event.inputs.models || 'claude-haiku-5-5' }}" > "$out/RUN.txt"
+          cd "$out"
+          git init -q
+          git checkout -q -b bench-results
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "bench for ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" bench-results

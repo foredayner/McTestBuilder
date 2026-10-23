@@ -19,6 +19,9 @@ public class AibClientGameTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
+        if (System.getenv("AIB_BENCH_ONLY") != null) {
+            return; // the model benchmark run only wants its own pictures
+        }
         try (TestSingleplayerContext game = context.worldBuilder()
                 .adjustSettings(creator -> creator.setGameMode(WorldCreator.Mode.CREATIVE))
                 .create()) {
