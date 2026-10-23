@@ -22,6 +22,10 @@ server and the client of the player who builds. That player needs operator level
 
 ## Added in this fork
 
+- **Code review before running** (no AI call): the script must compile, call only real `ai.*`
+  functions with a valid argument count, use block names that exist in 1.21.4 and are not forbidden,
+  give walls an `x`/`z` direction and keep literal coordinates within 256 blocks. After the dry run,
+  fills over vanilla's 32768-block limit are caught too. Problems are sent back with line numbers.
 - **Dry run + auto-fix**: the AI's script is first run in a recording mode (nothing is placed).
   If it fails to compile/run or places nothing, the error and script go back to the AI to be fixed
   (Settings > "Auto-fix failed scripts", default 2). Accept then places exactly what was recorded.
