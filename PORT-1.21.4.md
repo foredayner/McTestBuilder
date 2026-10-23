@@ -40,3 +40,18 @@ server and the client of the player who builds. That player needs operator level
   re-layout; Esc saves; the preset button shows the model in use; each provider remembers its model.
 - **Ollama**: `keep_alive` (Settings > "Keep model loaded", default 30 min) so the model is not
   unloaded after 5 minutes, and `num_ctx` 8192 so the long build prompt is not cut off.
+
+## Fixed in this fork
+
+- Classic `for (int i = 0; i < n; i++)` loops were rejected by the sandbox as "closures" (Groovy
+  keeps the loop header as a ClosureListExpression), so many AI scripts failed with `1 error`.
+  Closures and lambdas are still blocked; loops now work.
+
+## Tests (run in CI on every push)
+
+- `./gradlew test` - unit tests: plan rotation, linter, block-state rotation, summon commands,
+  rebuild validation, record files.
+- `./gradlew runGametest` - a real dedicated server: dry run places nothing, build matches the
+  script, saved builds turn with the player, undo restores, objects are display entities.
+- `./gradlew runClientGametest` (needs a display; CI uses xvfb) - a real client builds a demo house
+  and object and takes screenshots of every page; CI pushes them to the `ci-screenshots` branch.
