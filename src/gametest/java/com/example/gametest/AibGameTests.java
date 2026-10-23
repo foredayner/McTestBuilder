@@ -89,14 +89,16 @@ public class AibGameTests implements FabricGameTest {
         BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
         ServerPlayerEntity player = opPlayer(context, origin, 0f);
         BuildPlan plan = Demo.plan(world, origin, player, Demo.APPLE);
-        check(plan.parts.size() == 22, "sphere (20) + stem + leaf = 22 parts, got " + plan.parts.size());
+        int n = plan.parts.size();
+        check(n >= 6 && n <= 120, "a smooth sphere + stem + leaf is a few dozen merged parts, got " + n);
+        check(plan.parts.stream().anyMatch(p -> p.block.equals("minecraft:lime_concrete") && p.yaw == 30), "the exact leaf piece stays as it is");
         check(plan.ops.isEmpty(), "objects place no blocks");
 
         BuildRecord record = Demo.place(player, origin, plan, 0, "apple");
         String tag = "aib_" + record.id;
         Box area = new Box(origin).expand(6);
         int count = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag)).size();
-        check(count == 22, "22 display entities summoned, got " + count);
+        check(count == n, n + " display entities summoned, got " + count);
 
         var solid = world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area, e -> e.getCommandTags().contains(tag));
         check(!solid.isEmpty() && solid.size() <= 60, "solid hitboxes follow the shape, got " + solid.size());
@@ -106,7 +108,7 @@ public class AibGameTests implements FabricGameTest {
             "hitbox carries the title");
         var listed = com.example.ai.build.ObjectService.nearby(player);
         // Other tests place objects close by at the same time: look for this one.
-        check(listed.stream().anyMatch(n -> n.tag.equals(tag) && n.parts == 22 && "apple".equals(n.name)), "nearby list finds it");
+        check(listed.stream().anyMatch(n -> n.tag.equals(tag) && n.parts == plan.parts.size() && "apple".equals(n.name)), "nearby list finds it");
 
         // Delete key path: remove by the hitbox entity id.
         com.example.ai.build.ObjectService.removeByEntity(player, hitboxes.get(0).getId());
@@ -143,11 +145,29 @@ public class AibGameTests implements FabricGameTest {
         Box solid = hitbox.stream().map(net.minecraft.entity.Entity::getBoundingBox).reduce(Box::union).get();
         check(solid.getLengthY() > 1.5, "hitboxes grew with the object: " + solid);
         var parts = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib"));
-        check(parts.size() == 22, "22 parts, got " + parts.size());
+        check(parts.size() == big.plan.parts.size(), big.plan.parts.size() + " parts, got " + parts.size());
         for (var part : parts) {
             // The culling box is display data, not the entity's own size: read it back as NBT.
             var nbt = part.writeNbt(new net.minecraft.nbt.NbtCompound());
             check(nbt.getFloat("width") > 0.2f && nbt.getFloat("height") > 0.2f, "display culling box is set: " + nbt.getFloat("width"));
+        }
+        context.complete();
+    }
+
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void promptExamplesPassTheReviewAndDryRun(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 90f); // facing west: objects still use their own frame
+        for (String example : new String[] {
+            com.example.ai.AiController.EXAMPLE_DUCK, com.example.ai.AiController.EXAMPLE_LAMP, com.example.ai.AiController.EXAMPLE_CHAIR }) {
+            BuildPlan plan = Demo.plan(world, origin, player, example);
+            check(plan.ops.isEmpty() && !plan.parts.isEmpty(), "an object");
+            check(plan.parts.size() <= BuildPlan.MAX_PARTS, "within the part limit: " + plan.parts.size());
+            check("south".equals(plan.facing), "objects are designed facing south (+Z), got " + plan.facing);
+            double[] b = plan.partBounds();
+            check(Math.abs((b[0] + b[3]) / 2) < 0.2, "centred on x = 0: " + b[0] + ".." + b[3]);
+            check(b[1] > -0.05 && b[1] < 0.1, "stands on y = 0: " + b[1]);
         }
         context.complete();
     }

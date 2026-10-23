@@ -97,6 +97,16 @@ public final class BuildPlan {
         return parts != null && !parts.isEmpty();
     }
 
+    /**
+     * Objects are designed in one fixed frame (the player looks toward +Z, the object's front
+     * faces back at them), whichever way the player really looked; placing turns them.
+     */
+    public void useObjectFrame() {
+        if (isObject() && (ops == null || ops.isEmpty())) {
+            facing = "south";
+        }
+    }
+
     /** Allowed sizes when placing a saved object bigger or smaller. */
     public static final double MIN_SCALE = 0.25;
     public static final double MAX_SCALE = 8;

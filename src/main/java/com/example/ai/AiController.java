@@ -71,7 +71,7 @@ public class AiController {
 
             debug("[DEBUG] Building prompt...");
             String promptText = objectMode
-                ? buildObjectPrompt(prompt, MinecraftAI.getFacing())
+                ? buildObjectPrompt(prompt)
                 : buildPrompt(prompt, worldInfo, webSearch);
 
             debug("[DEBUG] Sending to AI provider...");
@@ -216,6 +216,7 @@ public class AiController {
             } finally {
                 MinecraftAI.stopRecording();
             }
+            plan.useObjectFrame();
             failure = !result.success() ? result.message()
                 : plan.isEmpty() ? "The script ran but placed nothing. Use the ai.place* / ai.addPart functions." : null;
             if (failure == null) {
@@ -232,7 +233,7 @@ public class AiController {
     public static String promptFor(ServerPlayerEntity player, String userPrompt, boolean objectMode) {
         MinecraftAI.init(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player.getPitch());
         return objectMode
-            ? buildObjectPrompt(userPrompt, MinecraftAI.getFacing())
+            ? buildObjectPrompt(userPrompt)
             : buildPrompt(userPrompt, MinecraftAI.getWorldInfo(30, player.getYaw(), player.getPitch()), false);
     }
 
@@ -290,32 +291,119 @@ public class AiController {
         }
     }
 
-    private static String buildObjectPrompt(String userPrompt, String facing) {
-        return "You are a Minecraft prop designer. Write ONLY executable Groovy using the `ai` API.\n"
-            + "Object request: " + userPrompt + "\n\n"
-            + "Make ONE small, detailed decorative object out of scaled block pieces (display entities), not whole blocks.\n"
-            + "Player facing: " + facing + "\n\n"
-            + "API (units are blocks; decimals allowed, 0.0625 = one texture pixel):\n"
-            + "  ai.addPart(block, x, y, z, sizeX, sizeY, sizeZ)                    // box: min corner + size\n"
-            + "  ai.addPart(block, x, y, z, sizeX, sizeY, sizeZ, yaw)               // turned around its centre, degrees\n"
-            + "  ai.addPart(block, x, y, z, sizeX, sizeY, sizeZ, yaw, pitch, roll)\n"
-            + "  ai.addCylinder(block, centerX, bottomY, centerZ, radius, height)  // upright, 4 parts\n"
-            + "  ai.addSphere(block, centerX, centerY, centerZ, radius)              // 20 parts\n"
-            + "  ai.getForwardX(distance) -> int | ai.getForwardZ(distance) -> int | ai.searchBlocks(keyword)\n\n"
-            + "Rules:\n"
-            + "- Use ONLY addPart / addCylinder / addSphere to build. Never placeBlock/placeBox.\n"
-            + "- Coordinates are relative to the corner of the player's feet block: +X east, +Y up, +Z south.\n"
-            + "- Its FRONT (face, display side, opening) must face the player, i.e. point back toward (0, 0, 0).\n"
-            + "- Put it 2 blocks in front of the player, standing on the ground: centre x = ai.getForwardX(2) + 0.5,\n"
-            + "  centre z = ai.getForwardZ(2) + 0.5, bottom y = 0. Store these in variables and build around them.\n"
-            + "- Unless the request gives a size, make it about 1 block tall. Keep it within 3 blocks in every direction.\n"
-            + "- Each part shows one block texture: use concrete, wool, terracotta, glass, iron_block, gold_block,\n"
-            + "  quartz_block, planks, etc. for colours and materials.\n"
-            + "- Build base -> body -> details with correct proportions. At most 400 parts; prefer fewer, well-placed parts.\n"
-            + "- Output Groovy only. No markdown, no comments, no explanation.\n";
+    /** Example objects shown to the AI (also dry-run by the game tests, so they always work). */
+    public static final String EXAMPLE_DUCK = """
+        // rubber duck with a top hat, about 1.5 blocks tall; it looks at the player (-Z)
+        def z = 2.6
+        ai.addEllipsoid('yellow_concrete', 0, 0.42, z + 0.15, 0.42, 0.34, 0.55)      // body
+        ai.addEllipsoid('yellow_terracotta', 0, 0.16, z + 0.15, 0.34, 0.1, 0.45)     // darker underside
+        ai.addCone('yellow_concrete', 0, 0.45, z + 0.62, 0.16, 0.0, 0.32)          // tail
+        ai.addSphere('yellow_concrete', 0, 0.98, z - 0.12, 0.3)                      // big head
+        ai.addRoundBox('orange_concrete', -0.13, 0.84, z - 0.56, 0.26, 0.1, 0.2, 0.04) // beak
+        ai.addCylinder('black_concrete', 0, 1.24, z - 0.12, 0.22, 0.03)              // hat brim
+        ai.addCylinder('black_concrete', 0, 1.26, z - 0.12, 0.14, 0.26)              // hat
+        ai.addCylinder('red_concrete', 0, 1.29, z - 0.12, 0.145, 0.05)               // hat band
+        ai.mirrorOn()
+        ai.addSphere('black_concrete', 0.13, 1.04, z - 0.38, 0.06)                   // eyes
+        ai.addSphere('white_concrete', 0.11, 1.07, z - 0.43, 0.02)                   // eye shine
+        ai.addEllipsoid('yellow_terracotta', 0.4, 0.48, z + 0.2, 0.07, 0.18, 0.3)    // wings
+        ai.addRoundBox('orange_concrete', 0.1, 0, z - 0.15, 0.16, 0.05, 0.2, 0.02)   // feet
+        ai.mirrorOff()
+        """;
+
+    public static final String EXAMPLE_LAMP = """
+        // desk lamp, about 1 block tall
+        def z = 2.5
+        ai.addCylinder('spruce_planks', 0, 0, z, 0.22, 0.06)                         // base
+        ai.addCylinder('dark_oak_planks', 0, 0.06, z, 0.18, 0.02)                     // base trim (darker)
+        ai.addTube('iron_block', [[0, 0.06, z], [0.06, 0.35, z + 0.04], [0, 0.66, z]], 0.035)  // curved stem
+        ai.addSphere('glowstone', 0, 0.68, z, 0.08)                                   // bulb
+        ai.addCone('white_wool', 0, 0.6, z, 0.3, 0.15, 0.36)                          // shade
+        ai.addCone('light_gray_wool', 0, 0.58, z, 0.31, 0.29, 0.03)                   // shade rim
+        """;
+
+    public static final String EXAMPLE_CHAIR = """
+        // wooden chair at real size; the seat front faces the player
+        def z = 2.2
+        def w = 0.8
+        def d = 0.8
+        ai.addRoundBox('oak_planks', -w / 2, 0.45, z, w, 0.08, d, 0.02)              // seat
+        ai.addRoundBox('red_wool', -w / 2 + 0.06, 0.53, z + 0.06, w - 0.12, 0.05, d - 0.12, 0.03)  // cushion
+        ai.mirrorOn()
+        ai.addRoundBox('oak_planks', w / 2 - 0.1, 0, z + 0.02, 0.08, 0.45, 0.08, 0.01)          // front legs
+        ai.addRoundBox('stripped_oak_log', w / 2 - 0.1, 0, z + d - 0.1, 0.08, 1.2, 0.08, 0.01)  // back legs and posts
+        ai.mirrorOff()
+        for (int i = 0; i < 3; i++) {
+            ai.addRoundBox('oak_planks', -w / 2 + 0.06, 0.72 + i * 0.16, z + d - 0.09, w - 0.12, 0.08, 0.05, 0.01)  // back slats
+        }
+        """;
+
+    static String buildObjectPrompt(String userPrompt) {
+        return """
+            You are an expert modeller of cute, detailed Minecraft props and characters. Write ONLY executable Groovy using the `ai` API.
+            Object request: %s
+
+            Build ONE object out of display-entity pieces (not whole blocks). Smooth shapes are drawn on a fine
+            1/16-block grid (one texture pixel), and touching pieces of the same block are merged automatically.
+
+            FRAME (always this, whichever way the player really looks):
+            - Units are blocks; decimals are fine. +X = the player's right, +Y = up, +Z = away from the player.
+            - The player stands at (0, 0, 0). Centre the object on x = 0, standing on y = 0, starting about 1.5-2 blocks away (+Z).
+            - Its FRONT (face, eyes, display side, opening, seat front) looks toward -Z, at the player.
+            - Left and right are mirror images across x = 0.
+
+            SIZE (the player is 1.8 blocks tall):
+            - If the request gives a size, use it. Otherwise: characters and animals 1.2-2.5 blocks tall; furniture at real
+              size (chair seat 0.45 high, table 0.9 high); small items 0.4-1 block.
+            - Never more than 4 blocks in any direction unless the request asks for it.
+
+            SMOOTH SHAPES (on the grid; a later shape paints over earlier ones where they overlap):
+              ai.addSphere(block, cx, cy, cz, r)
+              ai.addEllipsoid(block, cx, cy, cz, rx, ry, rz)
+              ai.addCylinder(block, cx, bottomY, cz, r, height)                 // upright
+              ai.addCone(block, cx, bottomY, cz, r, height)                     // upright, point on top
+              ai.addCone(block, cx, bottomY, cz, bottomR, topR, height)         // cut cone: lampshade, pot, trunk
+              ai.addCapsule(block, x1, y1, z1, x2, y2, z2, r)                   // rounded rod in any direction: limbs, handles
+              ai.addCapsule(block, x1, y1, z1, x2, y2, z2, r1, r2)              // tapered rod (r1 at the first end)
+              ai.addTube(block, [[x, y, z], [x, y, z], ...], r)                 // smooth curve through 2-16 points: neck, tail, horn, stem
+              ai.addTube(block, [[x, y, z], ...], r1, r2)                       // tapering along the curve
+              ai.addRoundBox(block, x, y, z, sizeX, sizeY, sizeZ, radius)       // min corner + size, rounded edges; radius 0 = sharp
+            EXACT PIECES (not on the grid; for very thin or tilted details):
+              ai.addPart(block, x, y, z, sizeX, sizeY, sizeZ)                   // box: min corner + size
+              ai.addPart(block, x, y, z, sizeX, sizeY, sizeZ, yaw)              // turned around its centre, degrees
+              ai.addPart(block, x, y, z, sizeX, sizeY, sizeZ, yaw, pitch, roll)
+            SYMMETRY:
+              ai.mirrorOn()    // until mirrorOff, every piece is also made on the other side of x = 0 (eyes, ears, arms, legs, wings)
+              ai.mirrorOff()
+            BLOCKS: ai.searchBlocks(keyword)
+
+            STYLE (this decides the quality):
+            - Silhouette first: 2-4 big shapes with the right proportions, then medium parts, then small details.
+            - Characters and animals: cute, stylised proportions. A big head (40-60%% of the body), big readable eyes
+              (dark pupil + small white shine), a simple nose/mouth/beak, short sturdy limbs, a recognisable feature
+              (horn, hat, mane, ears, tail).
+            - 3-5 main colours. Use a darker shade for undersides and creases and a lighter one for highlights
+              (e.g. yellow_concrete body + yellow_terracotta underside; white_concrete + light_gray_concrete).
+            - Overlap shapes slightly so nothing floats or leaves gaps; set details just outside the surface they sit on.
+            - Colours: *_concrete (bright, flat), *_terracotta (muted, skin and earth tones), *_wool (soft), white and black
+              concrete for eyes. Materials: oak/spruce/dark_oak_planks, stripped_*_log, stone, mossy_cobblestone, iron_block,
+              gold_block, glass, glowstone, quartz_block.
+            - Put the main sizes and positions in variables and build from them.
+            - Prefer a few smooth shapes over many tiny boxes. At most 400 pieces after merging.
+
+            CODE RULES:
+            - Block names are quoted strings: 'white_concrete'.
+            - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
+            - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
+
+            EXAMPLES (style reference; make your own design, do not copy):
+            %s
+            %s
+            %s
+            """.formatted(userPrompt, EXAMPLE_DUCK.strip(), EXAMPLE_LAMP.strip(), EXAMPLE_CHAIR.strip());
     }
 
-    private static String buildPrompt(String userPrompt, String worldInfo, boolean webSearchEnabled) {
+    static String buildPrompt(String userPrompt, String worldInfo, boolean webSearchEnabled) {
         StringBuilder prompt = new StringBuilder();
 
         prompt.append("You are a Minecraft architect. Write ONLY executable Groovy using the `ai` API.\n");
@@ -323,12 +411,20 @@ public class AiController {
 
         prompt.append("Absolute instructions:\n");
         prompt.append("1. Prioritize building quality above all else. (Never build flat. Focus on depth, 3D layering, overhangs, and mixing blocks for realistic texture).\n");
-        prompt.append("2. Use Web Search actively whenever you need design inspiration or up-to-date block information.\n");
-        prompt.append("3. Base your designs on real-world structures and architecture rather than abstract concepts. Build with physical logic (foundations, pillars, beams).\n");
+        prompt.append("2. Base your designs on real-world structures and architecture rather than abstract concepts. Build with physical logic (foundations, pillars, beams).\n");
         if (webSearchEnabled) {
-            prompt.append("(Web search: ON)\n");
+            prompt.append("3. Web search is ON: use it whenever you need design inspiration or block information.\n");
         }
         prompt.append("\n");
+
+        prompt.append("Scale and space (1 block = 1 metre; the player is 1.8 blocks tall). Make buildings and rooms feel roomy:\n");
+        prompt.append("- Unless the request says otherwise, a house has a footprint of at least 11 x 11 (bigger for mansions, shops,\n");
+        prompt.append("  halls, castles) and is divided into several rooms with interior walls and doorways.\n");
+        prompt.append("- Rooms are at least 5 x 5 inside; living rooms, kitchens and halls 7 x 9 or more.\n");
+        prompt.append("- Every storey has 3-4 blocks of free air inside (floor to floor 4-5 blocks). Never 2-block-high rooms.\n");
+        prompt.append("- Doors 2 high; hallways 2-3 wide; stairs 2 wide with 3 blocks of headroom; leave walking space around furniture.\n");
+        prompt.append("- Windows on the outer walls of every room, light inside (lanterns, glowstone), and a few pieces of furniture.\n");
+        prompt.append("- Clear the inside with air (clearArea) so terrain does not stay inside the rooms.\n\n");
 
         prompt.append("World Information:\n");
         prompt.append(worldInfo).append("\n\n");
@@ -364,9 +460,10 @@ public class AiController {
         prompt.append("- Always prefix calls with ai. Match argument count exactly (5 or 6 for clearArea).\n");
         prompt.append("- Coordinates are RELATIVE to player feet (0,0,0). getGroundLevel returns relative Y.\n");
         prompt.append("- Use searchBlocks/listBlocks for block names. Forbidden blocks cannot be placed.\n");
+        prompt.append("- Block names are quoted strings: 'oak_planks'. Loops: for (int i = 0; i < n; i++); never closures (.each { }).\n");
         prompt.append("- Build in front of the player. The FRONT of the building (main door, facade, windows of the main\n");
         prompt.append("  face) must face the player, i.e. point back toward (0, 0, 0).\n");
-        prompt.append("- Inspect terrain before building. Output Groovy only. No markdown, no comments, no explanation.\n");
+        prompt.append("- Inspect terrain before building. Output Groovy only. No markdown, no explanation.\n");
 
         return prompt.toString();
     }

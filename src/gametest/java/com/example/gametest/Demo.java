@@ -53,6 +53,7 @@ public final class Demo {
         } finally {
             MinecraftAI.stopRecording();
         }
+        plan.useObjectFrame();
         if (!result.success()) {
             throw new IllegalStateException("dry run: " + result.message());
         }

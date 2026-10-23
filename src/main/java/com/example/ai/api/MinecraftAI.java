@@ -43,11 +43,24 @@ public class MinecraftAI {
 
     public static void startRecording(BuildPlan plan) {
         recorder = plan;
+        canvas = new ShapeCanvas();
+        mirrorX = null;
     }
 
+    /** Ends recording; smooth shapes are turned into parts now (see ShapeCanvas). */
     public static void stopRecording() {
+        if (recorder != null && canvas != null && !canvas.isEmpty()) {
+            int budget = Math.max(20, BuildPlan.MAX_PARTS - recorder.parts.size() - 5);
+            recorder.parts.addAll(canvas.toParts(budget));
+        }
         recorder = null;
+        canvas = null;
+        mirrorX = null;
     }
+
+    private static ShapeCanvas canvas;
+    /** While set, every object piece is also made mirrored across x = mirrorX. */
+    private static Double mirrorX;
     
     public static void init(ServerWorld w, BlockPos o) {
         init(w, o, 0f, 0f, null);
@@ -457,41 +470,122 @@ public class MinecraftAI {
         double w = Math.abs(toDouble(sx));
         double h = Math.abs(toDouble(sy));
         double l = Math.abs(toDouble(sz));
-        recorder.parts.add(new BuildPlan.Part(normalizeBlockId(blockName),
-            toDouble(x) + w / 2, toDouble(y) + h / 2, toDouble(z) + l / 2, w, h, l,
-            toDouble(yaw), toDouble(pitch), toDouble(roll)));
-    }
-
-    /** Upright cylinder (8-sided): centre (cx, cz), bottom at y. Made of 4 crossed boxes. */
-    public static void addCylinder(String blockName, Number cx, Number y, Number cz, Number radius, Number height) {
-        double r = Math.abs(toDouble(radius));
-        double h = Math.abs(toDouble(height));
-        double strip = 2 * r * Math.tan(Math.PI / 8);
-        for (int i = 0; i < 4; i++) {
-            addCenteredPart(blockName, toDouble(cx), toDouble(y) + h / 2, toDouble(cz), 2 * r, h, strip, i * 45.0);
+        String block = normalizeBlockId(blockName);
+        double cx = toDouble(x) + w / 2;
+        BuildPlan.Part part = new BuildPlan.Part(block, cx, toDouble(y) + h / 2, toDouble(z) + l / 2, w, h, l,
+            toDouble(yaw), toDouble(pitch), toDouble(roll));
+        recorder.parts.add(part);
+        if (mirrorX != null && Math.abs(cx - mirrorX) > 1e-6) {
+            recorder.parts.add(new BuildPlan.Part(mirrorBlockState(block), 2 * mirrorX - cx, part.y, part.z, w, h, l,
+                -part.yaw, part.pitch, -part.roll));
         }
     }
 
-    /** Ball of radius r around (cx, cy, cz), from 5 stacked cylinder slices. */
-    public static void addSphere(String blockName, Number cx, Number cy, Number cz, Number radius) {
-        double r = Math.abs(toDouble(radius));
-        int layers = 5;
-        for (int i = 0; i < layers; i++) {
-            double t = -1 + (2.0 * i + 1) / layers;
-            double sliceR = r * Math.sqrt(1 - t * t);
-            double sliceH = 2 * r / layers;
-            double strip = 2 * sliceR * Math.tan(Math.PI / 8);
-            for (int k = 0; k < 4; k++) {
-                addCenteredPart(blockName, toDouble(cx), toDouble(cy) + t * r, toDouble(cz), 2 * sliceR, sliceH, strip, k * 45.0);
-            }
+    /** Left-right mirror of a block state: facing=east <-> west. */
+    static String mirrorBlockState(String block) {
+        if (block == null || !block.contains("[")) {
+            return block;
         }
+        if (block.contains("facing=east")) {
+            return block.replace("facing=east", "facing=west");
+        }
+        if (block.contains("facing=west")) {
+            return block.replace("facing=west", "facing=east");
+        }
+        return block;
     }
 
-    private static void addCenteredPart(String blockName, double cx, double cy, double cz, double w, double h, double l, double yaw) {
-        if (recorder == null || ForbiddenBlockRegistry.isForbidden(blockName)) {
+    // Smooth shapes: drawn on a fine grid when recording ends (ShapeCanvas).
+
+    private static void shape(String blockName, ShapeCanvas.Shape shape) {
+        if (recorder == null || canvas == null || blockName == null || ForbiddenBlockRegistry.isForbidden(blockName)) {
             return;
         }
-        recorder.parts.add(new BuildPlan.Part(normalizeBlockId(blockName), cx, cy, cz, w, h, l, yaw, 0, 0));
+        canvas.add(normalizeBlockId(blockName), shape, mirrorX);
+    }
+
+    /** Upright cylinder: centre (cx, cz), bottom at y. */
+    public static void addCylinder(String blockName, Number cx, Number y, Number cz, Number radius, Number height) {
+        double r = toDouble(radius);
+        shape(blockName, ShapeCanvas.frustum(toDouble(cx), toDouble(y), toDouble(cz), r, r, toDouble(height)));
+    }
+
+    /** Ball of radius r around (cx, cy, cz). */
+    public static void addSphere(String blockName, Number cx, Number cy, Number cz, Number radius) {
+        double r = toDouble(radius);
+        shape(blockName, ShapeCanvas.ellipsoid(toDouble(cx), toDouble(cy), toDouble(cz), r, r, r));
+    }
+
+    public static void addEllipsoid(String blockName, Number cx, Number cy, Number cz, Number rx, Number ry, Number rz) {
+        shape(blockName, ShapeCanvas.ellipsoid(toDouble(cx), toDouble(cy), toDouble(cz), toDouble(rx), toDouble(ry), toDouble(rz)));
+    }
+
+    /** Upright cone, point on top. */
+    public static void addCone(String blockName, Number cx, Number y, Number cz, Number radius, Number height) {
+        shape(blockName, ShapeCanvas.frustum(toDouble(cx), toDouble(y), toDouble(cz), toDouble(radius), 0, toDouble(height)));
+    }
+
+    /** Upright cut cone: bottom radius, top radius. */
+    public static void addCone(String blockName, Number cx, Number y, Number cz, Number bottomRadius, Number topRadius, Number height) {
+        shape(blockName, ShapeCanvas.frustum(toDouble(cx), toDouble(y), toDouble(cz), toDouble(bottomRadius), toDouble(topRadius), toDouble(height)));
+    }
+
+    public static void addCapsule(String blockName, Number x1, Number y1, Number z1, Number x2, Number y2, Number z2, Number radius) {
+        addCapsule(blockName, x1, y1, z1, x2, y2, z2, radius, radius);
+    }
+
+    /** Rounded rod from (x1,y1,z1) with radius r1 to (x2,y2,z2) with radius r2. */
+    public static void addCapsule(String blockName, Number x1, Number y1, Number z1, Number x2, Number y2, Number z2,
+                                  Number r1, Number r2) {
+        List<double[]> points = List.of(
+            new double[] { toDouble(x1), toDouble(y1), toDouble(z1) },
+            new double[] { toDouble(x2), toDouble(y2), toDouble(z2) });
+        shape(blockName, ShapeCanvas.tube(points, toDouble(r1), toDouble(r2)));
+    }
+
+    public static void addTube(String blockName, List<?> points, Number radius) {
+        addTube(blockName, points, radius, radius);
+    }
+
+    /** Smooth curve through 2-16 points [[x,y,z], ...], radius r1 at the start to r2 at the end. */
+    public static void addTube(String blockName, List<?> points, Number r1, Number r2) {
+        List<double[]> list = new ArrayList<>();
+        if (points != null) {
+            for (Object o : points) {
+                if (o instanceof List<?> p && p.size() >= 3 && list.size() < 16) {
+                    list.add(new double[] { num(p.get(0)), num(p.get(1)), num(p.get(2)) });
+                }
+            }
+        }
+        if (list.isEmpty()) {
+            throw new IllegalArgumentException("addTube needs points like [[x, y, z], [x, y, z]]");
+        }
+        if (list.size() == 1) {
+            list.add(list.get(0));
+        }
+        shape(blockName, ShapeCanvas.tube(ShapeCanvas.curve(list), toDouble(r1), toDouble(r2)));
+    }
+
+    /** Box from min corner (x, y, z) with size, edges rounded by radius (0 = sharp), on the fine grid. */
+    public static void addRoundBox(String blockName, Number x, Number y, Number z, Number sx, Number sy, Number sz, Number radius) {
+        shape(blockName, ShapeCanvas.roundBox(toDouble(x), toDouble(y), toDouble(z), toDouble(sx), toDouble(sy), toDouble(sz), toDouble(radius)));
+    }
+
+    /** From now on every object piece is also made mirrored across x = 0 (or x = centerX). */
+    public static void mirrorOn() {
+        mirrorOn(0);
+    }
+
+    public static void mirrorOn(Number centerX) {
+        mirrorX = toDouble(centerX);
+    }
+
+    public static void mirrorOff() {
+        mirrorX = null;
+    }
+
+    private static double num(Object o) {
+        return o instanceof Number n ? n.doubleValue() : 0;
     }
 
     private static double toDouble(Number value) {

@@ -152,4 +152,48 @@ public final class AiScriptFacade {
     public void addSphere(String blockName, Number cx, Number cy, Number cz, Number radius) {
         MinecraftAI.addSphere(blockName, cx, cy, cz, radius);
     }
+
+    public void addEllipsoid(String blockName, Number cx, Number cy, Number cz, Number rx, Number ry, Number rz) {
+        MinecraftAI.addEllipsoid(blockName, cx, cy, cz, rx, ry, rz);
+    }
+
+    public void addCone(String blockName, Number cx, Number y, Number cz, Number radius, Number height) {
+        MinecraftAI.addCone(blockName, cx, y, cz, radius, height);
+    }
+
+    public void addCone(String blockName, Number cx, Number y, Number cz, Number bottomRadius, Number topRadius, Number height) {
+        MinecraftAI.addCone(blockName, cx, y, cz, bottomRadius, topRadius, height);
+    }
+
+    public void addCapsule(String blockName, Number x1, Number y1, Number z1, Number x2, Number y2, Number z2, Number radius) {
+        MinecraftAI.addCapsule(blockName, x1, y1, z1, x2, y2, z2, radius);
+    }
+
+    public void addCapsule(String blockName, Number x1, Number y1, Number z1, Number x2, Number y2, Number z2, Number r1, Number r2) {
+        MinecraftAI.addCapsule(blockName, x1, y1, z1, x2, y2, z2, r1, r2);
+    }
+
+    public void addTube(String blockName, java.util.List<?> points, Number radius) {
+        MinecraftAI.addTube(blockName, points, radius);
+    }
+
+    public void addTube(String blockName, java.util.List<?> points, Number r1, Number r2) {
+        MinecraftAI.addTube(blockName, points, r1, r2);
+    }
+
+    public void addRoundBox(String blockName, Number x, Number y, Number z, Number sx, Number sy, Number sz, Number radius) {
+        MinecraftAI.addRoundBox(blockName, x, y, z, sx, sy, sz, radius);
+    }
+
+    public void mirrorOn() {
+        MinecraftAI.mirrorOn();
+    }
+
+    public void mirrorOn(Number centerX) {
+        MinecraftAI.mirrorOn(centerX);
+    }
+
+    public void mirrorOff() {
+        MinecraftAI.mirrorOff();
+    }
 }

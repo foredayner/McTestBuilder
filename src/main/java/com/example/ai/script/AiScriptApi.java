@@ -28,7 +28,14 @@ public final class AiScriptApi {
         "isBlockAllowed",
         "addPart",
         "addCylinder",
-        "addSphere"
+        "addSphere",
+        "addEllipsoid",
+        "addCone",
+        "addCapsule",
+        "addTube",
+        "addRoundBox",
+        "mirrorOn",
+        "mirrorOff"
     );
 
     private AiScriptApi() {

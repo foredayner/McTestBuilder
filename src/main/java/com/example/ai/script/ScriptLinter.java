@@ -30,7 +30,7 @@ public final class ScriptLinter {
     private static final int MAX_PROBLEMS = 15;
     private static final Set<String> PLACERS = Set.of(
         "placeBlock", "placeBox", "placePillar", "placeFloor", "placeRoof", "placeWall",
-        "addPart", "addCylinder", "addSphere");
+        "addPart", "addCylinder", "addSphere", "addEllipsoid", "addCone", "addCapsule", "addTube", "addRoundBox");
     private static final Set<String> WALL_DIRECTIONS = Set.of("x", "z", "north", "south", "east", "west");
     private static final Pattern CALL = Pattern.compile("(?<![\\w$])(ai\\s*\\.\\s*)?([A-Za-z_]\\w*)\\s*\\(");
     private static final Pattern STRING = Pattern.compile("^(['\"])(.*)\\1$", Pattern.DOTALL);
