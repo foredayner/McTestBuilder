@@ -28,12 +28,21 @@ server and the client of the player who builds. That player needs operator level
   fills over vanilla's 32768-block limit are caught too. Problems are sent back with line numbers.
 - **Dry run + auto-fix**: the AI's script is first run in a recording mode (nothing is placed).
   If it fails to compile/run or places nothing, the error and script go back to the AI to be fixed
-  (Settings > "Auto-fix failed scripts", default 2). Accept then places exactly what was recorded.
-- **Tabs**: Create / History / Logs.
-  - History: every accepted build is saved (`config/ai_builder/history/<id>.json`) with a top and a
-    front preview drawn from block map colours (also saved as PNG). Open one to read the full request
-    and press **Build here** to place it again in front of you, turned to face where you look
-    (no AI call). Delete asks for confirmation.
+  (Settings > "Auto-fix failed scripts", default 2). A design that passes goes straight into
+  보관함 (no approval step); nothing is placed until you take it out.
+- **Tabs**: AI 공방 (cleared every time the window opens) / 보관함 / 작업 일지.
+  - 보관함: every finished design is saved (`config/ai_builder/history/<id>.json`) with a top and a
+    front preview drawn from block map colours (also saved as PNG). Open one and press **손에 받기**:
+    - a building comes as a **blueprint paper**: right-click the top of a block and the building's
+      front edge, centred, stands on it, facing you;
+    - an object comes as an **object item** whose icon is its front picture (any size ×0.5–×5).
+      Right-click the top of a block to set it there, centred and facing you; hold attack on it to
+      mine it in the time a stone block takes with your tool, and the item drops again
+      (not in creative). Works in survival without cheats once you have the item.
+  - Objects are **solid**: their parts are merged into a few boxes that follow the shape (an
+    invisible collidable hitbox entity), so you bump into them and can stand on them. Collision is
+    computed by each player's game, so players need this mod. Delete key (twice) or the
+    "주변 배치" list removes objects for operators.
   - Logs: full log text by day (`config/ai_builder/logs/yyyy-MM-dd.log`); the live panel shows a
     cleaned version (no CR/tab boxes or stack traces).
 - **Settings**: scrolls on small windows with Save/Cancel always visible; typed values survive
