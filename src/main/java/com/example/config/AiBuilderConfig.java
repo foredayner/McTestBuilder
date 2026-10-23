@@ -21,7 +21,7 @@ public final class AiBuilderConfig {
     private static AiBuilderConfig instance = new AiBuilderConfig();
 
     public AiProvider provider = AiProvider.OLLAMA;
-    public String modelName = "gemma2:2b";
+    public String modelName = "qwen2.5-coder:7b";
     public String apiUrl = "http://localhost:11434";
     public String apiKey = "";
     public int ticksPerBlock = 5;
@@ -107,7 +107,7 @@ public final class AiBuilderConfig {
         boolean openAiWebSearchEnabled
     ) {
         this.provider = provider == null ? AiProvider.OLLAMA : provider;
-        this.modelName = modelName == null || modelName.isBlank() ? "gemma2:2b" : modelName.trim();
+        this.modelName = modelName == null || modelName.isBlank() ? "qwen2.5-coder:7b" : modelName.trim();
         this.apiUrl = apiUrl == null || apiUrl.isBlank() ? this.provider.getDefaultApiUrl() : apiUrl.trim();
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.ticksPerBlock = Math.clamp(ticksPerBlock, 1, 20);
@@ -182,7 +182,7 @@ public final class AiBuilderConfig {
             provider = AiProvider.OLLAMA;
         }
         if (modelName == null || modelName.isBlank()) {
-            modelName = "gemma2:2b";
+            modelName = "qwen2.5-coder:7b";
         }
         if (apiUrl == null || apiUrl.isBlank()) {
             apiUrl = provider.getDefaultApiUrl();

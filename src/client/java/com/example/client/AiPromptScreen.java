@@ -415,7 +415,9 @@ public class AiPromptScreen extends Screen {
             y += LINE;
         }
         y += 6;
-        int img = Math.min(140, (width - 8) / 2);
+        // Fit both pictures and the four info lines between the request text and the buttons.
+        int room = bottom - (y + detailScroll) - (LINE + 3) - 8 - 5 * LINE - 6;
+        int img = Math.max(48, Math.min(Math.min(140, (width - 8) / 2), room));
         ctx.drawText(this.textRenderer, "위에서 (앞쪽이 위)", x, y, SUBTITLE, false);
         ctx.drawText(this.textRenderer, "정면에서", x + img + 8, y, SUBTITLE, false);
         y += LINE + 3;

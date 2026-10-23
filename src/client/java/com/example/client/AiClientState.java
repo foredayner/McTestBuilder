@@ -67,10 +67,21 @@ public final class AiClientState {
         }
         String first = lines.get(0).trim();
         Speaker speaker;
-        String text = String.join("\n", lines);
+        List<String> shown = new java.util.ArrayList<>();
+        for (String line : lines) {
+            shown.add(stripTag(line));
+        }
+        String text = String.join("\n", shown);
+        Entry previous = ENTRIES.peekLast();
+        // Indented lines continue the previous message (e.g. the plan shown for approval).
+        if (lines.get(0).startsWith(" ") && previous != null && previous.speaker() != Speaker.ME) {
+            ENTRIES.removeLast();
+            ENTRIES.add(new Entry(previous.speaker(), previous.text() + "\n" + text));
+            return;
+        }
         if (first.startsWith("[Request]")) {
             speaker = Speaker.ME;
-            text = text.trim().substring("[Request]".length()).trim();
+            text = String.join("\n", lines).trim().substring("[Request]".length()).trim();
         } else if (first.startsWith("[AI]") || first.startsWith("[Review]") || first.startsWith("[Waiting")
             || first.startsWith("[Web]") || first.startsWith("[Security")) {
             speaker = Speaker.AI;
@@ -86,6 +97,21 @@ public final class AiClientState {
         while (ENTRIES.size() > MAX_ENTRIES) {
             ENTRIES.removeFirst();
         }
+    }
+
+    /** "[AI] Complete!" -> "Complete!" for the cards (the log file keeps the tags). */
+    private static String stripTag(String line) {
+        String t = line.stripLeading();
+        String indent = line.substring(0, line.length() - t.length());
+        for (String tag : new String[] { "[AI] ", "[Waiting...] ", "[History] ", "[Settings] ", "[Web] " }) {
+            if (t.startsWith(tag)) {
+                return indent + t.substring(tag.length());
+            }
+        }
+        if (t.startsWith("[Review] ")) {
+            return indent + "검토: " + t.substring("[Review] ".length());
+        }
+        return line;
     }
 
     public static List<Entry> getEntries() {

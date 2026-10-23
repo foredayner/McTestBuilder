@@ -45,6 +45,7 @@ public class AibClientGameTest implements FabricClientGameTest {
             });
             context.waitTicks(20);
             game.getClientWorld().waitForChunksRender();
+            context.runOnClient(client -> client.inGameHud.getChatHud().clear(false));
             context.takeScreenshot("01_world_house_and_apple");
 
             // Fill the window with a realistic session.
