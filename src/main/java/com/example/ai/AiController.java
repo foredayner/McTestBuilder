@@ -13,6 +13,8 @@ import com.example.ai.approval.BuildApproval;
 import com.example.ai.build.BuildPlan;
 import com.example.ai.build.BuildRecord;
 import com.example.ai.script.ScriptExecutor;
+import com.example.ai.script.ScriptLinter;
+import java.util.List;
 import com.example.config.AiBuilderConfig;
 import com.example.config.AiProvider;
 import com.example.network.AiNetworking;
@@ -141,16 +143,31 @@ public class AiController {
         BuildPlan plan = new BuildPlan();
         plan.facing = BuildPlan.normalizeFacing(MinecraftAI.getFacing());
 
-        ScriptExecutor.ExecutionResult result;
-        MinecraftAI.startRecording(plan);
-        try {
-            result = ScriptExecutor.executeScript(aiCode);
-        } finally {
-            MinecraftAI.stopRecording();
+        // 1) Review the code (no AI call), 2) dry run, 3) check what it would place.
+        ScriptExecutor.ExecutionResult result = null;
+        String failure;
+        List<String> review = ScriptLinter.lint(aiCode);
+        if (!review.isEmpty()) {
+            failure = "Code review found problems:\n- " + String.join("\n- ", review);
+            AiNetworking.sendLog(player, "[Review] " + review.size() + " problem(s) found before running:\n- " + String.join("\n- ", review));
+        } else {
+            AiNetworking.sendDebugLog(player, "[Review] Code check passed.");
+            MinecraftAI.startRecording(plan);
+            try {
+                result = ScriptExecutor.executeScript(aiCode);
+            } finally {
+                MinecraftAI.stopRecording();
+            }
+            failure = !result.success() ? result.message()
+                : plan.ops.isEmpty() ? "The script ran but placed no blocks. Build with the ai.place* functions." : null;
+            if (failure == null) {
+                List<String> planProblems = plan.problems();
+                if (!planProblems.isEmpty()) {
+                    failure = "The build plan has problems:\n- " + String.join("\n- ", planProblems);
+                    AiNetworking.sendLog(player, "[Review] " + failure);
+                }
+            }
         }
-
-        String failure = !result.success() ? result.message()
-            : plan.ops.isEmpty() ? "The script ran but placed no blocks. Build with the ai.place* functions." : null;
         if (failure == null) {
             AiBuilderConfig config = AiBuilderConfig.get();
             String description = generateDescription(aiCode, origin) + "\n" + plan.summary();
@@ -168,7 +185,7 @@ public class AiController {
             return;
         }
 
-        if (result.securityBlocked()) {
+        if (result != null && result.securityBlocked()) {
             AiNetworking.sendLog(player, "[Security Alert] " + failure);
             AiNetworking.notify(player, "\u00a7c[Security Alert] " + firstLine(failure) + "\u00a7r");
         } else {

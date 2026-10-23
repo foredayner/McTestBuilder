@@ -69,6 +69,22 @@ public final class ScriptExecutor {
         }
     }
 
+    /** Compile without running (syntax + sandbox rules). Null when the script compiles. */
+    public static String compileProblem(String code) {
+        Optional<String> preParseFailure = ScriptSecurityValidator.validateSource(code);
+        if (preParseFailure.isPresent()) {
+            return "not allowed: " + preParseFailure.get();
+        }
+        try {
+            SafeGroovyShellFactory.createShell(createBinding()).parse(code);
+            return null;
+        } catch (MultipleCompilationErrorsException compilationException) {
+            return compilationException.getMessage();
+        } catch (Exception exception) {
+            return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
+        }
+    }
+
     private static Binding createBinding() {
         Binding binding = new Binding();
         for (String method : AiScriptApi.METHOD_NAMES) {

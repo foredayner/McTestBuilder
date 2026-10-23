@@ -106,6 +106,29 @@ public final class BuildPlan {
         return b == null ? new int[6] : b;
     }
 
+    /** Things vanilla commands would reject or that are clearly wrong, for the AI to fix. */
+    public List<String> problems() {
+        List<String> problems = new ArrayList<>();
+        int bigFills = 0;
+        int far = 0;
+        for (Op op : ops) {
+            long volume = (long) (Math.abs(op.x2 - op.x1) + 1) * (Math.abs(op.y2 - op.y1) + 1) * (Math.abs(op.z2 - op.z1) + 1);
+            if ("fill".equals(op.kind) && volume > 32768 && bigFills++ < 3) {
+                problems.add("a fill of " + volume + " blocks from (" + op.x1 + "," + op.y1 + "," + op.z1 + ") to ("
+                    + op.x2 + "," + op.y2 + "," + op.z2 + ") is over Minecraft's 32768 limit; split it into smaller parts.");
+            }
+            for (int v : new int[] { op.x1, op.y1, op.z1, op.x2, op.y2, op.z2 }) {
+                if (Math.abs(v) > 256) {
+                    if (far++ == 0) {
+                        problems.add("blocks are placed " + Math.abs(v) + " blocks from the player; keep the build within 256.");
+                    }
+                    break;
+                }
+            }
+        }
+        return problems;
+    }
+
     public String summary() {
         int[] b = bounds();
         return "Size: " + (b[3] - b[0] + 1) + " x " + (b[4] - b[1] + 1) + " x " + (b[5] - b[2] + 1)
