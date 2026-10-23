@@ -252,7 +252,8 @@ public class AibModelBench implements FabricClientGameTest {
             // Stand in front of it (the player's side, north of it since the player faces south).
             double dist = c.object() ? Math.max(1.2, size * 1.3) : size * 1.3 + 4;
             double camZ = cz - (b[5] - b[2]) / 2.0 - dist;
-            double camY = cy + (c.object() ? size * 0.25 : size * 0.35);
+            // tp moves the feet; the eyes are 1.62 higher, so lower the feet to look from camY.
+            double camY = cy + (c.object() ? size * 0.25 : size * 0.35) - 1.62;
             return String.format(Locale.ROOT, "tp @a %.2f %.2f %.2f facing %.2f %.2f %.2f", cx, camY, camZ, cx, cy, cz);
         });
         for (int i = 0; i < 400 && BuildTaskQueue.pendingCount() > 0; i++) {

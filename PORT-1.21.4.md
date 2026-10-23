@@ -39,6 +39,15 @@ server and the client of the player who builds. That player needs operator level
       Right-click the top of a block to set it there, centred and facing you; hold attack on it to
       mine it in the time a stone block takes with your tool, and the item drops again
       (not in creative). Works in survival without cheats once you have the item.
+  - Objects are modelled with **smooth shapes** (sphere, ellipsoid, cone, capsule, curved tube, rounded
+    box) painted into a 1/16-block voxel grid (coarser for big objects to stay within 400 pieces); each
+    block's voxels are covered with as few display entities as possible. `ai.mirrorOn()` / `mirrorOff()`
+    make both sides at once. The object prompt has a size guide, style rules and three example scripts
+    (dry-run by the game tests). Objects are designed in a fixed frame (front toward -Z) and turned on
+    placement.
+  - Buildings: the prompt asks for real-world scale (rooms 5×5+, 3-4 blocks of headroom, houses 11×11+).
+  - **Claude (Anthropic)** provider: Messages API with the fixed instructions as a cached system prompt,
+    optional web search (`web_search` tool, at most 3 searches per build).
   - Objects are **solid**: their parts are merged into a few boxes that follow the shape (an
     invisible collidable hitbox entity), so you bump into them and can stand on them. Collision is
     computed by each player's game, so players need this mod. Delete key (twice) or the
