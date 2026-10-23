@@ -29,8 +29,8 @@ public class AiSettingsScreen extends Screen {
     private static final int HEADER = 30;
     private static final int FOOTER = 32;
     private static final int CONTENT_HEIGHT = 380;
-    private static final int LABEL_COLOR = 0xFFCCCCCC;
-    private static final int SECTION_COLOR = 0xFF88AAFF;
+    private static final int LABEL_COLOR = WoodUi.INK;
+    private static final int SECTION_COLOR = WoodUi.TAG;
 
     private static final List<String> OLLAMA_MODELS = List.of(
         "qwen2.5-coder:7b", "qwen2.5-coder:14b", "qwen2.5-coder:3b", "gemma2:2b", "llama3.2", "mistral", "qwen2.5"
@@ -148,15 +148,11 @@ public class AiSettingsScreen extends Screen {
 
         int buttonY = this.panelY + this.panelHeight - 26;
         int buttonWidth = (w - 8) / 2;
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Save"), button -> saveSettings())
-            .dimensions(x, buttonY, buttonWidth, 20)
-            .build());
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Cancel"), button -> {
+        this.addDrawableChild(new WoodUi.WoodButton(x, buttonY, buttonWidth, 20, Text.literal("저장"), button -> saveSettings(), false));
+        this.addDrawableChild(new WoodUi.WoodButton(x + buttonWidth + 8, buttonY, buttonWidth, 20, Text.literal("취소"), button -> {
                 this.saved = true; // discard
                 this.client.setScreen(this.parent);
-            })
-            .dimensions(x + buttonWidth + 8, buttonY, buttonWidth, 20)
-            .build());
+            }, false));
 
         updateVisibility();
     }
@@ -316,10 +312,9 @@ public class AiSettingsScreen extends Screen {
 
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        ctx.fill(0, 0, this.width, this.height, 0x80000000);
-        ctx.fill(this.panelX, this.panelY, this.panelX + PANEL_WIDTH, this.panelY + this.panelHeight, 0xF0202027);
-        ctx.fill(this.panelX, this.panelY, this.panelX + PANEL_WIDTH, this.panelY + 28, 0xFF2E3744);
-        ctx.drawCenteredTextWithShadow(this.textRenderer, this.title, this.panelX + PANEL_WIDTH / 2, this.panelY + 9, 0xFFFFFFFF);
+        ctx.fill(0, 0, this.width, this.height, 0x55000000);
+        WoodUi.frame(ctx, this.panelX - 6, this.panelY - 2, this.panelX + PANEL_WIDTH + 6, this.panelY + this.panelHeight + 2);
+        WoodUi.plaque(ctx, this.textRenderer, "설정", this.panelX + PANEL_WIDTH / 2, this.panelY + 6, WoodUi.INK);
 
         int x = this.panelX + 16;
         ctx.enableScissor(this.panelX, viewTop(), this.panelX + PANEL_WIDTH, viewBottom());
