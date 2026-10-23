@@ -25,7 +25,10 @@ public final class AiScriptApi {
         "searchBlocks",
         "listBlocks",
         "getBlockListCount",
-        "isBlockAllowed"
+        "isBlockAllowed",
+        "addPart",
+        "addCylinder",
+        "addSphere"
     );
 
     private AiScriptApi() {

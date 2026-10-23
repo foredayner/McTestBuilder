@@ -15,6 +15,11 @@ import net.minecraft.util.math.BlockPos;
 
 import com.example.ai.build.BuildPlan;
 import com.example.ai.build.BuildTaskQueue;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import com.example.config.ForbiddenBlockRegistry;
 import java.util.HashMap;
 import java.util.Map;
@@ -431,6 +436,112 @@ public class MinecraftAI {
         return BlockCatalog.isAllowed(blockName);
     }
 
+    // ---------------------------------------------------------------- small objects (block_display)
+
+    /** A box-shaped piece of an object: min corner (x, y, z), size (sx, sy, sz); decimals allowed. */
+    public static void addPart(String blockName, Number x, Number y, Number z, Number sx, Number sy, Number sz) {
+        addPart(blockName, x, y, z, sx, sy, sz, 0, 0, 0);
+    }
+
+    /** Same, turned yaw degrees around the vertical axis through its centre. */
+    public static void addPart(String blockName, Number x, Number y, Number z, Number sx, Number sy, Number sz, Number yaw) {
+        addPart(blockName, x, y, z, sx, sy, sz, yaw, 0, 0);
+    }
+
+    /** Same, turned by yaw (vertical axis), then pitch (X axis), then roll (Z axis), in degrees. */
+    public static void addPart(String blockName, Number x, Number y, Number z, Number sx, Number sy, Number sz,
+                               Number yaw, Number pitch, Number roll) {
+        if (recorder == null || blockName == null || ForbiddenBlockRegistry.isForbidden(blockName)) {
+            return;
+        }
+        double w = Math.abs(toDouble(sx));
+        double h = Math.abs(toDouble(sy));
+        double l = Math.abs(toDouble(sz));
+        recorder.parts.add(new BuildPlan.Part(normalizeBlockId(blockName),
+            toDouble(x) + w / 2, toDouble(y) + h / 2, toDouble(z) + l / 2, w, h, l,
+            toDouble(yaw), toDouble(pitch), toDouble(roll)));
+    }
+
+    /** Upright cylinder (8-sided): centre (cx, cz), bottom at y. Made of 4 crossed boxes. */
+    public static void addCylinder(String blockName, Number cx, Number y, Number cz, Number radius, Number height) {
+        double r = Math.abs(toDouble(radius));
+        double h = Math.abs(toDouble(height));
+        double strip = 2 * r * Math.tan(Math.PI / 8);
+        for (int i = 0; i < 4; i++) {
+            addCenteredPart(blockName, toDouble(cx), toDouble(y) + h / 2, toDouble(cz), 2 * r, h, strip, i * 45.0);
+        }
+    }
+
+    /** Ball of radius r around (cx, cy, cz), from 5 stacked cylinder slices. */
+    public static void addSphere(String blockName, Number cx, Number cy, Number cz, Number radius) {
+        double r = Math.abs(toDouble(radius));
+        int layers = 5;
+        for (int i = 0; i < layers; i++) {
+            double t = -1 + (2.0 * i + 1) / layers;
+            double sliceR = r * Math.sqrt(1 - t * t);
+            double sliceH = 2 * r / layers;
+            double strip = 2 * sliceR * Math.tan(Math.PI / 8);
+            for (int k = 0; k < 4; k++) {
+                addCenteredPart(blockName, toDouble(cx), toDouble(cy) + t * r, toDouble(cz), 2 * sliceR, sliceH, strip, k * 45.0);
+            }
+        }
+    }
+
+    private static void addCenteredPart(String blockName, double cx, double cy, double cz, double w, double h, double l, double yaw) {
+        if (recorder == null || ForbiddenBlockRegistry.isForbidden(blockName)) {
+            return;
+        }
+        recorder.parts.add(new BuildPlan.Part(normalizeBlockId(blockName), cx, cy, cz, w, h, l, yaw, 0, 0));
+    }
+
+    private static double toDouble(Number value) {
+        return value == null ? 0 : value.doubleValue();
+    }
+
+    /** /summon command for one part at {@code at}, the object turned {@code turns} quarter turns clockwise. */
+    static String summonCommand(BuildPlan.Part part, BlockPos at, int turns, String tag) {
+        double cx = part.x;
+        double cz = part.z;
+        for (int i = 0; i < Math.floorMod(turns, 4); i++) {
+            double t = cx;
+            cx = -cz;
+            cz = t;
+        }
+        Quaternionf q = new Quaternionf()
+            .rotateY((float) Math.toRadians(-90.0 * turns))
+            .rotateY((float) Math.toRadians(part.yaw))
+            .rotateX((float) Math.toRadians(part.pitch))
+            .rotateZ((float) Math.toRadians(part.roll));
+        Vector3f half = q.transform(new Vector3f((float) part.sx / 2, (float) part.sy / 2, (float) part.sz / 2));
+        String block = rotateBlockState(part.block, turns);
+        return String.format(Locale.ROOT,
+            "summon minecraft:block_display %.4f %.4f %.4f {block_state:%s,transformation:{left_rotation:[%.6ff,%.6ff,%.6ff,%.6ff],"
+                + "right_rotation:[0f,0f,0f,1f],translation:[%.4ff,%.4ff,%.4ff],scale:[%.4ff,%.4ff,%.4ff]},Tags:[\"aib\",\"%s\"]}",
+            at.getX() + cx, at.getY() + part.y, at.getZ() + cz, blockStateNbt(block),
+            q.x, q.y, q.z, q.w, -half.x, -half.y, -half.z, part.sx, part.sy, part.sz, tag);
+    }
+
+    /** minecraft:oak_stairs[facing=east] -> {Name:"minecraft:oak_stairs",Properties:{facing:"east"}} */
+    static String blockStateNbt(String block) {
+        int open = block.indexOf('[');
+        String name = open < 0 ? block : block.substring(0, open);
+        StringBuilder nbt = new StringBuilder("{Name:\"").append(name).append('"');
+        if (open >= 0 && block.endsWith("]")) {
+            String inner = block.substring(open + 1, block.length() - 1);
+            List<String> props = new ArrayList<>();
+            for (String pair : inner.split(",")) {
+                int eq = pair.indexOf('=');
+                if (eq > 0) {
+                    props.add(pair.substring(0, eq).trim() + ":\"" + pair.substring(eq + 1).trim() + "\"");
+                }
+            }
+            if (!props.isEmpty()) {
+                nbt.append(",Properties:{").append(String.join(",", props)).append('}');
+            }
+        }
+        return nbt.append('}').toString();
+    }
+
     public static void clearArea(Number x, Number y, Number z, Number w, Number l) {
         clearArea(x, y, z, w, 1, l);
     }
@@ -488,7 +599,7 @@ public class MinecraftAI {
      * Queue a recorded plan at {@code at}, turned {@code turns} quarter turns clockwise (so a
      * saved build faces the way the player faces now). Returns the number of commands queued.
      */
-    public static int executePlan(BuildPlan plan, BlockPos at, int turns) {
+    public static int executePlan(BuildPlan plan, BlockPos at, int turns, String tag) {
         int count = 0;
         for (BuildPlan.Op op : plan.ops) {
             int[] a = BuildPlan.rotate(op.x1, op.z1, turns);
@@ -501,7 +612,27 @@ public class MinecraftAI {
             BuildTaskQueue.enqueue(() -> executeBuildCommand(command));
             count++;
         }
+        // Object parts appear a few at a time so a model pops in quickly but visibly.
+        List<String> batch = new ArrayList<>();
+        for (BuildPlan.Part part : plan.parts) {
+            batch.add(summonCommand(part, at, turns, tag));
+            count++;
+            if (batch.size() == 8) {
+                List<String> run = List.copyOf(batch);
+                BuildTaskQueue.enqueue(() -> run.forEach(MinecraftAI::executeBuildCommand));
+                batch.clear();
+            }
+        }
+        if (!batch.isEmpty()) {
+            List<String> run = List.copyOf(batch);
+            BuildTaskQueue.enqueue(() -> run.forEach(MinecraftAI::executeBuildCommand));
+        }
         return count;
+    }
+
+    /** Run one command now as the build actor (used by undo). */
+    public static void runNow(String command) {
+        executeBuildCommand(command);
     }
 
     /** Turn stairs, doors, logs... with the structure. Unknown or stateless blocks pass through. */

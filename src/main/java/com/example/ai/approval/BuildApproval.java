@@ -7,6 +7,7 @@ import net.minecraft.util.math.BlockPos;
 import com.example.ai.api.MinecraftAI;
 import com.example.ai.build.BuildRecord;
 import com.example.ai.build.BuildTaskQueue;
+import com.example.ai.build.UndoService;
 import com.example.network.AiNetworking;
 
 /**
@@ -64,13 +65,20 @@ public final class BuildApproval {
         AiNetworking.sendLog(player, "[AI] Origin: X=" + origin.getX() + " Y=" + origin.getY() + " Z=" + origin.getZ());
         System.out.println("[APPROVAL] Building approved by " + player.getName().getString() + " at " + origin);
 
-        int commands = MinecraftAI.executePlan(record.plan, origin, 0);
+        String tag = "aib_" + record.id;
+        UndoService.capture(player, record.plan, origin, 0, tag, shortTitle(record.prompt));
+        int commands = MinecraftAI.executePlan(record.plan, origin, 0, tag);
         AiNetworking.sendLog(player, "[AI] Running " + commands + " build command(s)...");
         clearPending(player);
         BuildTaskQueue.whenEmpty(() -> {
             AiNetworking.sendLog(player, "[AI] Complete!");
             AiNetworking.sendBuildComplete(player, record);
         });
+    }
+
+    static String shortTitle(String prompt) {
+        String p = prompt == null ? "" : prompt.replace('\n', ' ');
+        return p.length() > 40 ? p.substring(0, 40) + "..." : p;
     }
 
     public static void denyFor(ServerPlayerEntity player) {

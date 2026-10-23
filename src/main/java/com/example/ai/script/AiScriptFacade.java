@@ -131,4 +131,25 @@ public final class AiScriptFacade {
     public boolean isBlockAllowed(String blockName) {
         return MinecraftAI.isBlockAllowed(blockName);
     }
+
+    public void addPart(String blockName, Number x, Number y, Number z, Number sx, Number sy, Number sz) {
+        MinecraftAI.addPart(blockName, x, y, z, sx, sy, sz);
+    }
+
+    public void addPart(String blockName, Number x, Number y, Number z, Number sx, Number sy, Number sz, Number yaw) {
+        MinecraftAI.addPart(blockName, x, y, z, sx, sy, sz, yaw);
+    }
+
+    public void addPart(String blockName, Number x, Number y, Number z, Number sx, Number sy, Number sz,
+                        Number yaw, Number pitch, Number roll) {
+        MinecraftAI.addPart(blockName, x, y, z, sx, sy, sz, yaw, pitch, roll);
+    }
+
+    public void addCylinder(String blockName, Number cx, Number y, Number cz, Number radius, Number height) {
+        MinecraftAI.addCylinder(blockName, cx, y, cz, radius, height);
+    }
+
+    public void addSphere(String blockName, Number cx, Number cy, Number cz, Number radius) {
+        MinecraftAI.addSphere(blockName, cx, cy, cz, radius);
+    }
 }

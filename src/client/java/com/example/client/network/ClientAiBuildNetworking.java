@@ -12,9 +12,13 @@ public final class ClientAiBuildNetworking {
     }
 
     public static void sendAiBuildRequest(String prompt, boolean useWebSearch) {
+        sendAiBuildRequest(prompt, useWebSearch, false);
+    }
+
+    public static void sendAiBuildRequest(String prompt, boolean useWebSearch, boolean objectMode) {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
-            String command = useWebSearch ? "aibuild --web " + prompt : "aibuild " + prompt;
+            String command = "aibuild " + (useWebSearch ? "--web " : "") + (objectMode ? "--object " : "") + prompt;
             client.player.networkHandler.sendChatCommand(command);
         }
     }

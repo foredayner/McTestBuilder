@@ -90,17 +90,36 @@ public final class RebuildService {
         String facing = BuildPlan.normalizeFacing(TerrainVision.compassFromYaw(player.getYaw()));
         int turns = BuildPlan.turnsBetween(record.plan.facing, facing);
         MinecraftAI.init(player.getServerWorld(), origin, player.getYaw(), player.getPitch(), player);
-        int commands = MinecraftAI.executePlan(record.plan, origin, turns);
-
         String title = record.prompt.length() > 40 ? record.prompt.substring(0, 40) + "..." : record.prompt;
+        String tag = "aib_" + record.id + "_" + Long.toString(System.currentTimeMillis(), 36);
+        UndoService.capture(player, record.plan, origin, turns, tag, title);
+        int commands = MinecraftAI.executePlan(record.plan, origin, turns, tag);
         AiNetworking.sendLog(player, "[History] Rebuilding \"" + title + "\" facing " + facing + " (" + commands + " commands)...");
         BuildTaskQueue.whenEmpty(() -> AiNetworking.sendLog(player, "[History] Rebuild complete!"));
     }
 
     /** Only plain setblock/fill with sane coordinates, known modes and allowed blocks. */
     static String validate(BuildPlan plan) {
-        if (plan.ops.isEmpty()) {
+        if (plan.isEmpty()) {
             return "it has no blocks";
+        }
+        if (plan.parts.size() > BuildPlan.MAX_PARTS) {
+            return "too many object parts (" + plan.parts.size() + ")";
+        }
+        for (BuildPlan.Part part : plan.parts) {
+            if (part.block == null || !BLOCK.matcher(part.block).matches()) {
+                return "bad block " + part.block;
+            }
+            String id = part.block.contains("[") ? part.block.substring(0, part.block.indexOf('[')) : part.block;
+            if (ForbiddenBlockRegistry.isForbidden(id)) {
+                return "forbidden block " + id;
+            }
+            double big = Math.max(part.sx, Math.max(part.sy, part.sz));
+            double far = Math.max(Math.abs(part.x), Math.max(Math.abs(part.y), Math.abs(part.z)));
+            if (!(big > 0 && big <= BuildPlan.MAX_PART_SIZE) || !(far <= BuildPlan.MAX_PART_OFFSET)
+                || !Double.isFinite(part.yaw + part.pitch + part.roll)) {
+                return "object part out of range";
+            }
         }
         if (plan.ops.size() > MAX_OPS) {
             return "too many commands (" + plan.ops.size() + ")";

@@ -33,6 +33,11 @@ public class AiController {
     }
 
     public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch) {
+        requestBuild(player, prompt, useWebSearch, false);
+    }
+
+    /** objectMode: a small decorative object from scaled block pieces instead of a block build. */
+    public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch, boolean objectMode) {
         long startTime = System.currentTimeMillis();
         AiBuilderConfig config = AiBuilderConfig.get();
         boolean webSearch = config.provider == AiProvider.OPENAI
@@ -65,7 +70,9 @@ public class AiController {
             debug("[DEBUG] World info:\n" + worldInfo);
 
             debug("[DEBUG] Building prompt...");
-            String promptText = buildPrompt(prompt, worldInfo, webSearch);
+            String promptText = objectMode
+                ? buildObjectPrompt(prompt, MinecraftAI.getFacing())
+                : buildPrompt(prompt, worldInfo, webSearch);
 
             debug("[DEBUG] Sending to AI provider...");
             AiNetworking.sendDebugLog(player, "[AI] Requesting from AI model (" + config.provider.getDisplayName() + ")...");
@@ -159,7 +166,7 @@ public class AiController {
                 MinecraftAI.stopRecording();
             }
             failure = !result.success() ? result.message()
-                : plan.ops.isEmpty() ? "The script ran but placed no blocks. Build with the ai.place* functions." : null;
+                : plan.isEmpty() ? "The script ran but placed nothing. Use the ai.place* / ai.addPart functions." : null;
             if (failure == null) {
                 List<String> planProblems = plan.problems();
                 if (!planProblems.isEmpty()) {
@@ -248,6 +255,30 @@ public class AiController {
         if (AiBuilderConfig.get().debugLogEnabled) {
             System.out.println(message);
         }
+    }
+
+    private static String buildObjectPrompt(String userPrompt, String facing) {
+        return "You are a Minecraft prop designer. Write ONLY executable Groovy using the `ai` API.\n"
+            + "Object request: " + userPrompt + "\n\n"
+            + "Make ONE small, detailed decorative object out of scaled block pieces (display entities), not whole blocks.\n"
+            + "Player facing: " + facing + "\n\n"
+            + "API (units are blocks; decimals allowed, 0.0625 = one texture pixel):\n"
+            + "  ai.addPart(block, x, y, z, sizeX, sizeY, sizeZ)                    // box: min corner + size\n"
+            + "  ai.addPart(block, x, y, z, sizeX, sizeY, sizeZ, yaw)               // turned around its centre, degrees\n"
+            + "  ai.addPart(block, x, y, z, sizeX, sizeY, sizeZ, yaw, pitch, roll)\n"
+            + "  ai.addCylinder(block, centerX, bottomY, centerZ, radius, height)  // upright, 4 parts\n"
+            + "  ai.addSphere(block, centerX, centerY, centerZ, radius)              // 20 parts\n"
+            + "  ai.getForwardX(distance) -> int | ai.getForwardZ(distance) -> int | ai.searchBlocks(keyword)\n\n"
+            + "Rules:\n"
+            + "- Use ONLY addPart / addCylinder / addSphere to build. Never placeBlock/placeBox.\n"
+            + "- Coordinates are relative to the corner of the player's feet block: +X east, +Y up, +Z south.\n"
+            + "- Put it 2 blocks in front of the player, standing on the ground: centre x = ai.getForwardX(2) + 0.5,\n"
+            + "  centre z = ai.getForwardZ(2) + 0.5, bottom y = 0. Store these in variables and build around them.\n"
+            + "- Unless the request gives a size, make it about 1 block tall. Keep it within 3 blocks in every direction.\n"
+            + "- Each part shows one block texture: use concrete, wool, terracotta, glass, iron_block, gold_block,\n"
+            + "  quartz_block, planks, etc. for colours and materials.\n"
+            + "- Build base -> body -> details with correct proportions. At most 400 parts; prefer fewer, well-placed parts.\n"
+            + "- Output Groovy only. No markdown, no comments, no explanation.\n";
     }
 
     private static String buildPrompt(String userPrompt, String worldInfo, boolean webSearchEnabled) {

@@ -11,7 +11,17 @@ import java.util.List;
 
 public final class AiClientState {
 
+    /** Who a chat card is from. */
+    public enum Speaker { ME, AI, SYSTEM }
+
+    /** One message card in the chat view. */
+    public record Entry(Speaker speaker, String text) {
+    }
+
     private static final LinkedList<String> LOGS = new LinkedList<>();
+    private static final LinkedList<Entry> ENTRIES = new LinkedList<>();
+    private static final int MAX_ENTRIES = 120;
+    private static boolean objectMode = false;
     private static final int MAX_LOGS = 300;
     private static final int MAX_LINES_PER_MESSAGE = 8;
 
@@ -39,13 +49,62 @@ public final class AiClientState {
             return;
         }
         LogStore.append(message);
+        List<String> clean = cleanForDisplay(message);
         synchronized (LOGS) {
-            LOGS.addAll(cleanForDisplay(message));
+            LOGS.addAll(clean);
             while (LOGS.size() > MAX_LOGS) {
                 LOGS.removeFirst();
             }
+            addEntry(clean);
         }
         refreshOpenScreen(false);
+    }
+
+    /** Group lines into chat cards: my requests, AI work, and everything else from the system. */
+    private static void addEntry(List<String> lines) {
+        if (lines.isEmpty()) {
+            return;
+        }
+        String first = lines.get(0).trim();
+        Speaker speaker;
+        String text = String.join("\n", lines);
+        if (first.startsWith("[Request]")) {
+            speaker = Speaker.ME;
+            text = text.trim().substring("[Request]".length()).trim();
+        } else if (first.startsWith("[AI]") || first.startsWith("[Review]") || first.startsWith("[Waiting")
+            || first.startsWith("[Web]") || first.startsWith("[Security")) {
+            speaker = Speaker.AI;
+        } else {
+            speaker = Speaker.SYSTEM;
+        }
+        Entry last = ENTRIES.peekLast();
+        if (speaker != Speaker.ME && last != null && last.speaker() == speaker) {
+            ENTRIES.removeLast();
+            text = last.text() + "\n" + text;
+        }
+        ENTRIES.add(new Entry(speaker, text));
+        while (ENTRIES.size() > MAX_ENTRIES) {
+            ENTRIES.removeFirst();
+        }
+    }
+
+    public static List<Entry> getEntries() {
+        synchronized (LOGS) {
+            return List.copyOf(ENTRIES);
+        }
+    }
+
+    public static boolean isObjectMode() {
+        return objectMode;
+    }
+
+    public static void toggleObjectMode() {
+        objectMode = !objectMode;
+        refreshOpenScreen(true);
+    }
+
+    public static void undo() {
+        AiClientNetworking.sendUndo();
     }
 
     /**
@@ -141,7 +200,7 @@ public final class AiClientState {
             return;
         }
 
-        ClientAiBuildNetworking.sendAiBuildRequest(trimmed, willUseWebSearch());
+        ClientAiBuildNetworking.sendAiBuildRequest(trimmed, willUseWebSearch(), objectMode);
     }
 
     public static void approve() {

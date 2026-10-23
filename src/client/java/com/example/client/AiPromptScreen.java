@@ -6,6 +6,8 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 
@@ -17,46 +19,62 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * Main window, three tabs:
- *  Create  - request a build, watch the log, accept or cancel
- *  History - finished builds with previews; open one to read the full request and rebuild it
- *  Logs    - saved log files by day
+ * Main window: a wooden frame with a menu on the left and the page on the right.
+ *   AI로 만들기   - chat with the AI: request, review, place (설계 배치하기), cancel, undo
+ *   내 오브젝트   - saved builds and objects with previews; open one to place it again
+ *   더보기        - 로그 (saved logs by day), 설정 (settings)
  */
 public class AiPromptScreen extends Screen {
 
-    private enum Tab { CREATE, HISTORY, LOGS }
+    private enum Page { CREATE, HISTORY, LOGS }
 
-    private static final double PANEL_WIDTH_RATIO = 0.35;
-    private static final int MIN_PANEL_WIDTH = 280;
-    private static final int LINE = 11;
+    // Palette: dark wood frame, warm parchment text, dark chat area.
+    private static final int FRAME_OUT = 0xFF24170D;
+    private static final int FRAME = 0xFF6E4C2E;
+    private static final int SIDEBAR = 0xFF56391F;
+    private static final int HEADER = 0xFF4A3322;
+    private static final int LINE_LIGHT = 0xFF8C6B47;
+    private static final int CHAT_BG = 0xFF24201C;
+    private static final int CARD = 0xFF36302A;
+    private static final int CARD_BORDER = 0xFF5E5040;
+    private static final int CARD_ME = 0xFFC9A86A;
+    private static final int TITLE = 0xFFF3E6C8;
+    private static final int SUBTITLE = 0xFFD2BE98;
+    private static final int TEXT = 0xFFEDE3CF;
+    private static final int DIM = 0xFF9C8F7C;
+    private static final int SELECTED = 0xFFE8C26A;
+    private static final int SIDEBAR_WIDTH = 118;
+    private static final int LINE = 10;
     private static final int ROW = 40;
-    private static final int TEXT = 0xFFE6E6E6;
-    private static final int LOG_TEXT_COLOR = 0xFFB0B9C6;
-    private static final int DIM = 0xFF888888;
-    private static final int ACCENT = 0xFF88AAFF;
     private static final SimpleDateFormat DATE = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
     // Kept across re-inits (the screen rebuilds its widgets when state changes).
-    private static Tab tab = Tab.CREATE;
+    private static Page page = Page.CREATE;
+    private static boolean moreOpen = false;
     private static String selectedId = null;
-    private static int logScroll = 0;      // lines up from the bottom
-    private static int listScroll = 0;     // rows
-    private static int detailScroll = 0;   // pixels
-    private static int fileScroll = 0;     // lines up from the bottom
+    private static int filter = 0;        // 0 all, 1 builds, 2 objects
+    private static int chatScroll = 0;    // pixels up from the bottom
+    private static int listScroll = 0;    // rows
+    private static int detailScroll = 0;  // pixels
+    private static int fileScroll = 0;    // lines up from the bottom
     private static int dayIndex = 0;
+
+    private final List<IconAt> icons = new ArrayList<>();
+    private record IconAt(ItemStack stack, int x, int y) {
+    }
 
     private TextFieldWidget promptField;
     private String draftPrompt = "";
     private boolean confirmDelete = false;
-    private int panelX;
-    private int panelWidth;
-    private int panelY;
-    private int panelHeight;
+    private int x0;
+    private int y0;
+    private int w;
+    private int h;
     private List<String> fileLines = List.of();
     private List<String> days = List.of();
 
     public AiPromptScreen() {
-        super(Text.literal("Minecraft AI Build Assistant"));
+        super(Text.literal("AI Builder"));
     }
 
     public void onStateUpdated(boolean rebuildWidgets) {
@@ -77,10 +95,11 @@ public class AiPromptScreen extends Screen {
     protected void init() {
         super.init();
         AiClientState.setOpenScreen(this);
-        layoutPanel();
+        layout();
         this.promptField = null;
-        buildHeader();
-        switch (tab) {
+        this.icons.clear();
+        buildSidebar();
+        switch (page) {
             case CREATE -> buildCreate();
             case HISTORY -> buildHistory();
             case LOGS -> buildLogs();
@@ -93,101 +112,97 @@ public class AiPromptScreen extends Screen {
         super.removed();
     }
 
-    private void layoutPanel() {
-        if (tab == Tab.CREATE) {
-            this.panelWidth = Math.max(MIN_PANEL_WIDTH, (int) (this.width * PANEL_WIDTH_RATIO));
-        } else {
-            this.panelWidth = Math.min(this.width - 20, Math.max(320, (int) (this.width * 0.6)));
-        }
-        this.panelWidth = Math.min(this.panelWidth, this.width - 20);
-        this.panelX = this.width - this.panelWidth - 10;
-        this.panelY = 10;
-        this.panelHeight = this.height - 20;
+    private void layout() {
+        this.w = Math.min(this.width - 16, 500);
+        this.h = Math.min(this.height - 16, 320);
+        this.x0 = (this.width - this.w) / 2;
+        this.y0 = (this.height - this.h) / 2;
     }
 
-    private int bodyTop() { return this.panelY + 32; }
-    private int bodyBottom() { return this.panelY + this.panelHeight - 6; }
-    private int bodyLeft() { return this.panelX + 8; }
-    private int bodyRight() { return this.panelX + this.panelWidth - 8; }
+    // Right-hand page geometry.
+    private int rx() { return this.x0 + 4 + SIDEBAR_WIDTH + 4; }
+    private int rr() { return this.x0 + this.w - 4; }
+    private int contentTop() { return this.y0 + 46; }
+    private int chatBottom() { return this.y0 + this.h - 58; }
 
-    // ---------------------------------------------------------------- header
-
-    private void buildHeader() {
-        int x = this.panelX + 6;
-        for (Tab t : Tab.values()) {
-            String label = switch (t) {
-                case CREATE -> "Create";
-                case HISTORY -> "History";
-                case LOGS -> "Logs";
-            };
-            ButtonWidget button = ButtonWidget.builder(Text.literal(label), b -> switchTab(t))
-                .dimensions(x, this.panelY + 5, 54, 20)
-                .build();
-            button.active = tab != t;
-            this.addDrawableChild(button);
-            x += 56;
-        }
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("⚙"), button -> this.client.setScreen(new AiSettingsScreen(this)))
-            .dimensions(this.panelX + this.panelWidth - 50, this.panelY + 5, 20, 20)
-            .build());
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("×"), button -> this.close())
-            .dimensions(this.panelX + this.panelWidth - 25, this.panelY + 5, 20, 20)
-            .build());
+    private ButtonWidget button(String label, int x, int y, int width, ButtonWidget.PressAction action) {
+        return this.addDrawableChild(ButtonWidget.builder(Text.literal(label), action).dimensions(x, y, width, 20).build());
     }
 
-    private void switchTab(Tab t) {
-        tab = t;
+    // ---------------------------------------------------------------- sidebar
+
+    private void buildSidebar() {
+        int x = this.x0 + 10;
+        int bw = SIDEBAR_WIDTH - 12;
+        int y = this.y0 + 44;
+        menu("   AI로 만들기", Items.WRITABLE_BOOK, x, y, bw, Page.CREATE);
+        y += 24;
+        menu("   내 오브젝트", Items.CHEST, x, y, bw, Page.HISTORY);
+        y += 24;
+        button("   더보기 " + (moreOpen ? "▴" : "▾"), x, y, bw, b -> {
+            moreOpen = !moreOpen;
+            rebuild();
+        });
+        this.icons.add(new IconAt(new ItemStack(Items.BUNDLE), x + 3, y + 2));
+        if (moreOpen) {
+            y += 22;
+            ButtonWidget logs = button("로그", x + 10, y, bw - 10, b -> switchPage(Page.LOGS));
+            logs.active = page != Page.LOGS;
+            y += 22;
+            button("설정", x + 10, y, bw - 10, b -> this.client.setScreen(new AiSettingsScreen(this)));
+        }
+        button("닫기", x, this.y0 + this.h - 28, bw, b -> this.close());
+    }
+
+    private void menu(String label, net.minecraft.item.Item icon, int x, int y, int width, Page target) {
+        ButtonWidget b = button(label, x, y, width, btn -> switchPage(target));
+        b.active = page != target;
+        this.icons.add(new IconAt(new ItemStack(icon), x + 3, y + 2));
+    }
+
+    private void switchPage(Page target) {
+        page = target;
         this.confirmDelete = false;
-        if (t == Tab.LOGS) {
+        if (target == Page.LOGS) {
             fileScroll = 0;
         }
         rebuild();
     }
 
-    // ---------------------------------------------------------------- create tab
-
-    private int createLogBottom() {
-        return this.panelY + this.panelHeight - (AiClientState.hasPendingApproval() ? 90 : 64);
-    }
+    // ---------------------------------------------------------------- AI로 만들기
 
     private void buildCreate() {
-        int fieldY = this.panelY + this.panelHeight - (AiClientState.hasPendingApproval() ? 85 : 58);
-        int sendWidth = 55;
-        int webWidth = 45;
-        int fieldWidth = this.panelWidth - sendWidth - webWidth - 20;
+        boolean object = AiClientState.isObjectMode();
+        button(object ? "모드: 소품" : "모드: 건물", rr() - 92, this.y0 + 10, 86, b -> AiClientState.toggleObjectMode());
 
-        this.promptField = new TextFieldWidget(this.textRenderer, this.panelX + 5, fieldY, fieldWidth, 20, Text.literal(""));
-        this.promptField.setMaxLength(256);
-        this.promptField.setPlaceholder(Text.literal("Describe the build..."));
+        boolean pending = AiClientState.hasPendingApproval();
+        int y = this.y0 + this.h - 52;
+        ButtonWidget place = button("설계 배치하기", rx(), y, 86, b -> AiClientState.approve());
+        place.active = pending;
+        ButtonWidget cancel = button("취소", rx() + 90, y, 50, b -> AiClientState.cancel());
+        cancel.active = pending;
+        button("   되돌리기", rx() + 144, y, 76, b -> {
+            AiClientState.undo();
+            chatScroll = 0;
+        });
+        this.icons.add(new IconAt(new ItemStack(Items.CLOCK), rx() + 147, y + 2));
+        if (AiClientState.isWebSearchAvailable()) {
+            button(AiClientState.willUseWebSearch() ? "웹 검색: 켬" : "웹 검색: 끔", rr() - 76, y, 76, b -> {
+                AiClientState.toggleSessionWebSearch();
+                rebuild();
+            });
+        }
+
+        int fieldY = this.y0 + this.h - 27;
+        this.promptField = new TextFieldWidget(this.textRenderer, rx(), fieldY, rr() - rx() - 66, 20, Text.literal(""));
+        this.promptField.setMaxLength(220); // the chat command that carries it is limited to 256 characters
+        this.promptField.setPlaceholder(Text.literal(object ? "만들 소품을 설명해 주세요" : "지을 건물을 설명해 주세요"));
         this.promptField.setText(this.draftPrompt);
         this.promptField.setFocused(true);
         this.addSelectableChild(this.promptField);
         this.setFocused(this.promptField);
-
-        int webX = this.panelX + fieldWidth + 10;
-        ButtonWidget webButton = ButtonWidget.builder(webSearchLabel(), button -> {
-                AiClientState.toggleSessionWebSearch();
-                button.setMessage(webSearchLabel());
-            })
-            .dimensions(webX, fieldY, webWidth, 20)
-            .build();
-        webButton.active = AiClientState.isWebSearchAvailable();
-        this.addDrawableChild(webButton);
-
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Send"), button -> sendBuild())
-            .dimensions(webX + webWidth + 5, fieldY, sendWidth, 20)
-            .build());
-
-        if (AiClientState.hasPendingApproval()) {
-            int buttonY = this.panelY + this.panelHeight - 58;
-            int buttonWidth = (this.panelWidth - 22) / 2;
-            this.addDrawableChild(ButtonWidget.builder(Text.literal("Accept"), button -> AiClientState.approve())
-                .dimensions(this.panelX + 8, buttonY, buttonWidth, 20)
-                .build());
-            this.addDrawableChild(ButtonWidget.builder(Text.literal("Cancel"), button -> AiClientState.cancel())
-                .dimensions(this.panelX + 14 + buttonWidth, buttonY, buttonWidth, 20)
-                .build());
-        }
+        button("   보내기", rr() - 62, fieldY, 62, b -> sendBuild());
+        this.icons.add(new IconAt(new ItemStack(Items.FEATHER), rr() - 59, fieldY + 2));
     }
 
     private void sendBuild() {
@@ -198,35 +213,99 @@ public class AiPromptScreen extends Screen {
         if (prompt.isEmpty()) {
             return;
         }
-        logScroll = 0;
+        chatScroll = 0;
         AiClientState.addLog("[Request] " + prompt);
         if (AiClientState.willUseWebSearch()) {
             AiClientState.addLog("[Web] Search enabled for this request");
         }
-        AiClientState.addLog("[Waiting...] Processing...");
+        AiClientState.addLog("[Waiting...] " + (AiClientState.isObjectMode() ? "소품" : "건물") + " 설계 중입니다. 잠시 기다려 주세요.");
         AiClientState.sendPromptText(prompt);
         this.promptField.setText("");
         this.draftPrompt = "";
     }
 
     private void renderCreate(DrawContext ctx) {
-        int top = bodyTop();
-        int bottom = createLogBottom();
-        box(ctx, bodyLeft(), top, bodyRight(), bottom);
+        int left = rx(), right = rr(), top = contentTop(), bottom = chatBottom();
+        ctx.fill(left, top, right, bottom, CHAT_BG);
 
-        List<String> logs = AiClientState.getLogs();
-        if (logs.isEmpty()) {
-            ctx.drawText(this.textRenderer, "Logs will appear here...", bodyLeft() + 5, top + 5, DIM, false);
-            return;
+        List<AiClientState.Entry> entries = new ArrayList<>(AiClientState.getEntries());
+        if (entries.isEmpty()) {
+            entries.add(new AiClientState.Entry(AiClientState.Speaker.SYSTEM,
+                "원하는 " + (AiClientState.isObjectMode() ? "소품" : "건물") + "을 아래에 적고 보내기를 누르세요.\n"
+                    + "오른쪽 위 버튼으로 건물 / 소품 모드를 바꿀 수 있어요."));
         }
-        List<OrderedText> lines = new ArrayList<>();
-        for (String log : logs) {
-            lines.addAll(this.textRenderer.wrapLines(Text.literal(log), bodyRight() - bodyLeft() - 10));
+        int cardW = right - left - 12;
+        int textW = cardW - 10;
+        List<List<OrderedText>> wrapped = new ArrayList<>();
+        int total = 0;
+        for (AiClientState.Entry e : entries) {
+            List<OrderedText> lines = this.textRenderer.wrapLines(Text.literal(e.text()), textW);
+            wrapped.add(lines);
+            total += cardHeight(lines.size()) + 4;
         }
-        drawScrolledFromBottom(ctx, lines, top, bottom, logScroll, LOG_TEXT_COLOR);
+        int view = bottom - top - 8;
+        chatScroll = Math.max(0, Math.min(chatScroll, Math.max(0, total - view)));
+
+        ctx.enableScissor(left, top, right, bottom);
+        int y = bottom - 4 + chatScroll;
+        for (int i = entries.size() - 1; i >= 0; i--) {
+            int ch = cardHeight(wrapped.get(i).size());
+            y -= ch;
+            if (y + ch >= top && y <= bottom) {
+                drawCard(ctx, entries.get(i), wrapped.get(i), left + 6, y, cardW, ch);
+            }
+            y -= 4;
+        }
+        ctx.disableScissor();
+        if (chatScroll > 0) {
+            String hint = "▼ 최신 메시지";
+            ctx.drawText(this.textRenderer, hint, right - this.textRenderer.getWidth(hint) - 6, bottom - 11, SELECTED, true);
+        }
     }
 
-    // ---------------------------------------------------------------- history tab
+    private static int cardHeight(int lines) {
+        return 19 + lines * LINE + 4;
+    }
+
+    private void drawCard(DrawContext ctx, AiClientState.Entry e, List<OrderedText> lines, int x, int y, int cw, int ch) {
+        boolean me = e.speaker() == AiClientState.Speaker.ME;
+        outline(ctx, x, y, x + cw, y + ch, me ? CARD_ME : CARD_BORDER);
+        ctx.fill(x + 1, y + 1, x + cw - 1, y + ch - 1, CARD);
+        ItemStack icon = new ItemStack(switch (e.speaker()) {
+            case ME -> Items.FEATHER;
+            case AI -> Items.ENCHANTED_BOOK;
+            case SYSTEM -> Items.COMPASS;
+        });
+        ctx.getMatrices().push();
+        ctx.getMatrices().translate(x + 4, y + 3, 0);
+        ctx.getMatrices().scale(0.75f, 0.75f, 1f);
+        ctx.drawItem(icon, 0, 0);
+        ctx.getMatrices().pop();
+        String who = switch (e.speaker()) {
+            case ME -> "나";
+            case AI -> "AI";
+            case SYSTEM -> "안내";
+        };
+        ctx.drawText(this.textRenderer, who, x + 19, y + 5, me ? CARD_ME : SUBTITLE, false);
+        int ty = y + 18;
+        for (OrderedText line : lines) {
+            ctx.drawText(this.textRenderer, line, x + 6, ty, TEXT, false);
+            ty += LINE;
+        }
+    }
+
+    // ---------------------------------------------------------------- 내 오브젝트
+
+    private List<BuildRecord> filtered() {
+        List<BuildRecord> out = new ArrayList<>();
+        for (BuildRecord r : BuildHistory.list()) {
+            boolean object = "object".equals(r.kind);
+            if (filter == 0 || (filter == 1 && !object) || (filter == 2 && object)) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
 
     private BuildRecord selected() {
         if (selectedId == null) {
@@ -244,182 +323,220 @@ public class AiPromptScreen extends Screen {
     private void buildHistory() {
         BuildRecord record = selected();
         if (record == null) {
+            String[] names = { "보기: 전체", "보기: 건물", "보기: 소품" };
+            button(names[filter], rr() - 92, this.y0 + 10, 86, b -> {
+                filter = (filter + 1) % 3;
+                listScroll = 0;
+                rebuild();
+            });
             return;
         }
-        int bottomY = bodyBottom() - 20;
-        int third = (bodyRight() - bodyLeft() - 8) / 3;
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("< Back"), b -> {
-                selectedId = null;
+        int y = this.y0 + this.h - 27;
+        int third = (rr() - rx() - 8) / 3;
+        button("← 목록", rx(), y, third, b -> {
+            selectedId = null;
+            rebuild();
+        });
+        button("여기에 배치", rx() + third + 4, y, third, b -> {
+            AiClientNetworking.sendRebuild(record);
+            AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\" 배치를 요청했어요. 내 앞에, 바라보는 방향으로 놓입니다.");
+        });
+        button(this.confirmDelete ? "정말 삭제?" : "삭제", rx() + 2 * third + 8, y, third, b -> {
+            if (!this.confirmDelete) {
+                this.confirmDelete = true;
                 rebuild();
-            })
-            .dimensions(bodyLeft(), bottomY, third, 20)
-            .build());
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Build here"), b -> {
-                AiClientNetworking.sendRebuild(record);
-                AiClientState.addLog("[History] Rebuild requested: builds in front of you, facing where you look.");
-            })
-            .dimensions(bodyLeft() + third + 4, bottomY, third, 20)
-            .build());
-        this.addDrawableChild(ButtonWidget.builder(Text.literal(this.confirmDelete ? "Really delete?" : "Delete"), b -> {
-                if (!this.confirmDelete) {
-                    this.confirmDelete = true;
-                    rebuild();
-                    return;
-                }
-                BuildHistory.delete(record);
-                selectedId = null;
-                this.confirmDelete = false;
-                rebuild();
-            })
-            .dimensions(bodyLeft() + 2 * third + 8, bottomY, third, 20)
-            .build());
+                return;
+            }
+            BuildHistory.delete(record);
+            selectedId = null;
+            this.confirmDelete = false;
+            rebuild();
+        });
     }
 
     private void renderHistory(DrawContext ctx, int mouseX, int mouseY) {
+        int left = rx(), right = rr(), top = contentTop(), bottom = this.y0 + this.h - 6;
         BuildRecord record = selected();
         if (record != null) {
-            renderDetail(ctx, record);
+            renderDetail(ctx, record, left, right, top, this.y0 + this.h - 32);
             return;
         }
-        int top = bodyTop();
-        int bottom = bodyBottom();
-        List<BuildRecord> records = BuildHistory.list();
+        ctx.fill(left, top, right, bottom, CHAT_BG);
+        List<BuildRecord> records = filtered();
         if (records.isEmpty()) {
-            ctx.drawText(this.textRenderer, "No builds yet. Accepted builds appear here.", bodyLeft() + 4, top + 6, DIM, false);
+            ctx.drawText(this.textRenderer, "아직 없어요. 설계를 배치하면 여기에 저장됩니다.", left + 6, top + 8, DIM, false);
             return;
         }
-        int visible = Math.max(1, (bottom - top) / ROW);
+        int visible = Math.max(1, (bottom - top - 4) / ROW);
         listScroll = Math.max(0, Math.min(listScroll, records.size() - visible));
-        int textX = bodyLeft() + ROW + 2;
-        int textW = bodyRight() - textX - 4;
+        int textX = left + ROW + 8;
+        int textW = right - textX - 6;
         for (int i = 0; i < visible && listScroll + i < records.size(); i++) {
             BuildRecord r = records.get(listScroll + i);
-            int y = top + i * ROW;
-            boolean hover = mouseX >= bodyLeft() && mouseX < bodyRight() && mouseY >= y && mouseY < y + ROW - 2;
-            ctx.fill(bodyLeft(), y, bodyRight(), y + ROW - 2, hover ? 0xCC2E3744 : 0xAA000000);
+            int y = top + 3 + i * ROW;
+            boolean hover = mouseX >= left + 3 && mouseX < right - 3 && mouseY >= y && mouseY < y + ROW - 3;
+            outline(ctx, left + 3, y, right - 3, y + ROW - 3, hover ? CARD_ME : CARD_BORDER);
+            ctx.fill(left + 4, y + 1, right - 4, y + ROW - 4, CARD);
             BuildPreview p = BuildPreview.of(r);
-            ctx.fill(bodyLeft() + 2, y + 2, bodyLeft() + ROW - 4, y + ROW - 4, 0xFF15151A);
-            BuildPreview.draw(ctx, p.top, p.topW, p.topH, bodyLeft() + 3, y + 3, ROW - 8, ROW - 8);
-            ctx.drawText(this.textRenderer, ellipsize(r.prompt.replace('\n', ' '), textW), textX, y + 6, TEXT, false);
-            String info = DATE.format(new Date(r.createdAt)) + "  " + p.sizeX + "x" + p.sizeY + "x" + p.sizeZ + "  " + r.model;
+            ctx.fill(left + 7, y + 3, left + ROW + 1, y + ROW - 6, 0xFF15130F);
+            BuildPreview.draw(ctx, p.top, p.topW, p.topH, left + 8, y + 4, ROW - 8, ROW - 11);
+            String tag = "object".equals(r.kind) ? "[소품] " : "[건물] ";
+            ctx.drawText(this.textRenderer, ellipsize(tag + r.prompt.replace('\n', ' '), textW), textX, y + 6, TEXT, false);
+            String info = DATE.format(new Date(r.createdAt)) + "  " + p.sizeX + "×" + p.sizeY + "×" + p.sizeZ + "  " + r.model;
             ctx.drawText(this.textRenderer, ellipsize(info, textW), textX, y + 20, DIM, false);
         }
         if (records.size() > visible) {
             String more = (listScroll + 1) + "-" + Math.min(records.size(), listScroll + visible) + " / " + records.size();
-            ctx.drawText(this.textRenderer, more, bodyRight() - this.textRenderer.getWidth(more), bottom - 9, DIM, false);
+            ctx.drawText(this.textRenderer, more, right - this.textRenderer.getWidth(more) - 6, bottom - 11, DIM, false);
         }
     }
 
-    private void renderDetail(DrawContext ctx, BuildRecord r) {
-        int top = bodyTop();
-        int bottom = bodyBottom() - 24;
-        int left = bodyLeft();
-        int width = bodyRight() - left;
+    private void renderDetail(DrawContext ctx, BuildRecord r, int left, int right, int top, int bottom) {
+        ctx.fill(left, top, right, bottom, CHAT_BG);
         BuildPreview p = BuildPreview.of(r);
-
-        ctx.enableScissor(left, top, bodyRight(), bottom);
-        int y = top + 2 - detailScroll;
-        ctx.drawText(this.textRenderer, "Request", left, y, ACCENT, false);
-        y += LINE + 2;
-        for (OrderedText line : this.textRenderer.wrapLines(Text.literal(r.prompt), width - 4)) {
-            ctx.drawText(this.textRenderer, line, left + 2, y, TEXT, false);
+        int width = right - left - 12;
+        ctx.enableScissor(left, top, right, bottom);
+        int x = left + 6;
+        int y = top + 6 - detailScroll;
+        ctx.drawText(this.textRenderer, "object".equals(r.kind) ? "소품 요청" : "건물 요청", x, y, SELECTED, false);
+        y += LINE + 3;
+        for (OrderedText line : this.textRenderer.wrapLines(Text.literal(r.prompt), width)) {
+            ctx.drawText(this.textRenderer, line, x, y, TEXT, false);
             y += LINE;
         }
         y += 6;
-        int img = Math.min(150, (width - 10) / 2);
-        ctx.drawText(this.textRenderer, "Top view (front at top)", left, y, ACCENT, false);
-        ctx.drawText(this.textRenderer, "Front view", left + img + 10, y, ACCENT, false);
-        y += LINE + 2;
-        ctx.fill(left, y, left + img, y + img, 0xFF15151A);
-        ctx.fill(left + img + 10, y, left + 2 * img + 10, y + img, 0xFF15151A);
-        BuildPreview.draw(ctx, p.top, p.topW, p.topH, left + 2, y + 2, img - 4, img - 4);
-        BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, left + img + 12, y + 2, img - 4, img - 4);
+        int img = Math.min(140, (width - 8) / 2);
+        ctx.drawText(this.textRenderer, "위에서 (앞쪽이 위)", x, y, SUBTITLE, false);
+        ctx.drawText(this.textRenderer, "정면에서", x + img + 8, y, SUBTITLE, false);
+        y += LINE + 3;
+        outline(ctx, x, y, x + img, y + img, CARD_BORDER);
+        ctx.fill(x + 1, y + 1, x + img - 1, y + img - 1, 0xFF15130F);
+        outline(ctx, x + img + 8, y, x + 2 * img + 8, y + img, CARD_BORDER);
+        ctx.fill(x + img + 9, y + 1, x + 2 * img + 7, y + img - 1, 0xFF15130F);
+        BuildPreview.draw(ctx, p.top, p.topW, p.topH, x + 3, y + 3, img - 6, img - 6);
+        BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, x + img + 11, y + 3, img - 6, img - 6);
         y += img + 8;
         String[] info = {
-            "Size: " + p.sizeX + " x " + p.sizeY + " x " + p.sizeZ + " (W x H x L), " + p.blocks + " blocks",
-            "Created: " + DATE.format(new Date(r.createdAt)),
+            "크기: " + p.sizeX + " × " + p.sizeY + " × " + p.sizeZ + " (가로 × 높이 × 세로), "
+                + ("object".equals(r.kind) ? "조각 " + p.blocks + "개" : "블록 " + p.blocks + "개"),
+            "만든 날: " + DATE.format(new Date(r.createdAt)),
             "AI: " + r.provider + " / " + r.model,
-            "Build here: placed in front of you, turned to face where you look."
+            "여기에 배치: 내 앞에, 지금 바라보는 방향으로 놓입니다. 되돌리기로 취소할 수 있어요."
         };
         for (String s : info) {
-            ctx.drawText(this.textRenderer, ellipsize(s, width), left, y, s.startsWith("Build here") ? DIM : TEXT, false);
-            y += LINE;
+            for (OrderedText line : this.textRenderer.wrapLines(Text.literal(s), width)) {
+                ctx.drawText(this.textRenderer, line, x, y, s.startsWith("여기에") ? DIM : TEXT, false);
+                y += LINE;
+            }
         }
         ctx.disableScissor();
         int contentHeight = y + detailScroll - top;
-        detailScroll = Math.max(0, Math.min(detailScroll, contentHeight - (bottom - top)));
+        detailScroll = Math.max(0, Math.min(detailScroll, Math.max(0, contentHeight - (bottom - top))));
     }
 
-    // ---------------------------------------------------------------- logs tab
+    // ---------------------------------------------------------------- 로그
 
     private void buildLogs() {
         this.days = LogStore.days();
         dayIndex = Math.max(0, Math.min(dayIndex, Math.max(0, this.days.size() - 1)));
         this.fileLines = this.days.isEmpty() ? List.of() : LogStore.read(this.days.get(dayIndex));
-        ButtonWidget older = ButtonWidget.builder(Text.literal("<"), b -> {
-                dayIndex++;
-                fileScroll = 0;
-                rebuild();
-            })
-            .dimensions(bodyLeft(), bodyTop(), 20, 20)
-            .build();
+        ButtonWidget older = button("<", rx(), contentTop(), 20, b -> {
+            dayIndex++;
+            fileScroll = 0;
+            rebuild();
+        });
         older.active = dayIndex < this.days.size() - 1;
-        this.addDrawableChild(older);
-        ButtonWidget newer = ButtonWidget.builder(Text.literal(">"), b -> {
-                dayIndex--;
-                fileScroll = 0;
-                rebuild();
-            })
-            .dimensions(bodyLeft() + 120, bodyTop(), 20, 20)
-            .build();
+        ButtonWidget newer = button(">", rx() + 110, contentTop(), 20, b -> {
+            dayIndex--;
+            fileScroll = 0;
+            rebuild();
+        });
         newer.active = dayIndex > 0;
-        this.addDrawableChild(newer);
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Reload"), b -> rebuild())
-            .dimensions(bodyRight() - 60, bodyTop(), 60, 20)
-            .build());
+        button("새로고침", rr() - 92, this.y0 + 10, 86, b -> rebuild());
     }
 
     private void renderLogs(DrawContext ctx) {
-        String day = this.days.isEmpty() ? "(no logs)" : this.days.get(dayIndex);
-        ctx.drawCenteredTextWithShadow(this.textRenderer, Text.literal(day), bodyLeft() + 70, bodyTop() + 6, TEXT);
-        int top = bodyTop() + 26;
-        int bottom = bodyBottom();
-        box(ctx, bodyLeft(), top, bodyRight(), bottom);
+        int left = rx(), right = rr();
+        String day = this.days.isEmpty() ? "(기록 없음)" : this.days.get(dayIndex);
+        ctx.drawCenteredTextWithShadow(this.textRenderer, Text.literal(day), left + 65, contentTop() + 6, TITLE);
+        int top = contentTop() + 24;
+        int bottom = this.y0 + this.h - 6;
+        ctx.fill(left, top, right, bottom, CHAT_BG);
         if (this.fileLines.isEmpty()) {
-            ctx.drawText(this.textRenderer, "Nothing logged yet.", bodyLeft() + 5, top + 5, DIM, false);
+            ctx.drawText(this.textRenderer, "아직 기록이 없어요.", left + 6, top + 6, DIM, false);
             return;
         }
         List<OrderedText> lines = new ArrayList<>();
         for (String line : this.fileLines) {
-            lines.addAll(this.textRenderer.wrapLines(Text.literal(line.replace("\t", "  ")), bodyRight() - bodyLeft() - 10));
+            lines.addAll(this.textRenderer.wrapLines(Text.literal(line.replace("\t", "  ")), right - left - 12));
         }
-        drawScrolledFromBottom(ctx, lines, top, bottom, fileScroll, LOG_TEXT_COLOR);
-    }
-
-    // ---------------------------------------------------------------- shared drawing
-
-    private void box(DrawContext ctx, int l, int t, int r, int b) {
-        ctx.fill(l - 1, t - 1, r + 1, b + 1, 0xFF000000);
-        ctx.fill(l, t, r, b, 0xCC000000);
-    }
-
-    /** Lines anchored at the bottom; scroll = lines moved up. Clamps the scroll it was given. */
-    private int drawScrolledFromBottom(DrawContext ctx, List<OrderedText> lines, int top, int bottom, int scroll, int color) {
         int visible = Math.max(1, (bottom - top - 8) / LINE);
-        int maxScroll = Math.max(0, lines.size() - visible);
-        int s = Math.max(0, Math.min(scroll, maxScroll));
-        int end = lines.size() - s;
-        int start = Math.max(0, end - visible);
+        fileScroll = Math.max(0, Math.min(fileScroll, Math.max(0, lines.size() - visible)));
+        int end = lines.size() - fileScroll;
         int y = top + 4;
-        for (int i = start; i < end; i++) {
-            ctx.drawTextWithShadow(this.textRenderer, lines.get(i), bodyLeft() + 5, y, color);
+        for (int i = Math.max(0, end - visible); i < end; i++) {
+            ctx.drawText(this.textRenderer, lines.get(i), left + 6, y, TEXT, false);
             y += LINE;
         }
-        if (s > 0) {
-            String hint = "▼ " + s;
-            ctx.drawText(this.textRenderer, hint, bodyRight() - this.textRenderer.getWidth(hint) - 4, bottom - 10, DIM, false);
+    }
+
+    // ---------------------------------------------------------------- frame
+
+    private void renderFrame(DrawContext ctx) {
+        ctx.fill(0, 0, this.width, this.height, 0x66000000);
+        int x1 = this.x0 + this.w, y1 = this.y0 + this.h;
+        ctx.fill(this.x0 - 2, this.y0 - 2, x1 + 2, y1 + 2, FRAME_OUT);
+        ctx.fill(this.x0, this.y0, x1, y1, FRAME);
+        // Corner studs.
+        for (int[] c : new int[][] { { this.x0 - 2, this.y0 - 2 }, { x1 - 2, this.y0 - 2 }, { this.x0 - 2, y1 - 2 }, { x1 - 2, y1 - 2 } }) {
+            ctx.fill(c[0], c[1], c[0] + 4, c[1] + 4, LINE_LIGHT);
         }
-        return maxScroll;
+        // Sidebar.
+        int sx = this.x0 + 4;
+        ctx.fill(sx, this.y0 + 4, sx + SIDEBAR_WIDTH, y1 - 4, SIDEBAR);
+        outline(ctx, sx, this.y0 + 4, sx + SIDEBAR_WIDTH, y1 - 4, LINE_LIGHT);
+        ctx.drawText(this.textRenderer, "AI BUILDER", sx + 7, this.y0 + 12, TITLE, true);
+        ctx.drawText(this.textRenderer, "블록 건축 도우미", sx + 7, this.y0 + 25, SUBTITLE, false);
+        for (int i = 0; i < 6; i++) { // faint plank lines
+            int ly = this.y0 + 150 + i * 22;
+            if (ly < y1 - 36) {
+                ctx.fill(sx + 6, ly, sx + SIDEBAR_WIDTH - 6, ly + 1, 0x30FFFFFF);
+            }
+        }
+        // Page header.
+        int left = rx(), right = rr();
+        ctx.fill(left, this.y0 + 4, right, this.y0 + 40, HEADER);
+        outline(ctx, left, this.y0 + 4, right, this.y0 + 40, LINE_LIGHT);
+        String title;
+        String subtitle;
+        ItemStack icon;
+        switch (page) {
+            case CREATE -> {
+                title = "AI 작업실";
+                subtitle = AiClientState.isObjectMode() ? "원하는 소품을 이야기해 주세요" : "원하는 건물을 이야기해 주세요";
+                icon = new ItemStack(Items.WRITABLE_BOOK);
+            }
+            case HISTORY -> {
+                title = selected() == null ? "내 오브젝트" : "오브젝트 정보";
+                subtitle = "만든 건물과 소품을 다시 배치할 수 있어요";
+                icon = new ItemStack(Items.CHEST);
+            }
+            default -> {
+                title = "로그";
+                subtitle = "날짜별 전체 기록";
+                icon = new ItemStack(Items.PAPER);
+            }
+        }
+        ctx.drawItem(icon, left + 6, this.y0 + 7);
+        ctx.drawText(this.textRenderer, title, left + 26, this.y0 + 11, TITLE, true);
+        ctx.drawText(this.textRenderer, ellipsize(subtitle, right - left - 112), left + 8, this.y0 + 27, SUBTITLE, false);
+    }
+
+    private static void outline(DrawContext ctx, int l, int t, int r, int b, int color) {
+        ctx.fill(l, t, r, t + 1, color);
+        ctx.fill(l, b - 1, r, b, color);
+        ctx.fill(l, t, l + 1, b, color);
+        ctx.fill(r - 1, t, r, b, color);
     }
 
     private String ellipsize(String text, int width) {
@@ -429,19 +546,29 @@ public class AiPromptScreen extends Screen {
         return this.textRenderer.trimToWidth(text, Math.max(0, width - this.textRenderer.getWidth("…"))) + "…";
     }
 
+    private static String shortTitle(String prompt) {
+        String p = prompt == null ? "" : prompt.replace('\n', ' ');
+        return p.length() > 30 ? p.substring(0, 30) + "…" : p;
+    }
+
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        layoutPanel();
-        ctx.fill(this.panelX, this.panelY, this.panelX + this.panelWidth, this.panelY + this.panelHeight, 0xE6202027);
-        ctx.fill(this.panelX, this.panelY, this.panelX + this.panelWidth, this.panelY + 30, 0xFF2E3744);
-
-        switch (tab) {
+        layout();
+        renderFrame(ctx);
+        switch (page) {
             case CREATE -> renderCreate(ctx);
             case HISTORY -> renderHistory(ctx, mouseX, mouseY);
             case LOGS -> renderLogs(ctx);
         }
-
         super.render(ctx, mouseX, mouseY, delta);
+        for (IconAt icon : this.icons) {
+            ctx.drawItem(icon.stack(), icon.x(), icon.y());
+        }
+        // Mark the open page in the menu.
+        int sy = page == Page.CREATE ? this.y0 + 44 : page == Page.HISTORY ? this.y0 + 68 : -1;
+        if (sy > 0) {
+            outline(ctx, this.x0 + 9, sy - 1, this.x0 + 9 + SIDEBAR_WIDTH - 10, sy + 21, SELECTED);
+        }
         if (this.promptField != null) {
             this.promptField.render(ctx, mouseX, mouseY, delta);
         }
@@ -454,10 +581,11 @@ public class AiPromptScreen extends Screen {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        if (tab == Tab.HISTORY && selected() == null && button == 0
-            && mouseX >= bodyLeft() && mouseX < bodyRight() && mouseY >= bodyTop() && mouseY < bodyBottom()) {
-            int index = listScroll + (int) ((mouseY - bodyTop()) / ROW);
-            List<BuildRecord> records = BuildHistory.list();
+        int top = contentTop() + 3;
+        if (page == Page.HISTORY && selected() == null && button == 0
+            && mouseX >= rx() && mouseX < rr() && mouseY >= top && mouseY < this.y0 + this.h - 6) {
+            int index = listScroll + (int) ((mouseY - top) / ROW);
+            List<BuildRecord> records = filtered();
             if (index >= 0 && index < records.size()) {
                 selectedId = records.get(index).id;
                 detailScroll = 0;
@@ -471,12 +599,12 @@ public class AiPromptScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (verticalAmount == 0.0D || mouseX < this.panelX || mouseX > this.panelX + this.panelWidth) {
+        if (verticalAmount == 0.0D || mouseX < rx() || mouseX > rr()) {
             return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         }
         int step = verticalAmount > 0 ? 1 : -1;
-        switch (tab) {
-            case CREATE -> logScroll = Math.max(0, logScroll + step * 3);
+        switch (page) {
+            case CREATE -> chatScroll = Math.max(0, chatScroll + step * 24);
             case LOGS -> fileScroll = Math.max(0, fileScroll + step * 3);
             case HISTORY -> {
                 if (selected() != null) {
@@ -489,16 +617,9 @@ public class AiPromptScreen extends Screen {
         return true;
     }
 
-    private Text webSearchLabel() {
-        if (!AiClientState.isWebSearchAvailable()) {
-            return Text.literal("Web");
-        }
-        return Text.literal(AiClientState.willUseWebSearch() ? "Web:ON" : "Web:OFF");
-    }
-
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (tab == Tab.CREATE && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
+        if (page == Page.CREATE && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
             sendBuild();
             return true;
         }

@@ -7,6 +7,7 @@ import net.minecraft.text.Text;
 import com.example.ai.approval.BuildApproval;
 import com.example.ai.build.BuildRecord;
 import com.example.ai.build.RebuildService;
+import com.example.ai.build.UndoService;
 import com.example.config.AiBuilderConfig;
 import com.example.config.AiProvider;
 import com.example.config.ForbiddenBlockRegistry;
@@ -34,6 +35,7 @@ public final class AiNetworking {
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.AiSettingsSyncC2SPayload.ID, AiNetworkPayloads.AiSettingsSyncC2SPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.BuildCompleteS2CPayload.ID, AiNetworkPayloads.BuildCompleteS2CPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RebuildPartC2SPayload.ID, AiNetworkPayloads.RebuildPartC2SPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.UndoC2SPayload.ID, AiNetworkPayloads.UndoC2SPayload.CODEC);
     }
 
     public static void registerServerReceivers() {
@@ -47,6 +49,10 @@ public final class AiNetworking {
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.AiSettingsSyncC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> applySettings(payload));
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.UndoC2SPayload.ID, (payload, context) -> {
+            context.server().execute(() -> UndoService.undo(context.player()));
         });
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.RebuildPartC2SPayload.ID, (payload, context) -> {

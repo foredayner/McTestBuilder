@@ -15,6 +15,8 @@ public final class BuildRecord {
     private static final Gson GSON = new Gson();
 
     public int version = 1;
+    /** "build" (blocks) or "object" (display-entity parts). */
+    public String kind = "build";
     public String id = "";
     public long createdAt;
     public String prompt = "";
@@ -30,6 +32,7 @@ public final class BuildRecord {
         record.provider = provider == null ? "" : provider;
         record.model = model == null ? "" : model;
         record.plan = plan;
+        record.kind = plan.isObject() ? "object" : "build";
         return record;
     }
 
@@ -41,6 +44,12 @@ public final class BuildRecord {
         BuildRecord record = GSON.fromJson(json, BuildRecord.class);
         if (record == null || record.plan == null || record.plan.ops == null) {
             throw new IllegalArgumentException("Not a build record");
+        }
+        if (record.plan.parts == null) {
+            record.plan.parts = new java.util.ArrayList<>();
+        }
+        if (record.kind == null) {
+            record.kind = record.plan.isObject() ? "object" : "build";
         }
         return record;
     }

@@ -155,4 +155,15 @@ public final class AiNetworkPayloads {
             return ID;
         }
     }
+
+    /** Client -> server: undo my last build. */
+    public record UndoC2SPayload() implements CustomPayload {
+        public static final CustomPayload.Id<UndoC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "undo"));
+        public static final PacketCodec<RegistryByteBuf, UndoC2SPayload> CODEC = PacketCodec.unit(new UndoC2SPayload());
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
 }

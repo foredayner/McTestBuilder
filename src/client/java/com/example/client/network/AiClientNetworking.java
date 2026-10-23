@@ -56,6 +56,10 @@ public final class AiClientNetworking {
         }
     }
 
+    public static void sendUndo() {
+        ClientPlayNetworking.send(new AiNetworkPayloads.UndoC2SPayload());
+    }
+
     /** Send a saved build to the server in parts small enough for client packets. */
     public static void sendRebuild(BuildRecord record) {
         byte[] data = record.toGzip();

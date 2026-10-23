@@ -32,13 +32,32 @@ public class AiBuildCommand {
         });
     }
 
-    private static int executeBuild(ServerCommandSource source, String prompt, boolean useWebSearch) {
+    private static int executeBuild(ServerCommandSource source, String rawPrompt, boolean webFlag) {
+        // Flags may come in any order before the prompt: --web, --object.
+        String prompt = rawPrompt.trim();
+        boolean useWebSearch = webFlag;
+        boolean objectMode = false;
+        while (true) {
+            if (prompt.startsWith("--web ")) {
+                useWebSearch = true;
+                prompt = prompt.substring(6).trim();
+            } else if (prompt.startsWith("--object ")) {
+                objectMode = true;
+                prompt = prompt.substring(9).trim();
+            } else {
+                break;
+            }
+        }
+        return executeBuild(source, prompt, useWebSearch, objectMode);
+    }
+
+    private static int executeBuild(ServerCommandSource source, String prompt, boolean useWebSearch, boolean objectMode) {
         source.sendFeedback(
-            () -> Text.literal("AI Build request" + (useWebSearch ? " (web search)" : "") + ": " + prompt),
+            () -> Text.literal("AI " + (objectMode ? "object" : "build") + " request" + (useWebSearch ? " (web search)" : "") + ": " + prompt),
             false
         );
 
-        AiController.requestBuild(source.getPlayer(), prompt, useWebSearch);
+        AiController.requestBuild(source.getPlayer(), prompt, useWebSearch, objectMode);
         return 1;
     }
 }

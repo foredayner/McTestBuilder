@@ -47,8 +47,55 @@ public final class BuildPlan {
         }
     }
 
+    /**
+     * A piece of a small object, drawn by a block_display entity: a block scaled to (sx, sy, sz)
+     * blocks, centred at (x, y, z) relative to the feet block's corner, turned by yaw/pitch/roll
+     * degrees around its centre.
+     */
+    public static final class Part {
+        public String block;
+        public double x;
+        public double y;
+        public double z;
+        public double sx;
+        public double sy;
+        public double sz;
+        public double yaw;
+        public double pitch;
+        public double roll;
+
+        public Part() {
+        }
+
+        public Part(String block, double x, double y, double z, double sx, double sy, double sz, double yaw, double pitch, double roll) {
+            this.block = block;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.sx = sx;
+            this.sy = sy;
+            this.sz = sz;
+            this.yaw = yaw;
+            this.pitch = pitch;
+            this.roll = roll;
+        }
+    }
+
+    public static final int MAX_PARTS = 400;
+    public static final double MAX_PART_SIZE = 16;
+    public static final double MAX_PART_OFFSET = 64;
+
     public List<Op> ops = new ArrayList<>();
+    public List<Part> parts = new ArrayList<>();
     public String facing = "north";
+
+    public boolean isEmpty() {
+        return (ops == null || ops.isEmpty()) && (parts == null || parts.isEmpty());
+    }
+
+    public boolean isObject() {
+        return parts != null && !parts.isEmpty();
+    }
 
     /** "NORTH", "North (-Z)", null... -> "north" | "east" | "south" | "west". */
     public static String normalizeFacing(String value) {
@@ -103,6 +150,23 @@ public final class BuildPlan {
                 }
             }
         }
+        if (parts != null) {
+            for (Part p : parts) {
+                double r = Math.sqrt(p.sx * p.sx + p.sy * p.sy + p.sz * p.sz) / 2;
+                int[] o = {
+                    (int) Math.floor(p.x - r), (int) Math.floor(p.y - r), (int) Math.floor(p.z - r),
+                    (int) Math.ceil(p.x + r) - 1, (int) Math.ceil(p.y + r) - 1, (int) Math.ceil(p.z + r) - 1
+                };
+                if (b == null) {
+                    b = o;
+                } else {
+                    for (int i = 0; i < 3; i++) {
+                        b[i] = Math.min(b[i], o[i]);
+                        b[i + 3] = Math.max(b[i + 3], o[i + 3]);
+                    }
+                }
+            }
+        }
         return b == null ? new int[6] : b;
     }
 
@@ -126,12 +190,33 @@ public final class BuildPlan {
                 }
             }
         }
+        if (parts != null) {
+            if (parts.size() > MAX_PARTS) {
+                problems.add("the object has " + parts.size() + " parts; use at most " + MAX_PARTS + " (merge small pieces into bigger boxes).");
+            }
+            int bad = 0;
+            for (Part p : parts) {
+                if (Math.max(p.sx, Math.max(p.sy, p.sz)) > MAX_PART_SIZE || Math.min(p.sx, Math.min(p.sy, p.sz)) <= 0) {
+                    if (bad++ == 0) {
+                        problems.add("a part of " + p.block + " has size " + p.sx + " x " + p.sy + " x " + p.sz
+                            + "; each size must be above 0 and at most " + (int) MAX_PART_SIZE + ".");
+                    }
+                }
+                if (Math.abs(p.x) > MAX_PART_OFFSET || Math.abs(p.y) > MAX_PART_OFFSET || Math.abs(p.z) > MAX_PART_OFFSET) {
+                    if (bad++ == 0) {
+                        problems.add("a part is placed too far away (" + p.x + ", " + p.y + ", " + p.z + "); keep objects within "
+                            + (int) MAX_PART_OFFSET + " blocks of the player.");
+                    }
+                }
+            }
+        }
         return problems;
     }
 
     public String summary() {
         int[] b = bounds();
         return "Size: " + (b[3] - b[0] + 1) + " x " + (b[4] - b[1] + 1) + " x " + (b[5] - b[2] + 1)
-            + " (W x H x L), " + ops.size() + " command(s)";
+            + " (W x H x L), " + (isObject() ? parts.size() + " part(s)" + (ops.isEmpty() ? "" : ", ") : "")
+            + (ops.isEmpty() && isObject() ? "" : ops.size() + " command(s)");
     }
 }

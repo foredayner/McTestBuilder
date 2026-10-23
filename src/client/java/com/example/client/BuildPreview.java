@@ -7,6 +7,9 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -67,6 +70,9 @@ public final class BuildPreview {
     private static int kz(long k) { return (int) (k << 43 >> 43); }
 
     static BuildPreview compute(BuildPlan plan) {
+        if (plan.isObject()) {
+            return computeObject(plan);
+        }
         // Turn the build so the player faced north: forward = -Z, right = +X.
         int turns = BuildPlan.turnsBetween(plan.facing, "north");
         Map<Long, Integer> voxels = new HashMap<>();
@@ -113,6 +119,68 @@ public final class BuildPreview {
             }
         }
 
+        return fromVoxels(voxels, 1, voxels.size());
+    }
+
+    /**
+     * Objects: rasterise each rotated part into a fine grid (r cells per block) so pieces smaller
+     * than a block still show.
+     */
+    static BuildPreview computeObject(BuildPlan plan) {
+        int turns = BuildPlan.turnsBetween(plan.facing, "north");
+        Map<String, Integer> colors = new HashMap<>();
+        double ext = 0.5;
+        for (BuildPlan.Part p : plan.parts) {
+            double half = Math.sqrt(p.sx * p.sx + p.sy * p.sy + p.sz * p.sz) / 2;
+            ext = Math.max(ext, Math.max(Math.abs(p.x), Math.max(Math.abs(p.y), Math.abs(p.z))) + half);
+        }
+        Map<Long, Integer> voxels = new HashMap<>();
+        double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+        double minZ = Double.MAX_VALUE, maxZ = -Double.MAX_VALUE;
+        for (BuildPlan.Part p : plan.parts) {
+            double half = Math.sqrt(p.sx * p.sx + p.sy * p.sy + p.sz * p.sz) / 2;
+            minX = Math.min(minX, p.x - half); maxX = Math.max(maxX, p.x + half);
+            minY = Math.min(minY, p.y - half); maxY = Math.max(maxY, p.y + half);
+            minZ = Math.min(minZ, p.z - half); maxZ = Math.max(maxZ, p.z + half);
+        }
+        double extent = Math.max(maxX - minX, Math.max(maxY - minY, maxZ - minZ));
+        int r = (int) Math.max(2, Math.min(16, Math.floor(96 / Math.max(0.1, extent))));
+
+        for (BuildPlan.Part p : plan.parts) {
+            double cx = p.x, cz = p.z;
+            for (int i = 0; i < turns; i++) {
+                double t = cx;
+                cx = -cz;
+                cz = t;
+            }
+            Quaternionf q = new Quaternionf()
+                .rotateY((float) Math.toRadians(-90.0 * turns))
+                .rotateY((float) Math.toRadians(p.yaw))
+                .rotateX((float) Math.toRadians(p.pitch))
+                .rotateZ((float) Math.toRadians(p.roll));
+            Quaternionf inverse = new Quaternionf(q).conjugate();
+            double hx = p.sx / 2, hy = p.sy / 2, hz = p.sz / 2;
+            double reach = Math.sqrt(hx * hx + hy * hy + hz * hz);
+            int color = colors.computeIfAbsent(p.block, BuildPreview::colorOf);
+            Vector3f local = new Vector3f();
+            for (int ix = (int) Math.floor((cx - reach) * r); ix <= (int) Math.ceil((cx + reach) * r); ix++) {
+                for (int iy = (int) Math.floor((p.y - reach) * r); iy <= (int) Math.ceil((p.y + reach) * r); iy++) {
+                    for (int iz = (int) Math.floor((cz - reach) * r); iz <= (int) Math.ceil((cz + reach) * r); iz++) {
+                        local.set((float) ((ix + 0.5) / r - cx), (float) ((iy + 0.5) / r - p.y), (float) ((iz + 0.5) / r - cz));
+                        inverse.transform(local);
+                        if (Math.abs(local.x) <= hx && Math.abs(local.y) <= hy && Math.abs(local.z) <= hz) {
+                            voxels.put(key(ix, iy, iz), color);
+                        }
+                    }
+                }
+            }
+        }
+        BuildPreview preview = fromVoxels(voxels, r, plan.parts.size());
+        return preview;
+    }
+
+    /** Top and front projections of a voxel map with r cells per block. */
+    private static BuildPreview fromVoxels(Map<Long, Integer> voxels, int r, int count) {
         if (voxels.isEmpty()) {
             return new BuildPreview(0, 0, 0, 0, 1, 1, new int[1], 1, 1, new int[1]);
         }
@@ -149,7 +217,7 @@ public final class BuildPreview {
 
         int[] t = shrink(top, sx, sz);
         int[] f = shrink(front, sx, sy);
-        return new BuildPreview(sx, sy, sz, voxels.size(),
+        return new BuildPreview((sx + r - 1) / r, (sy + r - 1) / r, (sz + r - 1) / r, count,
             Math.min(sx, MAX_SIDE), Math.min(sz, MAX_SIDE), t, Math.min(sx, MAX_SIDE), Math.min(sy, MAX_SIDE), f);
     }
 
