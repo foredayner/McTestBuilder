@@ -109,6 +109,11 @@ public final class ObjectItems {
      * and hitbox and drops the object item, except in creative mode (like blocks).
      */
     public static void breakObject(ServerPlayerEntity player, int entityId) {
+        breakObject(player, entityId, !player.isCreative());
+    }
+
+    /** drop: whether the item comes out (not in creative). */
+    public static void breakObject(ServerPlayerEntity player, int entityId, boolean drop) {
         ServerWorld world = player.getServerWorld();
         Entity target = world.getEntityById(entityId);
         if (!(target instanceof SolidHitboxEntity) || target.isRemoved() || player.isSpectator()) {
@@ -145,7 +150,7 @@ public final class ObjectItems {
             z /= n;
         }
         world.playSound(null, BlockPos.ofFloored(x, y, z), SoundEvents.BLOCK_STONE_BREAK, SoundCategory.BLOCKS, 1.0F, 0.8F);
-        if (player.isCreative()) {
+        if (!drop) {
             return;
         }
         BuildRecord record = BlueprintStore.load(world.getServer(), id);

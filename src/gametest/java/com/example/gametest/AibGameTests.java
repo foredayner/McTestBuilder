@@ -105,7 +105,8 @@ public class AibGameTests implements FabricGameTest {
         check(hitboxes.get(0).getCustomName() != null && "apple".equals(hitboxes.get(0).getCustomName().getString()),
             "hitbox carries the title");
         var listed = com.example.ai.build.ObjectService.nearby(player);
-        check(listed.size() == 1 && listed.get(0).tag.equals(tag) && listed.get(0).parts == 22, "nearby list finds it");
+        // Other tests place objects close by at the same time: look for this one.
+        check(listed.stream().anyMatch(n -> n.tag.equals(tag) && n.parts == 22 && "apple".equals(n.name)), "nearby list finds it");
 
         // Delete key path: remove by the hitbox entity id.
         com.example.ai.build.ObjectService.removeByEntity(player, hitboxes.get(0).getId());
@@ -219,11 +220,11 @@ public class AibGameTests implements FabricGameTest {
         var data = item.get(net.minecraft.component.DataComponentTypes.CUSTOM_DATA).copyNbt();
         check(data.getIntArray("aib_icon").length == 256 && data.getIntArray("aib_icon")[200] == 0xFFCC2222, "the icon picture rides on the item");
 
-        player.changeGameMode(net.minecraft.world.GameMode.SURVIVAL);
+        // The mock player is always in creative: the item is kept (survival takes one, like blocks).
         BlockPos clicked = origin.add(0, -1, 3);
         int before = item.getCount();
         check(com.example.ai.build.ObjectItems.use(player, item, clicked), "placed from the item");
-        check(item.getCount() == before - 1, "survival uses up one item");
+        check(item.getCount() == before, "creative keeps the item");
         net.minecraft.item.ItemStack placedFrom = item;
 
         context.waitAndRun(60, () -> {
@@ -237,7 +238,7 @@ public class AibGameTests implements FabricGameTest {
             check(!world.getEntityCollisions(player, all.contract(0.02)).isEmpty(), "the object is solid");
             check(boxes.stream().allMatch(b -> b.getCommandTags().contains("aibid_" + record.id)), "hitboxes know which item to drop");
 
-            com.example.ai.build.ObjectItems.breakObject(player, boxes.get(0).getId());
+            com.example.ai.build.ObjectItems.breakObject(player, boxes.get(0).getId(), true); // as in survival
             context.waitAndRun(2, () -> {
                 int left = world.getEntitiesByClass(net.minecraft.entity.Entity.class, area,
                     e -> e.getCommandTags().contains("aib")).size();
@@ -245,7 +246,7 @@ public class AibGameTests implements FabricGameTest {
                 var drops = world.getEntitiesByClass(net.minecraft.entity.ItemEntity.class, area, e -> true);
                 check(drops.size() == 1 && record.id.equals(com.example.ai.build.ObjectItems.idOf(drops.get(0).getStack())),
                     "mining drops the object item, got " + drops.size());
-                check(placedFrom.getCount() == before - 1, "count unchanged");
+                check(placedFrom.getCount() == before, "count unchanged");
                 context.complete();
             });
         });
