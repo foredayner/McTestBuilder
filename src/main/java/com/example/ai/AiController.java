@@ -10,6 +10,9 @@ import com.google.gson.JsonParser;
 
 import com.example.ai.api.MinecraftAI;
 import com.example.ai.approval.BuildApproval;
+import com.example.ai.build.BuildPlan;
+import com.example.ai.build.BuildRecord;
+import com.example.ai.script.ScriptExecutor;
 import com.example.config.AiBuilderConfig;
 import com.example.config.AiProvider;
 import com.example.network.AiNetworking;
@@ -18,6 +21,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class AiController {
+
+    /** One build request, kept across automatic retries. */
+    private record BuildRequest(String userPrompt, String basePrompt, boolean webSearch, long startTime) {
+    }
 
     public static void requestBuild(ServerPlayerEntity player, String prompt) {
         requestBuild(player, prompt, false);
@@ -61,13 +68,7 @@ public class AiController {
             debug("[DEBUG] Sending to AI provider...");
             AiNetworking.sendDebugLog(player, "[AI] Requesting from AI model (" + config.provider.getDisplayName() + ")...");
 
-            var request = AiHttpService.buildRequest(promptText, webSearch);
-            AiHttpService.client().sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenAccept(response -> runOnServer(player, () -> handleAiResponse(player, response, startTime, webSearch)))
-                .exceptionally(ex -> {
-                    runOnServer(player, () -> handleAiFailure(player, ex, startTime));
-                    return null;
-                });
+            sendToAi(player, new BuildRequest(prompt, promptText, webSearch, startTime), promptText, 0);
 
         } catch (Exception exception) {
             debug("[ERROR] Fatal error: " + exception.getMessage());
@@ -76,7 +77,19 @@ public class AiController {
         }
     }
 
-    private static void handleAiResponse(ServerPlayerEntity player, HttpResponse<String> response, long startTime, boolean webSearch) {
+    private static void sendToAi(ServerPlayerEntity player, BuildRequest req, String promptText, int attempt) {
+        var request = AiHttpService.buildRequest(promptText, req.webSearch());
+        AiHttpService.client().sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            .thenAccept(response -> runOnServer(player, () -> handleAiResponse(player, response, req, attempt)))
+            .exceptionally(ex -> {
+                runOnServer(player, () -> handleAiFailure(player, ex, req.startTime()));
+                return null;
+            });
+    }
+
+    private static void handleAiResponse(ServerPlayerEntity player, HttpResponse<String> response, BuildRequest req, int attempt) {
+        long startTime = req.startTime();
+        boolean webSearch = req.webSearch();
         try {
             AiProvider provider = AiBuilderConfig.get().provider;
             String endpoint = AiHttpService.resolveEndpointForProvider(provider, AiBuilderConfig.get().apiUrl, webSearch);
@@ -108,17 +121,90 @@ public class AiController {
                 return;
             }
 
-            BlockPos origin = player.getBlockPos();
-            String description = generateDescription(aiCode, origin);
-            BuildApproval.requestApproval(player, aiCode, description, origin);
-
+            planAndApprove(player, req, aiCode, attempt);
             debug("[TIMER] Total AI time: " + (System.currentTimeMillis() - startTime) + "ms");
-            debug("[TIMER] ===== PENDING USER APPROVAL =====");
         } catch (Exception exception) {
             debug("[ERROR] Exception: " + exception.getMessage());
             exception.printStackTrace();
             AiNetworking.sendLog(player, "[AI] Error: " + exception.getMessage());
         }
+    }
+
+    /**
+     * Dry-run the script, recording what it would place. A script that fails to compile or run
+     * (or places nothing) goes back to the AI with the error, up to autoRetries times; a good one
+     * is shown for approval. Nothing touches the world until the player accepts.
+     */
+    private static void planAndApprove(ServerPlayerEntity player, BuildRequest req, String aiCode, int attempt) {
+        BlockPos origin = player.getBlockPos();
+        MinecraftAI.init(player.getServerWorld(), origin, player.getYaw(), player.getPitch(), player);
+        BuildPlan plan = new BuildPlan();
+        plan.facing = BuildPlan.normalizeFacing(MinecraftAI.getFacing());
+
+        ScriptExecutor.ExecutionResult result;
+        MinecraftAI.startRecording(plan);
+        try {
+            result = ScriptExecutor.executeScript(aiCode);
+        } finally {
+            MinecraftAI.stopRecording();
+        }
+
+        String failure = !result.success() ? result.message()
+            : plan.ops.isEmpty() ? "The script ran but placed no blocks. Build with the ai.place* functions." : null;
+        if (failure == null) {
+            AiBuilderConfig config = AiBuilderConfig.get();
+            String description = generateDescription(aiCode, origin) + "\n" + plan.summary();
+            BuildRecord record = BuildRecord.create(req.userPrompt(), config.provider.name(), config.modelName, plan);
+            BuildApproval.requestApproval(player, record, description, origin);
+            debug("[TIMER] ===== PENDING USER APPROVAL =====");
+            return;
+        }
+
+        int maxRetries = AiBuilderConfig.get().autoRetries;
+        if (attempt < maxRetries) {
+            AiNetworking.sendLog(player, "[AI] Script failed: " + firstLine(failure));
+            AiNetworking.sendLog(player, "[AI] Asking the AI to fix it (retry " + (attempt + 1) + "/" + maxRetries + ")...");
+            sendToAi(player, req, fixPrompt(req.basePrompt(), aiCode, failure), attempt + 1);
+            return;
+        }
+
+        if (result.securityBlocked()) {
+            AiNetworking.sendLog(player, "[Security Alert] " + failure);
+            AiNetworking.notify(player, "\u00a7c[Security Alert] " + firstLine(failure) + "\u00a7r");
+        } else {
+            AiNetworking.sendLog(player, "[AI] Script error: " + failure);
+            if (maxRetries > 0) {
+                AiNetworking.sendLog(player, "[AI] Gave up after " + maxRetries + " retries. Try a simpler request or a larger model.");
+            }
+        }
+    }
+
+    private static String fixPrompt(String basePrompt, String badCode, String error) {
+        return basePrompt
+            + "\n\nYOUR PREVIOUS SCRIPT FAILED. Fix it.\n"
+            + "Error:\n" + truncate(error, 1500) + "\n\n"
+            + "Previous script:\n" + truncate(badCode, 6000) + "\n\n"
+            + "Return the complete corrected Groovy script only. No markdown, no comments, no explanation.\n";
+    }
+
+    private static String truncate(String text, int max) {
+        if (text == null) {
+            return "";
+        }
+        return text.length() <= max ? text : text.substring(0, max) + "\n...(truncated)";
+    }
+
+    private static String firstLine(String text) {
+        if (text == null) {
+            return "";
+        }
+        for (String line : text.replace("\r", "").split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty() && !trimmed.startsWith("startup failed")) {
+                return trimmed.length() > 160 ? trimmed.substring(0, 160) + "..." : trimmed;
+            }
+        }
+        return text.trim();
     }
 
     private static void handleAiFailure(ServerPlayerEntity player, Throwable throwable, long startTime) {

@@ -77,7 +77,9 @@ public final class AiNetworkPayloads {
         String forbiddenBlocksPath,
         String forbiddenBlocksData,
         int debugLogEnabled,
-        int openAiWebSearchEnabled
+        int openAiWebSearchEnabled,
+        int autoRetries,
+        int keepAliveMinutes
     ) implements CustomPayload {
         public static final CustomPayload.Id<AiSettingsSyncC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "settings_sync"));
         // 1.21.4's PacketCodec.tuple stops at 6 fields, so the 9 fields are written by hand
@@ -93,6 +95,8 @@ public final class AiNetworkPayloads {
                 PacketCodecs.STRING.encode(buf, payload.forbiddenBlocksData());
                 PacketCodecs.VAR_INT.encode(buf, payload.debugLogEnabled());
                 PacketCodecs.VAR_INT.encode(buf, payload.openAiWebSearchEnabled());
+                PacketCodecs.VAR_INT.encode(buf, payload.autoRetries());
+                PacketCodecs.VAR_INT.encode(buf, payload.keepAliveMinutes());
             },
             buf -> new AiSettingsSyncC2SPayload(
                 PacketCodecs.STRING.decode(buf),
@@ -102,6 +106,8 @@ public final class AiNetworkPayloads {
                 PacketCodecs.VAR_INT.decode(buf),
                 PacketCodecs.STRING.decode(buf),
                 PacketCodecs.STRING.decode(buf),
+                PacketCodecs.VAR_INT.decode(buf),
+                PacketCodecs.VAR_INT.decode(buf),
                 PacketCodecs.VAR_INT.decode(buf),
                 PacketCodecs.VAR_INT.decode(buf)
             )
@@ -118,6 +124,35 @@ public final class AiNetworkPayloads {
 
         public boolean isOpenAiWebSearchEnabled() {
             return openAiWebSearchEnabled != 0;
+        }
+    }
+
+    /** Server -> client: a finished build (gzip'd BuildRecord JSON) for the history tab. */
+    public record BuildCompleteS2CPayload(byte[] data) implements CustomPayload {
+        public static final CustomPayload.Id<BuildCompleteS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "build_complete"));
+        public static final PacketCodec<RegistryByteBuf, BuildCompleteS2CPayload> CODEC =
+            PacketCodec.tuple(PacketCodecs.BYTE_ARRAY, BuildCompleteS2CPayload::data, BuildCompleteS2CPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
+    /** Client -> server: one part of a saved build to rebuild (client packets are size-limited). */
+    public record RebuildPartC2SPayload(int id, int index, int total, byte[] data) implements CustomPayload {
+        public static final CustomPayload.Id<RebuildPartC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "rebuild_part"));
+        public static final PacketCodec<RegistryByteBuf, RebuildPartC2SPayload> CODEC = PacketCodec.tuple(
+            PacketCodecs.VAR_INT, RebuildPartC2SPayload::id,
+            PacketCodecs.VAR_INT, RebuildPartC2SPayload::index,
+            PacketCodecs.VAR_INT, RebuildPartC2SPayload::total,
+            PacketCodecs.BYTE_ARRAY, RebuildPartC2SPayload::data,
+            RebuildPartC2SPayload::new
+        );
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
         }
     }
 }

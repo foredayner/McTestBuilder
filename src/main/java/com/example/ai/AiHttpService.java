@@ -139,6 +139,16 @@ public final class AiHttpService {
         requestJson.addProperty("model", config.modelName);
         requestJson.addProperty("stream", false);
         requestJson.addProperty("prompt", promptText);
+        // Keep the model in memory between builds instead of Ollama's 5-minute default, and give
+        // it room for the long build prompt (+ the failed script on a retry).
+        if (config.keepAliveMinutes < 0) {
+            requestJson.addProperty("keep_alive", -1);
+        } else {
+            requestJson.addProperty("keep_alive", config.keepAliveMinutes + "m");
+        }
+        JsonObject options = new JsonObject();
+        options.addProperty("num_ctx", 8192);
+        requestJson.add("options", options);
 
         String endpoint = AiApiEndpoints.resolveOllamaGenerateUrl(config.apiUrl);
         return HttpRequest.newBuilder()

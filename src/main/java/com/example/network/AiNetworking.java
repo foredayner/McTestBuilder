@@ -5,6 +5,8 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
 import com.example.ai.approval.BuildApproval;
+import com.example.ai.build.BuildRecord;
+import com.example.ai.build.RebuildService;
 import com.example.config.AiBuilderConfig;
 import com.example.config.AiProvider;
 import com.example.config.ForbiddenBlockRegistry;
@@ -30,6 +32,8 @@ public final class AiNetworking {
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.ApprovalAcceptC2SPayload.ID, AiNetworkPayloads.ApprovalAcceptC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.ApprovalDenyC2SPayload.ID, AiNetworkPayloads.ApprovalDenyC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.AiSettingsSyncC2SPayload.ID, AiNetworkPayloads.AiSettingsSyncC2SPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.BuildCompleteS2CPayload.ID, AiNetworkPayloads.BuildCompleteS2CPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RebuildPartC2SPayload.ID, AiNetworkPayloads.RebuildPartC2SPayload.CODEC);
     }
 
     public static void registerServerReceivers() {
@@ -43,6 +47,11 @@ public final class AiNetworking {
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.AiSettingsSyncC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> applySettings(payload));
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.RebuildPartC2SPayload.ID, (payload, context) -> {
+            context.server().execute(() -> RebuildService.receivePart(
+                context.player(), payload.id(), payload.index(), payload.total(), payload.data()));
         });
     }
 
@@ -65,6 +74,8 @@ public final class AiNetworking {
             payload.isDebugLogEnabled(),
             payload.isOpenAiWebSearchEnabled()
         );
+        AiBuilderConfig.get().autoRetries = payload.autoRetries();
+        AiBuilderConfig.get().keepAliveMinutes = payload.keepAliveMinutes();
         AiBuilderConfig.save();
     }
 
@@ -92,6 +103,14 @@ public final class AiNetworking {
         runOnServerThread(player, () -> {
             if (player.networkHandler != null) {
                 ServerPlayNetworking.send(player, new AiNetworkPayloads.ApprovalPendingS2CPayload(description));
+            }
+        });
+    }
+
+    public static void sendBuildComplete(ServerPlayerEntity player, BuildRecord record) {
+        runOnServerThread(player, () -> {
+            if (player.networkHandler != null) {
+                ServerPlayNetworking.send(player, new AiNetworkPayloads.BuildCompleteS2CPayload(record.toGzip()));
             }
         });
     }

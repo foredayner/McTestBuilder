@@ -12,7 +12,8 @@ import java.util.List;
 public final class AiClientState {
 
     private static final LinkedList<String> LOGS = new LinkedList<>();
-    private static final int MAX_LOGS = 30;
+    private static final int MAX_LOGS = 300;
+    private static final int MAX_LINES_PER_MESSAGE = 8;
 
     private static boolean pendingApproval = false;
     private static String pendingDescription = "";
@@ -32,14 +33,49 @@ public final class AiClientState {
         }
     }
 
+    /** Full text goes to the log file (Logs tab); the panel gets a cleaned, short version. */
     public static void addLog(String message) {
+        if (message == null) {
+            return;
+        }
+        LogStore.append(message);
         synchronized (LOGS) {
-            LOGS.add(message);
+            LOGS.addAll(cleanForDisplay(message));
             while (LOGS.size() > MAX_LOGS) {
                 LOGS.removeFirst();
             }
         }
         refreshOpenScreen(false);
+    }
+
+    /**
+     * Drop carriage returns and tabs (they showed up as CR/HT boxes), stack trace lines and
+     * blank lines, and keep at most a few lines of any one message.
+     */
+    static List<String> cleanForDisplay(String message) {
+        List<String> out = new java.util.ArrayList<>();
+        int dropped = 0;
+        for (String raw : message.replace("\r", "").replace("\t", "  ").split("\n")) {
+            String line = raw.stripTrailing();
+            String t = line.trim();
+            if (t.isEmpty()) {
+                continue;
+            }
+            if (t.startsWith("at ") || t.startsWith("... ") || t.contains("java.base/") || t.startsWith("knot//")
+                || t.startsWith("Caused by: java.") || t.equals("startup failed:")) {
+                dropped++;
+                continue;
+            }
+            if (out.size() >= MAX_LINES_PER_MESSAGE) {
+                dropped++;
+                continue;
+            }
+            out.add(out.isEmpty() ? line : "  " + t);
+        }
+        if (dropped > 0) {
+            out.add("  (full text in the Logs tab)");
+        }
+        return out;
     }
 
     public static List<String> getLogs() {

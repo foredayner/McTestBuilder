@@ -29,6 +29,12 @@ public final class AiBuilderConfig {
     public List<String> forbiddenBlocks = new ArrayList<>(ForbiddenBlockRegistry.defaultBlocks());
     public boolean debugLogEnabled = false;
     public boolean openAiWebSearchEnabled = false;
+    /** How many times a failing script is sent back to the AI to be fixed (0 = off). */
+    public int autoRetries = 2;
+    /** Ollama: minutes to keep the model loaded after a request (-1 = until Ollama stops). */
+    public int keepAliveMinutes = 30;
+    /** Last model typed for each provider, so switching provider does not lose it. */
+    public java.util.Map<String, String> modelByProvider = new java.util.HashMap<>();
 
     private AiBuilderConfig() {
     }
@@ -165,6 +171,9 @@ public final class AiBuilderConfig {
             debugLogEnabled,
             openAiWebSearchEnabled
         );
+        copy.autoRetries = autoRetries;
+        copy.keepAliveMinutes = keepAliveMinutes;
+        copy.modelByProvider = new java.util.HashMap<>(modelByProvider);
         return copy;
     }
 
@@ -182,6 +191,12 @@ public final class AiBuilderConfig {
             apiKey = "";
         }
         ticksPerBlock = Math.clamp(ticksPerBlock, 1, 20);
+        autoRetries = Math.clamp(autoRetries, 0, 5);
+        keepAliveMinutes = Math.clamp(keepAliveMinutes, -1, 1440);
+        if (modelByProvider == null) {
+            modelByProvider = new java.util.HashMap<>();
+        }
+        modelByProvider.put(provider.name(), modelName);
         if (forbiddenBlocksPath == null || forbiddenBlocksPath.isBlank()) {
             forbiddenBlocksPath = "config/ai_builder/forbidden_blocks.txt";
         }

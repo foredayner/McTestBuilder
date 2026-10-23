@@ -1,7 +1,10 @@
 package com.example.ai.api;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.command.argument.BlockArgumentParser;
+import net.minecraft.util.BlockRotation;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
@@ -10,6 +13,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
+import com.example.ai.build.BuildPlan;
 import com.example.ai.build.BuildTaskQueue;
 import com.example.config.ForbiddenBlockRegistry;
 import java.util.HashMap;
@@ -29,6 +33,16 @@ public class MinecraftAI {
     private static float playerYaw;
     private static float playerPitch;
     private static ServerPlayerEntity actor;
+    /** While set, placements are recorded into this plan instead of being run (dry run). */
+    private static BuildPlan recorder;
+
+    public static void startRecording(BuildPlan plan) {
+        recorder = plan;
+    }
+
+    public static void stopRecording() {
+        recorder = null;
+    }
     
     public static void init(ServerWorld w, BlockPos o) {
         init(w, o, 0f, 0f, null);
@@ -440,6 +454,13 @@ public class MinecraftAI {
 
     private static void scheduleSetBlock(BlockPos pos, String blockName) {
         String blockId = normalizeBlockId(blockName);
+        if (recorder != null) {
+            int x = pos.getX() - origin.getX();
+            int y = pos.getY() - origin.getY();
+            int z = pos.getZ() - origin.getZ();
+            recorder.ops.add(new BuildPlan.Op("set", x, y, z, x, y, z, blockId, "replace"));
+            return;
+        }
         BuildTaskQueue.enqueue(() -> executeBuildCommand(
             "setblock " + pos.getX() + " " + pos.getY() + " " + pos.getZ() + " " + blockId + " replace"
         ));
@@ -448,12 +469,59 @@ public class MinecraftAI {
     private static void scheduleFill(BlockPos from, BlockPos to, String blockName, String mode) {
         String blockId = normalizeBlockId(blockName);
         String fillMode = mode == null || mode.isBlank() ? "replace" : mode.trim().toLowerCase();
+        if (recorder != null) {
+            recorder.ops.add(new BuildPlan.Op("fill",
+                from.getX() - origin.getX(), from.getY() - origin.getY(), from.getZ() - origin.getZ(),
+                to.getX() - origin.getX(), to.getY() - origin.getY(), to.getZ() - origin.getZ(),
+                blockId, fillMode));
+            return;
+        }
         BuildTaskQueue.enqueue(() -> executeBuildCommand(
             "fill "
                 + from.getX() + " " + from.getY() + " " + from.getZ() + " "
                 + to.getX() + " " + to.getY() + " " + to.getZ() + " "
                 + blockId + " " + fillMode
         ));
+    }
+
+    /**
+     * Queue a recorded plan at {@code at}, turned {@code turns} quarter turns clockwise (so a
+     * saved build faces the way the player faces now). Returns the number of commands queued.
+     */
+    public static int executePlan(BuildPlan plan, BlockPos at, int turns) {
+        int count = 0;
+        for (BuildPlan.Op op : plan.ops) {
+            int[] a = BuildPlan.rotate(op.x1, op.z1, turns);
+            int[] b = BuildPlan.rotate(op.x2, op.z2, turns);
+            String block = rotateBlockState(op.block, turns);
+            String command = "set".equals(op.kind)
+                ? "setblock " + (at.getX() + a[0]) + " " + (at.getY() + op.y1) + " " + (at.getZ() + a[1]) + " " + block + " replace"
+                : "fill " + (at.getX() + a[0]) + " " + (at.getY() + op.y1) + " " + (at.getZ() + a[1]) + " "
+                    + (at.getX() + b[0]) + " " + (at.getY() + op.y2) + " " + (at.getZ() + b[1]) + " " + block + " " + op.mode;
+            BuildTaskQueue.enqueue(() -> executeBuildCommand(command));
+            count++;
+        }
+        return count;
+    }
+
+    /** Turn stairs, doors, logs... with the structure. Unknown or stateless blocks pass through. */
+    static String rotateBlockState(String block, int turns) {
+        int t = Math.floorMod(turns, 4);
+        if (t == 0 || block == null) {
+            return block;
+        }
+        try {
+            BlockState state = BlockArgumentParser.block(Registries.BLOCK, block, false).blockState();
+            BlockRotation rotation = switch (t) {
+                case 1 -> BlockRotation.CLOCKWISE_90;
+                case 2 -> BlockRotation.CLOCKWISE_180;
+                default -> BlockRotation.COUNTERCLOCKWISE_90;
+            };
+            BlockState rotated = state.rotate(rotation);
+            return rotated == state ? block : BlockArgumentParser.stringifyBlockState(rotated);
+        } catch (Exception exception) {
+            return block;
+        }
     }
 
     private static void executeBuildCommand(String command) {

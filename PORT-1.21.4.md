@@ -19,3 +19,20 @@ All credit for the mod goes to the original authors; this fork only changes what
 
 Put the jar (not the `-sources` one) and Fabric API for 1.21.4 into `mods/` on **both** the Fabric 1.21.4
 server and the client of the player who builds. That player needs operator level 2 (or cheats in single player).
+
+## Added in this fork
+
+- **Dry run + auto-fix**: the AI's script is first run in a recording mode (nothing is placed).
+  If it fails to compile/run or places nothing, the error and script go back to the AI to be fixed
+  (Settings > "Auto-fix failed scripts", default 2). Accept then places exactly what was recorded.
+- **Tabs**: Create / History / Logs.
+  - History: every accepted build is saved (`config/ai_builder/history/<id>.json`) with a top and a
+    front preview drawn from block map colours (also saved as PNG). Open one to read the full request
+    and press **Build here** to place it again in front of you, turned to face where you look
+    (no AI call). Delete asks for confirmation.
+  - Logs: full log text by day (`config/ai_builder/logs/yyyy-MM-dd.log`); the live panel shows a
+    cleaned version (no CR/tab boxes or stack traces).
+- **Settings**: scrolls on small windows with Save/Cancel always visible; typed values survive
+  re-layout; Esc saves; the preset button shows the model in use; each provider remembers its model.
+- **Ollama**: `keep_alive` (Settings > "Keep model loaded", default 30 min) so the model is not
+  unloaded after 5 minutes, and `num_ctx` 8192 so the long build prompt is not cut off.
