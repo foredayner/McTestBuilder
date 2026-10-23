@@ -32,7 +32,9 @@ public class AibClientGameTest implements FabricClientGameTest {
             // Build the demo house and an apple in front of the player, like an accepted AI build.
             List<String> records = game.getServer().computeOnServer(server -> {
                 ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
-                server.getPlayerManager().addToOperators(player.getGameProfile());
+                // The GameTest server gives new operators level 0; set level 4 directly.
+                server.getPlayerManager().getOpList().add(
+                    new net.minecraft.server.OperatorEntry(player.getGameProfile(), 4, false));
                 var world = player.getServerWorld();
                 var origin = player.getBlockPos();
                 BuildPlan house = Demo.plan(world, origin, player, Demo.HOUSE);

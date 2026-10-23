@@ -32,7 +32,9 @@ public class AibGameTests implements FabricGameTest {
 
     private static ServerPlayerEntity opPlayer(TestContext context, BlockPos at, float yaw) {
         ServerPlayerEntity player = context.createMockCreativeServerPlayerInWorld();
-        player.getServer().getPlayerManager().addToOperators(player.getGameProfile());
+        // The GameTest server gives new operators level 0; set level 4 directly.
+        player.getServer().getPlayerManager().getOpList().add(
+            new net.minecraft.server.OperatorEntry(player.getGameProfile(), 4, false));
         player.refreshPositionAndAngles(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, yaw, 0);
         return player;
     }
