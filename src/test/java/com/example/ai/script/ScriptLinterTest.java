@@ -48,6 +48,13 @@ class ScriptLinterTest {
     }
 
     @Test
+    void classicForLoopsCompileButClosuresDoNot() {
+        assertEquals(List.of(), ScriptLinter.lint("for (int i = 0; i < 3; i++) { ai.placeBlock(i, 0, 0, 'stone') }"));
+        assertEquals(List.of(), ScriptLinter.lint("for (i in 0..2) { ai.placeBlock(i, 0, 0, 'stone') }"));
+        assertTrue(one("3.times { ai.placeBlock(it, 0, 0, 'stone') }").startsWith("Does not compile"));
+    }
+
+    @Test
     void catchesWallsWithoutDirectionAndFarCoordinates() {
         assertTrue(one("ai.placeWall('stone', 0, 0, 0, 3, 5, 'diagonal')").contains("needs a direction"));
         assertTrue(one("ai.placeBox(0, 0, 900, 3, 3, 3, 'stone')").contains("900"));

@@ -91,20 +91,28 @@ public final class ScriptLinter {
         if (!PLACERS.contains(name) && !"clearArea".equals(name)) {
             return;
         }
+        boolean wall = "placeWall".equals(name);
         boolean hasDirection = false;
         int strings = 0;
+        for (String raw : args) {
+            Matcher s = STRING.matcher(raw.trim());
+            if (s.matches()) {
+                strings++;
+                hasDirection |= wall && WALL_DIRECTIONS.contains(s.group(2).trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        boolean missingDirection = wall && strings >= 2 && !hasDirection;
         for (String raw : args) {
             String arg = raw.trim();
             Matcher s = STRING.matcher(arg);
             if (s.matches()) {
-                strings++;
                 String value = s.group(2).trim();
-                if ("placeWall".equals(name) && WALL_DIRECTIONS.contains(value.toLowerCase(Locale.ROOT))) {
-                    hasDirection = true;
+                if (wall && WALL_DIRECTIONS.contains(value.toLowerCase(Locale.ROOT))) {
                     continue;
                 }
                 String problem = blockProblem(value);
-                if (problem != null) {
+                // On a wall with no valid direction, the unknown word is the bad direction, not a block.
+                if (problem != null && !missingDirection) {
                     problems.add("line " + line + ": " + problem);
                 }
             } else if (INTEGER.matcher(arg).matches()) {
@@ -116,7 +124,7 @@ public final class ScriptLinter {
             }
         }
         // A wall with two literal strings but no direction among them places nothing.
-        if ("placeWall".equals(name) && strings >= 2 && !hasDirection) {
+        if (missingDirection) {
             problems.add("line " + line + ": placeWall needs a direction \"x\" or \"z\" (north/south = x, east/west = z).");
         }
     }

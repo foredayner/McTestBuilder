@@ -107,7 +107,10 @@ public final class SafeGroovyShellFactory {
         secure.setMethodDefinitionAllowed(false);
 
         // Closures enable meta-programming escapes; building scripts only need loops/ifs.
-        secure.setClosuresAllowed(false);
+        // The customizer's own switch would also reject classic for loops, because Groovy keeps
+        // "for (int i = 0; i < n; i++)" headers as a ClosureListExpression. So closures are
+        // blocked in isExpressionAuthorized instead, which lets those loops through.
+        secure.setClosuresAllowed(true);
 
         // Block synchronized blocks at the statement level.
         secure.setStatementsBlacklist(List.of(SynchronizedStatement.class));
@@ -144,6 +147,11 @@ public final class SafeGroovyShellFactory {
      */
     private static boolean isExpressionAuthorized(Expression expression) {
         if (expression instanceof MethodPointerExpression) {
+            return false;
+        }
+
+        // Real closures and lambdas ({ -> }, x -> y) stay forbidden.
+        if (expression instanceof org.codehaus.groovy.ast.expr.ClosureExpression) {
             return false;
         }
 
