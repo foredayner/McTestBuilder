@@ -227,13 +227,18 @@ public class AibModelBench implements FabricClientGameTest {
             user.addProperty("content", prompt);
             messages.add(user);
             body.add("messages", messages);
-            HttpRequest request = HttpRequest.newBuilder(URI.create("https://api.anthropic.com/v1/messages"))
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("https://api.anthropic.com/v1/messages"))
                 .header("content-type", "application/json")
                 .header("x-api-key", key)
                 .header("anthropic-version", "2023-06-01")
                 .timeout(Duration.ofSeconds(300))
-                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()));
+            // Keys that are not scoped to one workspace must say which workspace to bill.
+            String workspace = System.getenv("ANTHROPIC_WORKSPACE_ID");
+            if (workspace != null && !workspace.isBlank()) {
+                builder.header("anthropic-workspace-id", workspace.trim());
+            }
+            HttpRequest request = builder.build();
             HttpResponse<String> response = AiHttpService.client().send(request, HttpResponse.BodyHandlers.ofString());
             call.status = response.statusCode();
             call.ms = System.currentTimeMillis() - t;

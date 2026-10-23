@@ -38,6 +38,7 @@ jobs:
         uses: modmuss50/xvfb-action@v1
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
           AIB_BENCH_ONLY: "1"
           AIB_BENCH_MODELS: ${{ github.event.inputs.models || 'claude-haiku-5-5' }}
         with:
