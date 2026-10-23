@@ -41,7 +41,8 @@ public class AiPromptScreen extends Screen {
     // Kept across re-inits (the screen rebuilds its widgets when state changes).
     private static Page page = Page.CREATE;
     private static String selectedId = null;
-    private static int filter = 0;        // 0 all, 1 builds, 2 objects
+    private static int filter = 0;        // 0 all, 1 builds, 2 objects, 3 objects placed nearby
+    private static final int NEARBY = 3;
     private static int chatScroll = 0;    // pixels up from the bottom
     private static int listScroll = 0;    // rows
     private static int detailScroll = 0;  // pixels
@@ -84,6 +85,13 @@ public class AiPromptScreen extends Screen {
         listScroll = 0;
         detailScroll = 0;
         return new AiPromptScreen();
+    }
+
+    /** Open 보관함 on the "주변 배치" view (asks the server for the list). */
+    public static AiPromptScreen openNearby() {
+        filter = NEARBY;
+        AiClientNetworking.requestNearby();
+        return open("HISTORY", null);
     }
 
     public void onStateUpdated(boolean rebuildWidgets) {
@@ -140,6 +148,9 @@ public class AiPromptScreen extends Screen {
 
     private void switchPage(Page target) {
         page = target;
+        if (target == Page.HISTORY && filter == NEARBY) {
+            AiClientNetworking.requestNearby();
+        }
         this.confirmDelete = false;
         if (target == Page.LOGS) {
             fileScroll = 0;
@@ -333,12 +344,26 @@ public class AiPromptScreen extends Screen {
         if (record == null) {
             button("   되돌리기", right() - 162, top(), 74, b -> AiClientState.undo());
             this.icons.add(new IconAt(new ItemStack(Items.CLOCK), right() - 159, top() + 1));
-            String[] names = { "보기: 전체", "보기: 건물", "보기: 소품" };
+            String[] names = { "보기: 전체", "보기: 건물", "보기: 소품", "보기: 주변 배치" };
             button(names[filter], right() - 84, top(), 84, b -> {
-                filter = (filter + 1) % 3;
+                filter = (filter + 1) % 4;
                 listScroll = 0;
+                if (filter == NEARBY) {
+                    AiClientNetworking.requestNearby();
+                }
                 rebuild();
             });
+            if (filter == NEARBY) {
+                // One "지우기" per visible row of placed objects.
+                List<com.example.ai.build.ObjectService.Nearby> list = AiClientState.getNearby();
+                int visible = Math.max(1, (bottom() - listTop() - 4) / ROW);
+                for (int i = 0; i < visible && listScroll + i < list.size(); i++) {
+                    com.example.ai.build.ObjectService.Nearby n = list.get(listScroll + i);
+                    int y = listTop() + 3 + i * ROW + (ROW - 3 - 18) / 2;
+                    this.addDrawableChild(new WoodButton(right() - 54, y, 48, 18, Text.literal("지우기"),
+                        b -> AiClientNetworking.sendRemoveObject(0, n.tag), true));
+                }
+            }
             return;
         }
         int y = bottom() - 18;
@@ -375,6 +400,10 @@ public class AiPromptScreen extends Screen {
         BuildRecord record = selected();
         if (record != null) {
             renderDetail(ctx, record);
+            return;
+        }
+        if (filter == NEARBY) {
+            renderNearby(ctx);
             return;
         }
         ctx.drawText(this.textRenderer, "만든 건물과 소품을 다시 꺼내 놓을 수 있어요", left() + 2, top() + 5, INK_SOFT, false);
@@ -414,6 +443,36 @@ public class AiPromptScreen extends Screen {
         if (records.size() > visible) {
             String more = (listScroll + 1) + "-" + Math.min(records.size(), listScroll + visible) + " / " + records.size();
             ctx.drawText(this.textRenderer, more, r - this.textRenderer.getWidth(more) - 6, b - 11, INK_SOFT, false);
+        }
+    }
+
+    /** Objects placed around me, nearest first, each with a 지우기 button (added in buildHistory). */
+    private void renderNearby(DrawContext ctx) {
+        ctx.drawText(this.textRenderer, "주변 " + (int) com.example.ai.build.ObjectService.NEARBY_RADIUS
+            + "블록 안에 놓인 소품 · 조준하고 Delete 두 번으로도 지울 수 있어요", left() + 2, top() + 5, INK_SOFT, false);
+        int l = left(), r = right(), t = listTop(), b = bottom();
+        inset(ctx, l, t, r, b, PARCHMENT_DEEP);
+        List<com.example.ai.build.ObjectService.Nearby> list = AiClientState.getNearby();
+        if (list.isEmpty()) {
+            String empty = "근처에 놓인 소품이 없어요.";
+            ctx.drawText(this.textRenderer, empty, (l + r - this.textRenderer.getWidth(empty)) / 2, t + 20, INK_SOFT, false);
+            return;
+        }
+        int visible = Math.max(1, (b - t - 4) / ROW);
+        listScroll = Math.max(0, Math.min(listScroll, list.size() - visible));
+        for (int i = 0; i < visible && listScroll + i < list.size(); i++) {
+            com.example.ai.build.ObjectService.Nearby n = list.get(listScroll + i);
+            int y = t + 3 + i * ROW;
+            ctx.fill(l + 3, y, r - 3, y + ROW - 3, PAPER);
+            ctx.fill(l + 3, y + ROW - 4, r - 3, y + ROW - 3, PARCHMENT_LINE);
+            inset(ctx, l + 6, y + 3, l + ROW + 2, y + ROW - 6, 0xFFE8C48A);
+            ctx.drawItem(new ItemStack(Items.ARMOR_STAND), l + 12, y + 8);
+            String name = n.name == null || n.name.isBlank() ? "(이름 없는 소품)" : n.name;
+            int textX = l + ROW + 10;
+            ctx.drawText(this.textRenderer, ellipsize(name, r - textX - 64), textX, y + 7, INK, false);
+            String info = String.format(java.util.Locale.ROOT, "%.0f블록 거리 · (%.0f, %.0f, %.0f) · 조각 %d개",
+                n.distance, n.x, n.y, n.z, n.parts);
+            ctx.drawText(this.textRenderer, ellipsize(info, r - textX - 64), textX, y + 21, INK_SOFT, false);
         }
     }
 
@@ -606,7 +665,7 @@ public class AiPromptScreen extends Screen {
             return true;
         }
         int t = listTop() + 3;
-        if (page == Page.HISTORY && selected() == null && button == 0
+        if (page == Page.HISTORY && selected() == null && filter != NEARBY && button == 0
             && mouseX >= left() && mouseX < right() && mouseY >= t && mouseY < bottom()) {
             int index = listScroll + (int) ((mouseY - t) / ROW);
             List<BuildRecord> records = filtered();
@@ -635,6 +694,9 @@ public class AiPromptScreen extends Screen {
                     detailScroll = Math.max(0, detailScroll - step * 20);
                 } else {
                     listScroll = Math.max(0, listScroll - step);
+                    if (filter == NEARBY) {
+                        rebuild(); // the 지우기 buttons follow the rows
+                    }
                 }
             }
         }

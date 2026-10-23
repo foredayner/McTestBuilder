@@ -29,10 +29,51 @@ public class AiBuildAssistantClient implements ClientModInitializer {
             )
         );
 
+        REMOVE_OBJECT_KEY = KeyBindingHelper.registerKeyBinding(
+            new KeyBinding(
+                "key.minecraft-ai-build-assistant.remove_object",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_DELETE,
+                "key.categories.misc"
+            )
+        );
+
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (OPEN_AI_UI_KEY.wasPressed()) {
                 client.setScreen(new AiPromptScreen());
             }
+            while (REMOVE_OBJECT_KEY.wasPressed()) {
+                removeLookedAtObject(client);
+            }
         });
+    }
+
+    private static KeyBinding REMOVE_OBJECT_KEY;
+    private static int pendingRemoveId = -1;
+    private static long pendingRemoveAt = 0;
+
+    /** Look at an AI object and press the key twice within 3 seconds to remove it. */
+    private static void removeLookedAtObject(net.minecraft.client.MinecraftClient client) {
+        if (client.player == null) {
+            return;
+        }
+        if (client.crosshairTarget instanceof net.minecraft.util.hit.EntityHitResult hit
+            && hit.getEntity() instanceof net.minecraft.entity.decoration.InteractionEntity) {
+            int id = hit.getEntity().getId();
+            long now = System.currentTimeMillis();
+            if (id == pendingRemoveId && now - pendingRemoveAt < 3000) {
+                pendingRemoveId = -1;
+                AiClientNetworking.sendRemoveObject(id, "");
+            } else {
+                pendingRemoveId = id;
+                pendingRemoveAt = now;
+                client.player.sendMessage(net.minecraft.text.Text.literal("한 번 더 누르면 이 소품을 지워요")
+                    .formatted(net.minecraft.util.Formatting.YELLOW), true);
+            }
+            return;
+        }
+        pendingRemoveId = -1;
+        client.player.sendMessage(net.minecraft.text.Text.literal("지울 소품을 조준하고 누르세요")
+            .formatted(net.minecraft.util.Formatting.GRAY), true);
     }
 }

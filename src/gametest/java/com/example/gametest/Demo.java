@@ -69,7 +69,7 @@ public final class Demo {
         String tag = "aib_" + record.id;
         UndoService.capture(player, plan, origin, turns, tag, prompt);
         MinecraftAI.init(player.getServerWorld(), origin, player.getYaw(), player.getPitch(), player);
-        MinecraftAI.executePlan(plan, origin, turns, tag);
+        MinecraftAI.executePlan(plan, origin, turns, tag, prompt);
         return record;
     }
 }

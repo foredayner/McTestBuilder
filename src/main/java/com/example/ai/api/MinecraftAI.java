@@ -521,6 +521,48 @@ public class MinecraftAI {
             q.x, q.y, q.z, q.w, -half.x, -half.y, -half.z, part.sx, part.sy, part.sz, tag);
     }
 
+    /** World-aligned box around all parts: {minX, minY, minZ, maxX, maxY, maxZ}, relative to at. */
+    static double[] objectBounds(BuildPlan plan, int turns) {
+        double[] b = { Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE };
+        for (BuildPlan.Part part : plan.parts) {
+            double cx = part.x;
+            double cz = part.z;
+            for (int i = 0; i < Math.floorMod(turns, 4); i++) {
+                double t = cx;
+                cx = -cz;
+                cz = t;
+            }
+            Quaternionf q = new Quaternionf()
+                .rotateY((float) Math.toRadians(-90.0 * turns))
+                .rotateY((float) Math.toRadians(part.yaw))
+                .rotateX((float) Math.toRadians(part.pitch))
+                .rotateZ((float) Math.toRadians(part.roll));
+            org.joml.Matrix3f m = new org.joml.Matrix3f().rotation(q);
+            double hx = part.sx / 2, hy = part.sy / 2, hz = part.sz / 2;
+            double ex = Math.abs(m.m00()) * hx + Math.abs(m.m10()) * hy + Math.abs(m.m20()) * hz;
+            double ey = Math.abs(m.m01()) * hx + Math.abs(m.m11()) * hy + Math.abs(m.m21()) * hz;
+            double ez = Math.abs(m.m02()) * hx + Math.abs(m.m12()) * hy + Math.abs(m.m22()) * hz;
+            b[0] = Math.min(b[0], cx - ex);
+            b[1] = Math.min(b[1], part.y - ey);
+            b[2] = Math.min(b[2], cz - ez);
+            b[3] = Math.max(b[3], cx + ex);
+            b[4] = Math.max(b[4], part.y + ey);
+            b[5] = Math.max(b[5], cz + ez);
+        }
+        return b;
+    }
+
+    static String interactionCommand(BuildPlan plan, BlockPos at, int turns, String tag, String title) {
+        double[] b = objectBounds(plan, turns);
+        double width = Math.max(0.2, Math.max(b[3] - b[0], b[5] - b[2]));
+        double height = Math.max(0.2, b[4] - b[1]);
+        String json = new com.google.gson.Gson().toJson(title == null ? "" : title);
+        String snbt = json.replace("\\", "\\\\").replace("'", "\\'");
+        return String.format(Locale.ROOT,
+            "summon minecraft:interaction %.4f %.4f %.4f {width:%.4ff,height:%.4ff,response:1b,Tags:[\"aib\",\"aib_obj\",\"%s\"],CustomName:'%s'}",
+            at.getX() + (b[0] + b[3]) / 2, at.getY() + b[1], at.getZ() + (b[2] + b[5]) / 2, width, height, tag, snbt);
+    }
+
     /** minecraft:oak_stairs[facing=east] -> {Name:"minecraft:oak_stairs",Properties:{facing:"east"}} */
     static String blockStateNbt(String block) {
         int open = block.indexOf('[');
@@ -600,7 +642,19 @@ public class MinecraftAI {
      * saved build faces the way the player faces now). Returns the number of commands queued.
      */
     public static int executePlan(BuildPlan plan, BlockPos at, int turns, String tag) {
+        return executePlan(plan, at, turns, tag, "");
+    }
+
+    /**
+     * Same, and for objects also an invisible interaction entity around the whole object so the
+     * crosshair can target it (display entities have no hitbox). It carries the object's title.
+     */
+    public static int executePlan(BuildPlan plan, BlockPos at, int turns, String tag, String title) {
         int count = 0;
+        if (!plan.parts.isEmpty()) {
+            String hitbox = interactionCommand(plan, at, turns, tag, title);
+            BuildTaskQueue.enqueue(() -> executeBuildCommand(hitbox));
+        }
         for (BuildPlan.Op op : plan.ops) {
             int[] a = BuildPlan.rotate(op.x1, op.z1, turns);
             int[] b = BuildPlan.rotate(op.x2, op.z2, turns);

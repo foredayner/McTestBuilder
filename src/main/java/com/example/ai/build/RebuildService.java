@@ -148,7 +148,7 @@ public final class RebuildService {
         String title = title(record);
         String tag = "aib_" + record.id + "_" + Long.toString(System.currentTimeMillis(), 36);
         UndoService.capture(player, record.plan, origin, turns, tag, title);
-        int commands = MinecraftAI.executePlan(record.plan, origin, turns, tag);
+        int commands = MinecraftAI.executePlan(record.plan, origin, turns, tag, title);
         AiNetworking.sendLog(player, "[History] \"" + title + "\" 배치 중 (" + facingKo(facing) + "쪽 방향, 명령 " + commands + "개)...");
         BuildTaskQueue.whenEmpty(() -> AiNetworking.sendLog(player, "[History] 배치 완료! 되돌리기로 취소할 수 있어요."));
     }

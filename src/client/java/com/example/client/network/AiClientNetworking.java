@@ -35,6 +35,10 @@ public final class AiClientNetworking {
             context.client().execute(AiClientState::clearPendingApproval);
         });
 
+        ClientPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.NearbyObjectsS2CPayload.ID, (payload, context) -> {
+            context.client().execute(() -> AiClientState.setNearby(payload.json()));
+        });
+
         ClientPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.BuildCompleteS2CPayload.ID, (payload, context) -> {
             context.client().execute(() -> {
                 try {
@@ -54,6 +58,14 @@ public final class AiClientNetworking {
         } else {
             ClientPlayNetworking.send(new AiNetworkPayloads.ApprovalDenyC2SPayload());
         }
+    }
+
+    public static void sendRemoveObject(int entityId, String tag) {
+        ClientPlayNetworking.send(new AiNetworkPayloads.RemoveObjectC2SPayload(entityId, tag == null ? "" : tag));
+    }
+
+    public static void requestNearby() {
+        ClientPlayNetworking.send(new AiNetworkPayloads.NearbyRequestC2SPayload());
     }
 
     public static void sendUndo() {

@@ -8,6 +8,7 @@ import com.example.ai.approval.BuildApproval;
 import com.example.ai.build.BuildRecord;
 import com.example.ai.build.RebuildService;
 import com.example.ai.build.UndoService;
+import com.example.ai.build.ObjectService;
 import com.example.config.AiBuilderConfig;
 import com.example.config.AiProvider;
 import com.example.config.ForbiddenBlockRegistry;
@@ -36,6 +37,9 @@ public final class AiNetworking {
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.BuildCompleteS2CPayload.ID, AiNetworkPayloads.BuildCompleteS2CPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RebuildPartC2SPayload.ID, AiNetworkPayloads.RebuildPartC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.UndoC2SPayload.ID, AiNetworkPayloads.UndoC2SPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RemoveObjectC2SPayload.ID, AiNetworkPayloads.RemoveObjectC2SPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.NearbyRequestC2SPayload.ID, AiNetworkPayloads.NearbyRequestC2SPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.NearbyObjectsS2CPayload.ID, AiNetworkPayloads.NearbyObjectsS2CPayload.CODEC);
     }
 
     public static void registerServerReceivers() {
@@ -49,6 +53,20 @@ public final class AiNetworking {
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.AiSettingsSyncC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> applySettings(payload));
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.RemoveObjectC2SPayload.ID, (payload, context) -> {
+            context.server().execute(() -> {
+                if (payload.tag().isEmpty()) {
+                    ObjectService.removeByEntity(context.player(), payload.entityId());
+                } else {
+                    ObjectService.removeByTag(context.player(), payload.tag());
+                }
+            });
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.NearbyRequestC2SPayload.ID, (payload, context) -> {
+            context.server().execute(() -> ObjectService.sendNearby(context.player()));
         });
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.UndoC2SPayload.ID, (payload, context) -> {
@@ -117,6 +135,14 @@ public final class AiNetworking {
         runOnServerThread(player, () -> {
             if (player.networkHandler != null) {
                 ServerPlayNetworking.send(player, new AiNetworkPayloads.BuildCompleteS2CPayload(record.toGzip()));
+            }
+        });
+    }
+
+    public static void sendNearby(ServerPlayerEntity player, String json) {
+        runOnServerThread(player, () -> {
+            if (player.networkHandler != null) {
+                ServerPlayNetworking.send(player, new AiNetworkPayloads.NearbyObjectsS2CPayload(json));
             }
         });
     }

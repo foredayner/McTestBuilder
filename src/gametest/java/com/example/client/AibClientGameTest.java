@@ -97,6 +97,12 @@ public class AibClientGameTest implements FabricClientGameTest {
             });
             context.waitTicks(10);
             context.takeScreenshot("12_blueprint_used");
+            context.setScreen(AiPromptScreen::openNearby);
+            context.waitTicks(10);
+            context.setScreen(() -> AiPromptScreen.open("HISTORY", null)); // redraw with the server's answer
+            context.waitTicks(3);
+            context.takeScreenshot("13_nearby_objects");
+            context.setScreen(() -> null);
 
             // Small window: the settings form must scroll, nothing may overlap.
             context.getInput().resizeWindow(640, 360);

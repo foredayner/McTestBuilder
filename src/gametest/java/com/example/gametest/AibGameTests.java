@@ -98,10 +98,19 @@ public class AibGameTests implements FabricGameTest {
         int count = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag)).size();
         check(count == 22, "22 display entities summoned, got " + count);
 
-        UndoService.undo(player);
+        var hitboxes = world.getEntitiesByType(EntityType.INTERACTION, area, e -> e.getCommandTags().contains(tag));
+        check(hitboxes.size() == 1, "one invisible hitbox for the object, got " + hitboxes.size());
+        check(hitboxes.get(0).getCustomName() != null && "apple".equals(hitboxes.get(0).getCustomName().getString()),
+            "hitbox carries the title");
+        var listed = com.example.ai.build.ObjectService.nearby(player);
+        check(listed.size() == 1 && listed.get(0).tag.equals(tag) && listed.get(0).parts == 22, "nearby list finds it");
+
+        // Delete key path: remove by the hitbox entity id.
+        com.example.ai.build.ObjectService.removeByEntity(player, hitboxes.get(0).getId());
         context.waitAndRun(2, () -> {
-            int left = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag)).size();
-            check(left == 0, "undo removed the object, " + left + " left");
+            int left = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag)).size()
+                + world.getEntitiesByType(EntityType.INTERACTION, area, e -> e.getCommandTags().contains(tag)).size();
+            check(left == 0, "removing the object took every part and the hitbox, " + left + " left");
             context.complete();
         });
     }

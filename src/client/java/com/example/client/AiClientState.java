@@ -120,6 +120,23 @@ public final class AiClientState {
         }
     }
 
+    private static List<com.example.ai.build.ObjectService.Nearby> nearby = List.of();
+
+    public static void setNearby(String json) {
+        try {
+            com.example.ai.build.ObjectService.Nearby[] list =
+                new com.google.gson.Gson().fromJson(json, com.example.ai.build.ObjectService.Nearby[].class);
+            nearby = list == null ? List.of() : List.of(list);
+        } catch (RuntimeException exception) {
+            nearby = List.of();
+        }
+        refreshOpenScreen(true);
+    }
+
+    public static List<com.example.ai.build.ObjectService.Nearby> getNearby() {
+        return nearby;
+    }
+
     public static boolean isObjectMode() {
         return objectMode;
     }

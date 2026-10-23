@@ -167,4 +167,42 @@ public final class AiNetworkPayloads {
             return ID;
         }
     }
+
+    /** Client -> server: remove a placed object (by its hitbox entity id, or by tag from the list). */
+    public record RemoveObjectC2SPayload(int entityId, String tag) implements CustomPayload {
+        public static final CustomPayload.Id<RemoveObjectC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "remove_object"));
+        public static final PacketCodec<RegistryByteBuf, RemoveObjectC2SPayload> CODEC = PacketCodec.tuple(
+            PacketCodecs.VAR_INT, RemoveObjectC2SPayload::entityId,
+            PacketCodecs.STRING, RemoveObjectC2SPayload::tag,
+            RemoveObjectC2SPayload::new
+        );
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
+    /** Client -> server: which objects are near me? */
+    public record NearbyRequestC2SPayload() implements CustomPayload {
+        public static final CustomPayload.Id<NearbyRequestC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "nearby_request"));
+        public static final PacketCodec<RegistryByteBuf, NearbyRequestC2SPayload> CODEC = PacketCodec.unit(new NearbyRequestC2SPayload());
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
+    /** Server -> client: nearby objects as JSON (ObjectService.Nearby list). */
+    public record NearbyObjectsS2CPayload(String json) implements CustomPayload {
+        public static final CustomPayload.Id<NearbyObjectsS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "nearby_objects"));
+        public static final PacketCodec<RegistryByteBuf, NearbyObjectsS2CPayload> CODEC =
+            PacketCodec.tuple(PacketCodecs.STRING, NearbyObjectsS2CPayload::json, NearbyObjectsS2CPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
 }
