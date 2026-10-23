@@ -77,6 +77,16 @@ public class AiPromptScreen extends Screen {
         super(Text.literal("AI Builder"));
     }
 
+    /** Open on a page: "CREATE", "HISTORY" (optionally with a record open) or "LOGS". */
+    public static AiPromptScreen open(String pageName, String recordId) {
+        page = Page.valueOf(pageName);
+        selectedId = recordId;
+        chatScroll = 0;
+        listScroll = 0;
+        detailScroll = 0;
+        return new AiPromptScreen();
+    }
+
     public void onStateUpdated(boolean rebuildWidgets) {
         if (rebuildWidgets) {
             rebuild();

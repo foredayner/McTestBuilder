@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "aib-gametest",
+  "version": "1.0.0",
+  "name": "AI Build Assistant tests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": ["com.example.gametest.AibGameTests"],
+    "fabric-client-gametest": ["com.example.client.AibClientGameTest"]
+  },
+  "depends": {
+    "minecraft-ai-build-assistant": "*",
+    "fabric-api": "*"
+  }
+}

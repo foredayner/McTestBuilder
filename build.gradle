@@ -16,14 +16,47 @@ repositories {
 
 loom {
 	splitEnvironmentSourceSets()
+}
+
+sourceSets {
+	// In-game tests: server GameTests and client GameTests (screenshots). Not part of the mod jar.
+	gametest {
+		compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+		compileClasspath += sourceSets.client.compileClasspath + sourceSets.client.output
+		runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+		runtimeClasspath += sourceSets.client.runtimeClasspath + sourceSets.client.output
+	}
+}
+
+loom {
 
 	mods {
 		"minecraft-ai-build-assistant" {
 			sourceSet sourceSets.main
 			sourceSet sourceSets.client
 		}
+		"aib-gametest" {
+			sourceSet sourceSets.gametest
+		}
 	}
 
+	runs {
+		gametest {
+			server()
+			name "Game Test"
+			source sourceSets.gametest
+			vmArg "-Dfabric-api.gametest"
+			vmArg "-Dfabric-api.gametest.report-file=${project.layout.buildDirectory.file("gametest/junit.xml").get().getAsFile()}"
+			runDir "build/gametest"
+		}
+		clientGametest {
+			client()
+			name "Client Game Test"
+			source sourceSets.gametest
+			vmArg "-Dfabric.client.gametest"
+			runDir "build/clientgametest"
+		}
+	}
 }
 
 dependencies {
@@ -36,6 +69,11 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 	include implementation('org.codehaus.groovy:groovy:3.0.17')
 	include implementation('org.codehaus.groovy:groovy-json:3.0.17')
+
+	testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
+	testImplementation platform("org.junit:junit-bom:5.11.4")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 	
 }
 
@@ -85,5 +123,13 @@ publishing {
 		// Notice: This block does NOT have the same function as the block in the top level.
 		// The repositories here will be used for publishing your artifact, not for
 		// retrieving dependencies.
+	}
+}
+
+test {
+	useJUnitPlatform()
+	testLogging {
+		events "failed"
+		exceptionFormat "full"
 	}
 }

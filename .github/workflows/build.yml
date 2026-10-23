@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -18,7 +18,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build
+
+      - name: Build and unit tests
         run: |
           chmod +x gradlew
           set -o pipefail
@@ -26,17 +27,24 @@ jobs:
       - name: Report build errors
         if: failure()
         run: |
-          # Compiler errors and Gradle's summary as one annotation (readable through the API).
-          grep -E "error:|warning: \[removal\]|What went wrong|Could not|> " -A2 build.log | head -150 > errors.txt || true
+          grep -E "error:|FAILED|Test.*>|expected|Assertion|What went wrong|Could not|> " -A3 build.log | head -150 > errors.txt || true
           msg=$(sed -e 's/%/%25/g' errors.txt | awk '{printf "%s%%0A", $0}')
           echo "::error title=build errors::${msg}"
-      - name: Upload mod jar
-        uses: actions/upload-artifact@v4
-        with:
-          name: minecraft-ai-build-assistant-mc1.21.4
-          path: |
-            build/libs/*.jar
-            !build/libs/*-sources.jar
+
+      - name: Server game tests
+        run: |
+          mkdir -p build/gametest build/clientgametest
+          echo "eula=true" > build/gametest/eula.txt
+          echo "eula=true" > build/clientgametest/eula.txt
+          set -o pipefail
+          ./gradlew runGametest 2>&1 | tee gametest.log
+      - name: Report game test failures
+        if: failure()
+        run: |
+          grep -iE "error:|GameTestException|failed|exception|passed|tests? (were|was)|required tests" -A2 gametest.log | head -120 > errors.txt || true
+          msg=$(sed -e 's/%/%25/g' errors.txt | awk '{printf "%s%%0A", $0}')
+          echo "::error title=game test errors::${msg}"
+
       - name: Keep only the mod jar
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,5 +63,29 @@ jobs:
           make_latest: true
           body: |
             Minecraft 1.21.4 / Fabric port of Minecraft-AI-Build-Assistant (original: Fyzugx-Lab, CC0).
-            Built automatically from `${{ github.sha }}`. See PORT-1.21.4.md for what changed and how to install.
+            Built automatically from `${{ github.sha }}` after unit tests and in-game server tests passed.
+            See PORT-1.21.4.md for what changed and how to install.
           files: build/libs/*.jar
+
+      - name: Client game test (screenshots)
+        id: clienttest
+        continue-on-error: true
+        uses: modmuss50/xvfb-action@v1
+        with:
+          run: ./gradlew runClientGametest --stacktrace
+      - name: Publish screenshots and logs to the ci-screenshots branch
+        if: always()
+        run: |
+          out=$(mktemp -d)
+          cp -r build/clientgametest/screenshots "$out/" 2>/dev/null || true
+          mkdir -p "$out/logs"
+          cp build/clientgametest/logs/latest.log "$out/logs/client.log" 2>/dev/null || true
+          cp build/gametest/logs/latest.log "$out/logs/server-gametest.log" 2>/dev/null || true
+          cp build/gametest/junit.xml "$out/logs/server-gametest-junit.xml" 2>/dev/null || true
+          echo "${GITHUB_SHA} client-test=${{ steps.clienttest.outcome }}" > "$out/RUN.txt"
+          cd "$out"
+          git init -q
+          git checkout -q -b ci-screenshots
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "screenshots for ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-screenshots

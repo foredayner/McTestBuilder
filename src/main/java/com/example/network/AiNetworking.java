@@ -140,10 +140,17 @@ public final class AiNetworking {
             return;
         }
 
+        Runnable safe = () -> {
+            try {
+                action.run();
+            } catch (RuntimeException exception) {
+                System.out.println("[AI] Could not send to " + player.getName().getString() + ": " + exception.getMessage());
+            }
+        };
         if (server.isOnThread()) {
-            action.run();
+            safe.run();
         } else {
-            server.execute(action);
+            server.execute(safe);
         }
     }
 }
