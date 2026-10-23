@@ -97,6 +97,69 @@ public final class BuildPlan {
         return parts != null && !parts.isEmpty();
     }
 
+    /** Allowed sizes when placing a saved object bigger or smaller. */
+    public static final double MIN_SCALE = 0.25;
+    public static final double MAX_SCALE = 8;
+
+    /**
+     * A copy of an object scaled by {@code s}: every part's position and size. It grows from the
+     * middle of its bottom edge nearest the player, so it keeps its gap in front of the player
+     * instead of swallowing them. Rotations stay, so the front still faces the player.
+     */
+    public BuildPlan scaled(double s) {
+        BuildPlan out = new BuildPlan();
+        out.facing = facing;
+        out.ops = new ArrayList<>(ops);
+        double[] b = partBounds();
+        double px = (b[0] + b[3]) / 2;
+        double pz = (b[2] + b[5]) / 2;
+        double py = b[1];
+        switch (normalizeFacing(facing)) {
+            case "south" -> pz = b[2];
+            case "east" -> px = b[0];
+            case "west" -> px = b[3];
+            default -> pz = b[5]; // facing north: the near side is the south edge
+        }
+        for (Part p : parts) {
+            out.parts.add(new Part(p.block,
+                px + (p.x - px) * s, py + (p.y - py) * s, pz + (p.z - pz) * s,
+                p.sx * s, p.sy * s, p.sz * s, p.yaw, p.pitch, p.roll));
+        }
+        return out;
+    }
+
+    /** Exact box around the turned parts: {minX, minY, minZ, maxX, maxY, maxZ}. */
+    public double[] partBounds() {
+        double[] b = { Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE };
+        for (Part p : parts) {
+            org.joml.Quaternionf q = new org.joml.Quaternionf()
+                .rotateY((float) Math.toRadians(p.yaw))
+                .rotateX((float) Math.toRadians(p.pitch))
+                .rotateZ((float) Math.toRadians(p.roll));
+            org.joml.Matrix3f m = new org.joml.Matrix3f().rotation(q);
+            double hx = p.sx / 2, hy = p.sy / 2, hz = p.sz / 2;
+            double ex = Math.abs(m.m00()) * hx + Math.abs(m.m10()) * hy + Math.abs(m.m20()) * hz;
+            double ey = Math.abs(m.m01()) * hx + Math.abs(m.m11()) * hy + Math.abs(m.m21()) * hz;
+            double ez = Math.abs(m.m02()) * hx + Math.abs(m.m12()) * hy + Math.abs(m.m22()) * hz;
+            b[0] = Math.min(b[0], p.x - ex);
+            b[1] = Math.min(b[1], p.y - ey);
+            b[2] = Math.min(b[2], p.z - ez);
+            b[3] = Math.max(b[3], p.x + ex);
+            b[4] = Math.max(b[4], p.y + ey);
+            b[5] = Math.max(b[5], p.z + ez);
+        }
+        return parts.isEmpty() ? new double[6] : b;
+    }
+
+    /** Largest scale this object can take before a part grows past the size limit. */
+    public double maxScale() {
+        double biggest = 0;
+        for (Part p : parts) {
+            biggest = Math.max(biggest, Math.max(p.sx, Math.max(p.sy, p.sz)));
+        }
+        return biggest <= 0 ? MAX_SCALE : Math.min(MAX_SCALE, MAX_PART_SIZE / biggest);
+    }
+
     /** "NORTH", "North (-Z)", null... -> "north" | "east" | "south" | "west". */
     public static String normalizeFacing(String value) {
         if (value == null) {

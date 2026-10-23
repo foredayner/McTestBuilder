@@ -116,6 +116,38 @@ public class AibGameTests implements FabricGameTest {
     }
 
     @GameTest(templateName = EMPTY_STRUCTURE)
+    public void objectsCanBePlacedBigger(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f); // facing south
+        BuildPlan plan = Demo.plan(world, origin, player, Demo.APPLE);
+        BuildRecord record = BuildRecord.create("apple", "TEST", "script", plan);
+
+        BuildRecord big = com.example.ai.build.RebuildService.withScale(player, record, 300);
+        check(big != null && big != record, "x3 is allowed for a small apple");
+        check(big.id.endsWith("_x300") && big.scale == 3, "scaled copy has its own id and scale: " + big.id);
+        check(record.plan.parts.get(0).sx * 3 == big.plan.parts.get(0).sx, "parts are three times bigger");
+        double[] a = record.plan.partBounds();
+        double[] b = big.plan.partBounds();
+        check(Math.abs(b[1] - a[1]) < 1e-6, "still on the ground: " + a[1] + " -> " + b[1]);
+        check(Math.abs(b[2] - a[2]) < 1e-6, "near (north) edge keeps its gap: " + a[2] + " -> " + b[2]);
+        check(Math.abs((b[4] - b[1]) - 3 * (a[4] - a[1])) < 1e-4, "three times taller");
+        check(com.example.ai.build.RebuildService.withScale(player, record, 5000) == null, "x50 is refused");
+
+        Demo.place(player, origin, big.plan, 0, "big apple");
+        Box area = new Box(origin).expand(8);
+        var hitbox = world.getEntitiesByType(EntityType.INTERACTION, area, e -> e.getCommandTags().contains("aib_obj"));
+        check(hitbox.size() == 1, "one hitbox, got " + hitbox.size());
+        check(hitbox.get(0).getHeight() > 2.0f, "hitbox grew with the object: " + hitbox.get(0).getHeight());
+        var parts = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib"));
+        check(parts.size() == 22, "22 parts, got " + parts.size());
+        for (var part : parts) {
+            check(part.getWidth() > 0.5f && part.getHeight() > 0.5f, "display culling box is set: " + part.getWidth());
+        }
+        context.complete();
+    }
+
+    @GameTest(templateName = EMPTY_STRUCTURE)
     public void reviewRejectsBadScriptsBeforeRunning(TestContext context) {
         ServerWorld world = context.getWorld();
         BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));

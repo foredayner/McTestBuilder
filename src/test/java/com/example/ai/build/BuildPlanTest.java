@@ -70,4 +70,22 @@ class BuildPlanTest {
         assertEquals("build", old.kind);
         assertThrows(IllegalArgumentException.class, () -> BuildRecord.fromGzip(new byte[] { 1, 2, 3 }));
     }
+
+    @Test
+    void scalingGrowsFromTheNearBottomEdge() {
+        BuildPlan plan = new BuildPlan();
+        plan.facing = "north";
+        // A 1 x 0.5 x 1 box standing on the ground, 2 blocks north of the player.
+        plan.parts.add(new BuildPlan.Part("minecraft:red_concrete", 0.5, 0.25, -2.5, 1, 0.5, 1, 0, 0, 0));
+        BuildPlan big = plan.scaled(3);
+        BuildPlan.Part p = big.parts.get(0);
+        assertEquals(3, p.sx, 1e-9);
+        assertEquals(1.5, p.sy, 1e-9);
+        double[] b = big.partBounds();
+        assertEquals(0, b[1], 1e-6, "still standing on the ground");
+        assertEquals(-2, b[5], 1e-6, "near (south) edge stays 2 blocks ahead");
+        assertEquals(0.5, (b[0] + b[3]) / 2, 1e-6, "still centred in front of the player");
+        assertEquals("north", big.facing);
+        assertEquals(8, plan.maxScale(), 1e-9, "capped at MAX_SCALE");
+    }
 }

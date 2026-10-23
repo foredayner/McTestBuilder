@@ -140,13 +140,14 @@ public final class AiNetworkPayloads {
     }
 
     /** Client -> server: one part of a saved build to rebuild (client packets are size-limited). */
-    public record RebuildPartC2SPayload(int id, int index, int total, int mode, byte[] data) implements CustomPayload {
+    public record RebuildPartC2SPayload(int id, int index, int total, int mode, int scalePercent, byte[] data) implements CustomPayload {
         public static final CustomPayload.Id<RebuildPartC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "rebuild_part"));
         public static final PacketCodec<RegistryByteBuf, RebuildPartC2SPayload> CODEC = PacketCodec.tuple(
             PacketCodecs.VAR_INT, RebuildPartC2SPayload::id,
             PacketCodecs.VAR_INT, RebuildPartC2SPayload::index,
             PacketCodecs.VAR_INT, RebuildPartC2SPayload::total,
             PacketCodecs.VAR_INT, RebuildPartC2SPayload::mode,
+            PacketCodecs.VAR_INT, RebuildPartC2SPayload::scalePercent,
             PacketCodecs.BYTE_ARRAY, RebuildPartC2SPayload::data,
             RebuildPartC2SPayload::new
         );

@@ -79,6 +79,11 @@ public final class AiClientNetworking {
 
     /** mode: RebuildService.MODE_PLACE (build in front of me) or MODE_GIVE (blueprint paper). */
     public static void sendRebuild(BuildRecord record, int mode) {
+        sendRebuild(record, mode, 100);
+    }
+
+    /** scalePercent: 100 = as designed (objects can be placed bigger or smaller). */
+    public static void sendRebuild(BuildRecord record, int mode, int scalePercent) {
         byte[] data = record.toGzip();
         int part = RebuildService.PART_SIZE;
         int total = Math.max(1, (data.length + part - 1) / part);
@@ -86,7 +91,7 @@ public final class AiClientNetworking {
         for (int i = 0; i < total; i++) {
             int from = i * part;
             byte[] chunk = java.util.Arrays.copyOfRange(data, from, Math.min(data.length, from + part));
-            ClientPlayNetworking.send(new AiNetworkPayloads.RebuildPartC2SPayload(id, i, total, mode, chunk));
+            ClientPlayNetworking.send(new AiNetworkPayloads.RebuildPartC2SPayload(id, i, total, mode, scalePercent, chunk));
         }
     }
 

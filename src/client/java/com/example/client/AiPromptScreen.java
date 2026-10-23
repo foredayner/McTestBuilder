@@ -41,6 +41,9 @@ public class AiPromptScreen extends Screen {
     // Kept across re-inits (the screen rebuilds its widgets when state changes).
     private static Page page = Page.CREATE;
     private static String selectedId = null;
+    /** Size for placing a saved object: index into SCALES, kept while the game runs. */
+    private static final int[] SCALES = { 50, 100, 200, 300, 500 };
+    private static int scaleIndex = 1;
     private static int filter = 0;        // 0 all, 1 builds, 2 objects, 3 objects placed nearby
     private static final int NEARBY = 3;
     private static int chatScroll = 0;    // pixels up from the bottom
@@ -367,22 +370,38 @@ public class AiPromptScreen extends Screen {
             return;
         }
         int y = bottom() - 18;
-        int quarter = (right() - left() - 12) / 4;
-        button("← 목록", left(), y, quarter, b -> {
+        boolean object = "object".equals(record.kind);
+        int slots = object ? 5 : 4;
+        int quarter = (right() - left() - 4 * (slots - 1)) / slots;
+        int scale = object ? SCALES[scaleIndex] : 100;
+        String size = object ? " " + com.example.ai.build.RebuildService.scaleLabel(scale / 100.0) : "";
+        int x = left();
+        button("← 목록", x, y, quarter, b -> {
             selectedId = null;
             rebuild();
         });
-        button("   배치", left() + quarter + 4, y, quarter, b -> {
-            AiClientNetworking.sendRebuild(record, com.example.ai.build.RebuildService.MODE_PLACE);
-            AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\" 배치를 요청했어요. 내 앞에, 바라보는 방향으로 놓입니다.");
+        x += quarter + 4;
+        if (object) {
+            // Objects can be placed bigger or smaller: click to cycle the size.
+            button("크기" + size, x, y, quarter, b -> {
+                scaleIndex = (scaleIndex + 1) % SCALES.length;
+                rebuild();
+            });
+            x += quarter + 4;
+        }
+        button("   배치", x, y, quarter, b -> {
+            AiClientNetworking.sendRebuild(record, com.example.ai.build.RebuildService.MODE_PLACE, scale);
+            AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\"" + size + " 배치를 요청했어요. 내 앞에, 바라보는 방향으로 놓입니다.");
         });
-        this.icons.add(new IconAt(new ItemStack(Items.BRICKS), left() + quarter + 7, y + 1));
-        button("   손에 받기", left() + 2 * (quarter + 4), y, quarter, b -> {
-            AiClientNetworking.sendRebuild(record, com.example.ai.build.RebuildService.MODE_GIVE);
-            AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\" 설계도를 요청했어요.");
+        this.icons.add(new IconAt(new ItemStack(Items.BRICKS), x + 3, y + 1));
+        x += quarter + 4;
+        button("   손에 받기", x, y, quarter, b -> {
+            AiClientNetworking.sendRebuild(record, com.example.ai.build.RebuildService.MODE_GIVE, scale);
+            AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\"" + size + " 설계도를 요청했어요.");
         });
-        this.icons.add(new IconAt(new ItemStack(Items.PAPER), left() + 2 * (quarter + 4) + 3, y + 1));
-        this.addDrawableChild(new WoodButton(left() + 3 * (quarter + 4), y, quarter, 18,
+        this.icons.add(new IconAt(new ItemStack(Items.PAPER), x + 3, y + 1));
+        x += quarter + 4;
+        this.addDrawableChild(new WoodButton(x, y, right() - x, 18,
             Text.literal(this.confirmDelete ? "정말 삭제?" : "삭제"), b -> {
                 if (!this.confirmDelete) {
                     this.confirmDelete = true;

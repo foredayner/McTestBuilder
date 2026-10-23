@@ -23,6 +23,8 @@ public final class BuildRecord {
     public String provider = "";
     public String model = "";
     public BuildPlan plan = new BuildPlan();
+    /** Size it is placed at (objects only): the plan is already scaled, this is just for its name. */
+    public double scale = 1;
 
     public static BuildRecord create(String prompt, String provider, String model, BuildPlan plan) {
         BuildRecord record = new BuildRecord();

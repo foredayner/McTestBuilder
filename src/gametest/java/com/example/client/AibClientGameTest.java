@@ -107,6 +107,27 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.takeScreenshot("13_nearby_objects");
             context.setScreen(() -> null);
 
+            // The same apple placed at x1, x3 and x5, side by side somewhere empty.
+            game.getServer().runCommand("execute as @a at @s run tp @s ~40 ~ ~ 0 18");
+            context.waitTicks(5);
+            game.getClientWorld().waitForChunksRender();
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                var origin = player.getBlockPos();
+                BuildRecord apple = BuildRecord.create("사과", "TEST", "script",
+                    Demo.plan(player.getServerWorld(), origin, player, Demo.APPLE));
+                int[][] spots = { { -4, 100 }, { -1, 300 }, { 4, 500 } };
+                for (int[] spot : spots) {
+                    BuildRecord r = com.example.ai.build.RebuildService.withScale(player, apple, spot[1]);
+                    Demo.place(player, origin.add(spot[0], 0, 0), r.plan, 0, "사과 x" + spot[1] / 100);
+                }
+            });
+            context.waitTicks(30);
+            game.getServer().runCommand("execute as @a at @s run tp @s ~1 ~1 ~-5 0 15");
+            context.waitTicks(10);
+            game.getClientWorld().waitForChunksRender();
+            context.takeScreenshot("14_scaled_apples");
+
             // Small window: the settings form must scroll, nothing may overlap.
             context.getInput().resizeWindow(640, 360);
             context.waitTicks(2);

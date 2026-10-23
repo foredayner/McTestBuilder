@@ -37,8 +37,10 @@ class MinecraftAITest {
     void summonCentresThePartOnTheEntity() {
         BuildPlan.Part part = new BuildPlan.Part("minecraft:red_concrete", 0.5, 0.25, 0.5, 1, 0.5, 1, 0, 0, 0);
         String cmd = MinecraftAI.summonCommand(part, new BlockPos(10, 64, -3), 0, "aib_1");
-        assertTrue(cmd.startsWith("summon minecraft:block_display 10.5000 64.2500 -2.5000 "), cmd);
-        assertTrue(cmd.contains("translation:[-0.5000f,-0.2500f,-0.5000f]"), cmd);
+        // Entity stands 0.75 (half the part's diagonal) below the centre; the model is lifted back.
+        assertTrue(cmd.startsWith("summon minecraft:block_display 10.5000 63.5000 -2.5000 "), cmd);
+        assertTrue(cmd.contains("translation:[-0.5000f,0.5000f,-0.5000f]"), cmd);
+        assertTrue(cmd.contains("width:1.5000f,height:1.5000f"), cmd);
         assertTrue(cmd.contains("scale:[1.0000f,0.5000f,1.0000f]"), cmd);
         assertTrue(cmd.contains("Tags:[\"aib\",\"aib_1\"]"), cmd);
         assertTrue(cmd.contains("left_rotation:[0.000000f,0.000000f,0.000000f,1.000000f]"), cmd);
@@ -46,6 +48,6 @@ class MinecraftAITest {
         // One quarter turn: a part 2 blocks north ends up 2 blocks east.
         BuildPlan.Part north = new BuildPlan.Part("minecraft:stone", 0, 0, -2, 1, 1, 1, 0, 0, 0);
         String turned = MinecraftAI.summonCommand(north, BlockPos.ORIGIN, 1, "t");
-        assertTrue(turned.startsWith("summon minecraft:block_display 2.0000 0.0000 0.0000 "), turned);
+        assertTrue(turned.startsWith("summon minecraft:block_display 2.0000 -0.8660 0.0000 "), turned);
     }
 }

@@ -514,11 +514,17 @@ public class MinecraftAI {
             .rotateZ((float) Math.toRadians(part.roll));
         Vector3f half = q.transform(new Vector3f((float) part.sx / 2, (float) part.sy / 2, (float) part.sz / 2));
         String block = rotateBlockState(part.block, turns);
+        // The game hides a display entity when its culling box (width x height, standing on the
+        // entity position) is off screen; the default box is empty, so a big part would vanish
+        // as soon as its centre left the screen. Stand the entity at the bottom of a box that
+        // holds the whole part (any rotation) and lift the model back up by the same amount.
+        double r = Math.sqrt(part.sx * part.sx + part.sy * part.sy + part.sz * part.sz) / 2;
         return String.format(Locale.ROOT,
             "summon minecraft:block_display %.4f %.4f %.4f {block_state:%s,transformation:{left_rotation:[%.6ff,%.6ff,%.6ff,%.6ff],"
-                + "right_rotation:[0f,0f,0f,1f],translation:[%.4ff,%.4ff,%.4ff],scale:[%.4ff,%.4ff,%.4ff]},Tags:[\"aib\",\"%s\"]}",
-            at.getX() + cx, at.getY() + part.y, at.getZ() + cz, blockStateNbt(block),
-            q.x, q.y, q.z, q.w, -half.x, -half.y, -half.z, part.sx, part.sy, part.sz, tag);
+                + "right_rotation:[0f,0f,0f,1f],translation:[%.4ff,%.4ff,%.4ff],scale:[%.4ff,%.4ff,%.4ff]},"
+                + "width:%.4ff,height:%.4ff,Tags:[\"aib\",\"%s\"]}",
+            at.getX() + cx, at.getY() + part.y - r, at.getZ() + cz, blockStateNbt(block),
+            q.x, q.y, q.z, q.w, -half.x, -half.y + r, -half.z, part.sx, part.sy, part.sz, 2 * r, 2 * r, tag);
     }
 
     /** World-aligned box around all parts: {minX, minY, minZ, maxX, maxY, maxZ}, relative to at. */
@@ -775,4 +781,4 @@ public class MinecraftAI {
     public static BlockPos getOrigin() {
         return origin;
     }
-}
+}

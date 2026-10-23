@@ -49,6 +49,11 @@ public final class RebuildService {
     public static final int MODE_GIVE = 1;
 
     public static void receivePart(ServerPlayerEntity player, int id, int index, int total, int mode, byte[] data) {
+        receivePart(player, id, index, total, mode, 100, data);
+    }
+
+    /** scalePercent: 100 = as designed; objects can be placed bigger or smaller. */
+    public static void receivePart(ServerPlayerEntity player, int id, int index, int total, int mode, int scalePercent, byte[] data) {
         if (total <= 0 || total > MAX_PARTS || index < 0 || index >= total || data == null || data.length > PART_SIZE) {
             return;
         }
@@ -70,6 +75,9 @@ public final class RebuildService {
             all.writeBytes(part);
         }
         BuildRecord record = readChecked(player, all.toByteArray());
+        if (record != null) {
+            record = withScale(player, record, scalePercent);
+        }
         if (record == null) {
             return;
         }
@@ -103,7 +111,44 @@ public final class RebuildService {
 
     static String title(BuildRecord record) {
         String p = record.prompt.replace('\n', ' ');
-        return p.length() > 40 ? p.substring(0, 40) + "..." : p;
+        p = p.length() > 40 ? p.substring(0, 40) + "..." : p;
+        return record.scale == 1 ? p : p + " (" + scaleLabel(record.scale) + ")";
+    }
+
+    public static String scaleLabel(double scale) {
+        return "×" + (scale == Math.rint(scale) ? String.valueOf((int) scale) : String.valueOf(scale));
+    }
+
+    /**
+     * The record at another size (objects only), with its own id so a scaled blueprint does not
+     * overwrite the original one. Null (with a message) if that size is not possible.
+     */
+    public static BuildRecord withScale(ServerPlayerEntity player, BuildRecord record, int percent) {
+        if (percent <= 0 || percent == 100) {
+            return record;
+        }
+        double s = percent / 100.0;
+        if (!record.plan.isObject() || !record.plan.ops.isEmpty()) {
+            AiNetworking.sendLog(player, "[History] 크기 조절은 소품만 할 수 있어요. 원래 크기로 놓을게요.");
+            return record;
+        }
+        double max = record.plan.maxScale();
+        if (s < BuildPlan.MIN_SCALE || s > max + 1e-9) {
+            AiNetworking.sendLog(player, "[History] 이 소품은 " + scaleLabel(BuildPlan.MIN_SCALE) + " ~ "
+                + scaleLabel(Math.floor(max * 10) / 10) + " 크기까지만 놓을 수 있어요 (조각 하나가 "
+                + (int) BuildPlan.MAX_PART_SIZE + "블록을 넘으면 안 돼요).");
+            return null;
+        }
+        BuildRecord out = BuildRecord.fromJson(record.toJson());
+        out.plan = record.plan.scaled(s);
+        out.scale = record.scale * s;
+        out.id = record.id + "_x" + percent;
+        String problem = validate(out.plan);
+        if (problem != null) {
+            AiNetworking.sendLog(player, "[History] 그 크기로는 놓을 수 없어요: " + problem);
+            return null;
+        }
+        return out;
     }
 
     static String facingOf(ServerPlayerEntity player) {
