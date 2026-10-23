@@ -58,6 +58,20 @@ class ShapeCanvasTest {
     }
 
     @Test
+    void thinStemsStayInOnePiece() {
+        // A stem thinner than one grid pixel, between cell centres: it must not vanish or break up.
+        BuildPlan plan = record(() -> MinecraftAI.addTube("iron_block", List.of(List.of(0, 0, 2), List.of(0.05, 0.5, 2.02), List.of(0, 1, 2)), 0.02));
+        double low = plan.parts.stream().mapToDouble(p -> p.y - p.sy / 2).min().orElse(9);
+        double high = plan.parts.stream().mapToDouble(p -> p.y + p.sy / 2).max().orElse(-9);
+        assertTrue(low < 0.07 && high > 0.93, "from " + low + " to " + high);
+        // Every height step of the grid has some of the stem in it (no gaps).
+        for (double y = 0.05; y < 0.95; y += 1.0 / 16) {
+            final double at = y;
+            assertTrue(plan.parts.stream().anyMatch(p -> Math.abs(p.y - at) <= p.sy / 2 + 1e-9), "gap at y " + y);
+        }
+    }
+
+    @Test
     void laterShapesPaintOverEarlierOnes() {
         BuildPlan plan = record(() -> {
             MinecraftAI.addSphere("white_concrete", 0, 0.5, 2, 0.4);

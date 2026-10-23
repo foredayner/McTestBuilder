@@ -118,7 +118,7 @@ public final class ShapeCanvas {
             for (int x = x0; x < x1; x++) {
                 for (int y = y0; y < y1; y++) {
                     for (int z = z0; z < z1; z++) {
-                        if (p.inside((x + 0.5) / res, (y + 0.5) / res, (z + 0.5) / res)) {
+                        if (covers(p, x, y, z, res)) {
                             cells.put(key(x, y, z), id);
                             any = true;
                         }
@@ -148,6 +148,25 @@ public final class ShapeCanvas {
             }
         }
         return parts;
+    }
+
+    /**
+     * A cell belongs to a shape when its centre is inside, or (for shapes thinner than a cell,
+     * like a thin stem) one of eight points around the centre is: so thin parts stay connected
+     * instead of breaking into floating bits.
+     */
+    private static boolean covers(Painted p, int x, int y, int z, int res) {
+        double cx = (x + 0.5) / res, cy = (y + 0.5) / res, cz = (z + 0.5) / res;
+        if (p.inside(cx, cy, cz)) {
+            return true;
+        }
+        double o = 0.3 / res;
+        for (int i = 0; i < 8; i++) {
+            if (p.inside(cx + ((i & 1) == 0 ? -o : o), cy + ((i & 2) == 0 ? -o : o), cz + ((i & 4) == 0 ? -o : o))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

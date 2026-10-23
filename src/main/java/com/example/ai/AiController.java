@@ -382,6 +382,10 @@ public class AiController {
             - Characters and animals: cute, stylised proportions. A big head (40-60%% of the body), big readable eyes
               (dark pupil + small white shine), a simple nose/mouth/beak, short sturdy limbs, a recognisable feature
               (horn, hat, mane, ears, tail).
+            - Faces (eyes, mouth) only on characters and animals, or when the request asks for one. Food, plants,
+              furniture, tools and decorations stay realistic: get their shape and colours right instead.
+            - Round things (fruit, pots, heads, bodies) are spheres, ellipsoids, cylinders and cones, not boxes.
+            - Keep parts at least 0.06 thick (one grid pixel); thinner ones are drawn one pixel thick.
             - 3-5 main colours. Use a darker shade for undersides and creases and a lighter one for highlights
               (e.g. yellow_concrete body + yellow_terracotta underside; white_concrete + light_gray_concrete).
             - Overlap shapes slightly so nothing floats or leaves gaps; set details just outside the surface they sit on.

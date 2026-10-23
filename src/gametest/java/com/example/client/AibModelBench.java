@@ -237,15 +237,22 @@ public class AibModelBench implements FabricClientGameTest {
             ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
             var origin = player.getBlockPos();
             Demo.place(player, origin, record.plan, 0, c.prompt());
-            int[] b = record.plan.bounds();
-            double cx = origin.getX() + (b[0] + b[3] + 1) / 2.0;
-            double cy = origin.getY() + (b[1] + b[4] + 1) / 2.0;
-            double cz = origin.getZ() + (b[2] + b[5] + 1) / 2.0;
-            double size = Math.max(Math.max(b[3] - b[0], b[4] - b[1]), b[5] - b[2]) + 1;
+            // Objects: their exact box (they are smaller than whole blocks); buildings: block bounds.
+            double[] b;
+            if (c.object()) {
+                b = record.plan.partBounds();
+            } else {
+                int[] ib = record.plan.bounds();
+                b = new double[] { ib[0], ib[1], ib[2], ib[3] + 1, ib[4] + 1, ib[5] + 1 };
+            }
+            double cx = origin.getX() + (b[0] + b[3]) / 2.0;
+            double cy = origin.getY() + (b[1] + b[4]) / 2.0;
+            double cz = origin.getZ() + (b[2] + b[5]) / 2.0;
+            double size = Math.max(Math.max(b[3] - b[0], b[4] - b[1]), b[5] - b[2]);
             // Stand in front of it (the player's side, north of it since the player faces south).
-            double dist = c.object() ? Math.max(2.2, size * 1.6) : size * 1.3 + 4;
-            double camZ = cz - (b[5] - b[2] + 1) / 2.0 - dist;
-            double camY = cy + (c.object() ? 0.6 : size * 0.35);
+            double dist = c.object() ? Math.max(1.2, size * 1.3) : size * 1.3 + 4;
+            double camZ = cz - (b[5] - b[2]) / 2.0 - dist;
+            double camY = cy + (c.object() ? size * 0.25 : size * 0.35);
             return String.format(Locale.ROOT, "tp @a %.2f %.2f %.2f facing %.2f %.2f %.2f", cx, camY, camZ, cx, cy, cz);
         });
         for (int i = 0; i < 400 && BuildTaskQueue.pendingCount() > 0; i++) {
