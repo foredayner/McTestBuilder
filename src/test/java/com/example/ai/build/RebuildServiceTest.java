@@ -37,4 +37,15 @@ class RebuildServiceTest {
         badPart.parts.add(new BuildPlan.Part("minecraft:stone", 0, 0, 0, 100, 1, 1, 0, 0, 0));
         assertNotNull(RebuildService.validate(badPart));
     }
+
+    @Test
+    void blueprintAnchorIsTheMiddleOfTheNearEdge() {
+        BuildPlan plan = new BuildPlan();
+        plan.facing = "north";
+        plan.ops.add(new BuildPlan.Op("fill", 0, 0, -4, 2, 1, -2, "minecraft:stone", "outline"));
+        // Facing north, the near edge is the south side (z = -2), middle x = 1.
+        assertArrayEquals(new int[] { 1, 0, -2 }, RebuildService.anchor(plan, 0, "north"));
+        // Turned to face east: the footprint becomes x 2..4, z 0..2; near edge is the west side.
+        assertArrayEquals(new int[] { 2, 0, 1 }, RebuildService.anchor(plan, 1, "east"));
+    }
 }

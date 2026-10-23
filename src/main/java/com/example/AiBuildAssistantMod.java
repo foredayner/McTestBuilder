@@ -28,5 +28,19 @@ public class AiBuildAssistantMod implements ModInitializer {
         AiBuildCommand.register();
         AiApprovalCommands.register();
         ChatMessageHandler.registerChatFilter();
+
+        // Blueprint papers: right-click a block to build there.
+        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
+            net.minecraft.item.ItemStack stack = player.getStackInHand(hand);
+            if (com.example.ai.build.BlueprintStore.idOf(stack) == null) {
+                return net.minecraft.util.ActionResult.PASS;
+            }
+            if (world.isClient()) {
+                return net.minecraft.util.ActionResult.SUCCESS;
+            }
+            com.example.ai.build.BlueprintStore.use((net.minecraft.server.network.ServerPlayerEntity) player, stack,
+                hit.getBlockPos().offset(hit.getSide()));
+            return net.minecraft.util.ActionResult.SUCCESS;
+        });
     }
 }

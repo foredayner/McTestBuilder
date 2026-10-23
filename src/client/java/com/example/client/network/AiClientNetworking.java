@@ -40,7 +40,7 @@ public final class AiClientNetworking {
                 try {
                     BuildRecord record = BuildRecord.fromGzip(payload.data());
                     BuildHistory.save(record);
-                    AiClientState.addLog("[History] 보관함에 저장했어요.");
+                    AiClientState.addLog("[History] 보관함에 저장했어요. 보관함 탭에서 배치하거나 설계도로 받을 수 있어요.");
                 } catch (RuntimeException exception) {
                     AiClientState.addLog("[History] Could not save this build: " + exception.getMessage());
                 }
@@ -62,6 +62,11 @@ public final class AiClientNetworking {
 
     /** Send a saved build to the server in parts small enough for client packets. */
     public static void sendRebuild(BuildRecord record) {
+        sendRebuild(record, RebuildService.MODE_PLACE);
+    }
+
+    /** mode: RebuildService.MODE_PLACE (build in front of me) or MODE_GIVE (blueprint paper). */
+    public static void sendRebuild(BuildRecord record, int mode) {
         byte[] data = record.toGzip();
         int part = RebuildService.PART_SIZE;
         int total = Math.max(1, (data.length + part - 1) / part);
@@ -69,7 +74,7 @@ public final class AiClientNetworking {
         for (int i = 0; i < total; i++) {
             int from = i * part;
             byte[] chunk = java.util.Arrays.copyOfRange(data, from, Math.min(data.length, from + part));
-            ClientPlayNetworking.send(new AiNetworkPayloads.RebuildPartC2SPayload(id, i, total, chunk));
+            ClientPlayNetworking.send(new AiNetworkPayloads.RebuildPartC2SPayload(id, i, total, mode, chunk));
         }
     }
 

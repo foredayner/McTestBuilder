@@ -158,8 +158,8 @@ public class AiPromptScreen extends Screen {
 
         boolean pending = AiClientState.hasPendingApproval();
         int y = bottom() - 42;
-        button("설계 배치하기", left(), y, 84, b -> AiClientState.approve()).active = pending;
-        button("취소", left() + 88, y, 46, b -> AiClientState.cancel()).active = pending;
+        button("보관함에 등록", left(), y, 84, b -> AiClientState.approve()).active = pending;
+        button("버리기", left() + 88, y, 46, b -> AiClientState.cancel()).active = pending;
         button("   되돌리기", left() + 138, y, 74, b -> {
             AiClientState.undo();
             chatScroll = 0;
@@ -331,6 +331,8 @@ public class AiPromptScreen extends Screen {
     private void buildHistory() {
         BuildRecord record = selected();
         if (record == null) {
+            button("   되돌리기", right() - 162, top(), 74, b -> AiClientState.undo());
+            this.icons.add(new IconAt(new ItemStack(Items.CLOCK), right() - 159, top() + 1));
             String[] names = { "보기: 전체", "보기: 건물", "보기: 소품" };
             button(names[filter], right() - 84, top(), 84, b -> {
                 filter = (filter + 1) % 3;
@@ -340,16 +342,22 @@ public class AiPromptScreen extends Screen {
             return;
         }
         int y = bottom() - 18;
-        int third = (right() - left() - 8) / 3;
-        button("← 목록", left(), y, third, b -> {
+        int quarter = (right() - left() - 12) / 4;
+        button("← 목록", left(), y, quarter, b -> {
             selectedId = null;
             rebuild();
         });
-        button("여기에 배치", left() + third + 4, y, third, b -> {
-            AiClientNetworking.sendRebuild(record);
+        button("   배치", left() + quarter + 4, y, quarter, b -> {
+            AiClientNetworking.sendRebuild(record, com.example.ai.build.RebuildService.MODE_PLACE);
             AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\" 배치를 요청했어요. 내 앞에, 바라보는 방향으로 놓입니다.");
         });
-        this.addDrawableChild(new WoodButton(left() + 2 * third + 8, y, third, 18,
+        this.icons.add(new IconAt(new ItemStack(Items.BRICKS), left() + quarter + 7, y + 1));
+        button("   손에 받기", left() + 2 * (quarter + 4), y, quarter, b -> {
+            AiClientNetworking.sendRebuild(record, com.example.ai.build.RebuildService.MODE_GIVE);
+            AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\" 설계도를 요청했어요.");
+        });
+        this.icons.add(new IconAt(new ItemStack(Items.PAPER), left() + 2 * (quarter + 4) + 3, y + 1));
+        this.addDrawableChild(new WoodButton(left() + 3 * (quarter + 4), y, quarter, 18,
             Text.literal(this.confirmDelete ? "정말 삭제?" : "삭제"), b -> {
                 if (!this.confirmDelete) {
                     this.confirmDelete = true;

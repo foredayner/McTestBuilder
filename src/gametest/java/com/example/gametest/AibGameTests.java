@@ -119,4 +119,35 @@ public class AibGameTests implements FabricGameTest {
         }
         context.complete();
     }
+
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void blueprintPaperBuildsWhereClicked(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(4, 1, 6));
+        ServerPlayerEntity player = opPlayer(context, origin, 180f); // facing north
+        BuildPlan plan = Demo.plan(world, origin, player, SMALL);
+        BuildRecord record = BuildRecord.create("blueprint", "TEST", "script", plan);
+        com.example.config.AiBuilderConfig.get().ticksPerBlock = 1;
+
+        com.example.ai.build.BlueprintStore.give(player, record);
+        net.minecraft.item.ItemStack paper = net.minecraft.item.ItemStack.EMPTY;
+        for (int i = 0; i < player.getInventory().size(); i++) {
+            if (com.example.ai.build.BlueprintStore.idOf(player.getInventory().getStack(i)) != null) {
+                paper = player.getInventory().getStack(i);
+            }
+        }
+        check(!paper.isEmpty(), "the player got a blueprint paper");
+        check(record.id.equals(com.example.ai.build.BlueprintStore.idOf(paper)), "paper points at the record");
+
+        BlockPos target = origin.add(0, 0, -2);
+        check(com.example.ai.build.BlueprintStore.use(player, paper, target), "blueprint use handled");
+        // The middle of the box's near (south) edge lands on the target; the box runs north from it.
+        check(world.getBlockState(target).isOf(Blocks.STONE_BRICKS), "near edge sits on the clicked spot");
+        check(world.getBlockState(target.add(-1, 0, -2)).isOf(Blocks.STONE_BRICKS), "far corner north of it");
+        check(world.getBlockState(target.add(0, 0, 1)).isAir(), "nothing behind the clicked spot");
+        check(!paper.isEmpty(), "creative players keep the paper");
+        UndoService.undo(player);
+        check(world.getBlockState(target).isAir(), "undo removes a blueprint build too");
+        context.complete();
+    }
 }

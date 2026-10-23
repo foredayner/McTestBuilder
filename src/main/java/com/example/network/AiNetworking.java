@@ -57,7 +57,7 @@ public final class AiNetworking {
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.RebuildPartC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> RebuildService.receivePart(
-                context.player(), payload.id(), payload.index(), payload.total(), payload.data()));
+                context.player(), payload.id(), payload.index(), payload.total(), payload.mode(), payload.data()));
         });
     }
 

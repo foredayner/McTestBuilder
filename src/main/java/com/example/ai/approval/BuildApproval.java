@@ -57,23 +57,12 @@ public final class BuildApproval {
             return;
         }
 
+        // Accepting registers the design in the player's 보관함; placing is a separate step there.
         BuildRecord record = pendingRecord;
-        BuildTaskQueue.clear();
-        MinecraftAI.init(world, origin, player.getYaw(), player.getPitch(), player);
-
-        AiNetworking.sendLog(player, "[AI] Building started (via /setblock and /fill)...");
-        AiNetworking.sendLog(player, "[AI] Origin: X=" + origin.getX() + " Y=" + origin.getY() + " Z=" + origin.getZ());
-        System.out.println("[APPROVAL] Building approved by " + player.getName().getString() + " at " + origin);
-
-        String tag = "aib_" + record.id;
-        UndoService.capture(player, record.plan, origin, 0, tag, shortTitle(record.prompt));
-        int commands = MinecraftAI.executePlan(record.plan, origin, 0, tag);
-        AiNetworking.sendLog(player, "[AI] Running " + commands + " build command(s)...");
+        System.out.println("[APPROVAL] Design registered by " + player.getName().getString());
         clearPending(player);
-        BuildTaskQueue.whenEmpty(() -> {
-            AiNetworking.sendLog(player, "[AI] Complete!");
-            AiNetworking.sendBuildComplete(player, record);
-        });
+        AiNetworking.sendLog(player, "[AI] 보관함에 등록했어요. 보관함에서 배치하거나 설계도로 받아 쓰세요.");
+        AiNetworking.sendBuildComplete(player, record);
     }
 
     static String shortTitle(String prompt) {

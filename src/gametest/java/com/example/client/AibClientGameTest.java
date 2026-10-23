@@ -81,6 +81,23 @@ public class AibClientGameTest implements FabricClientGameTest {
             shot(context, () -> AiPromptScreen.open("LOGS", null), "07_logs");
             shot(context, () -> new AiSettingsScreen(null), "08_settings");
 
+            // Blueprint paper: hand one to the player, then use it on the ground to the left of the house.
+            context.setScreen(() -> null);
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                BuildRecord apple = BuildRecord.fromJson(records.get(1));
+                com.example.ai.build.BlueprintStore.give(player, apple);
+            });
+            context.waitTicks(5);
+            context.takeScreenshot("11_blueprint_in_hand");
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                var stack = player.getMainHandStack();
+                com.example.ai.build.BlueprintStore.use(player, stack, player.getBlockPos().add(-2, 0, 2));
+            });
+            context.waitTicks(10);
+            context.takeScreenshot("12_blueprint_used");
+
             // Small window: the settings form must scroll, nothing may overlap.
             context.getInput().resizeWindow(640, 360);
             context.waitTicks(2);
