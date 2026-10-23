@@ -25,6 +25,8 @@ public final class BuildRecord {
     public BuildPlan plan = new BuildPlan();
     /** Size it is placed at (objects only): the plan is already scaled, this is just for its name. */
     public double scale = 1;
+    /** Objects: 16 x 16 ARGB front picture for the item icon (made by the client), or null. */
+    public int[] icon;
 
     public static BuildRecord create(String prompt, String provider, String model, BuildPlan plan) {
         BuildRecord record = new BuildRecord();

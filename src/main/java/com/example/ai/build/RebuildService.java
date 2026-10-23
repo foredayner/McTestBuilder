@@ -172,6 +172,26 @@ public final class RebuildService {
         place(player, record, target.add(-a[0], -a[1], -a[2]), turns, facing);
     }
 
+    /**
+     * Object item (or an old object blueprint): the object sits centred on top of the clicked
+     * block, its front turned toward the player. Run by the server, so no cheats are needed.
+     * Returns the object's tag.
+     */
+    public static String placeObjectOn(ServerPlayerEntity player, BuildRecord record, BlockPos clicked) {
+        String facing = facingOf(player);
+        int turns = BuildPlan.turnsBetween(record.plan.facing, facing);
+        // Where the turned object would be, then move it so its middle is over the block centre
+        // and its bottom on the block's top face. The move is turned back into the design frame.
+        double[] b = MinecraftAI.objectBounds(record.plan, turns);
+        double[] back = BuildPlan.rotate(0.5 - (b[0] + b[3]) / 2, 0.5 - (b[2] + b[5]) / 2, 4 - turns);
+        BuildPlan plan = record.plan.translated(back[0], -b[1], back[1]);
+        String title = title(record);
+        String tag = "aib_" + record.id + "_" + Long.toString(System.currentTimeMillis(), 36);
+        MinecraftAI.executePlanAsServer(player.getServerWorld(), plan, clicked.up(), turns, tag, title,
+            java.util.List.of(ObjectItems.ID_TAG + record.id));
+        return tag;
+    }
+
     /** Point of the turned build that should land on the clicked spot: middle of its near edge, bottom. */
     static int[] anchor(BuildPlan plan, int turns, String facing) {
         int[] b = plan.bounds();

@@ -45,7 +45,7 @@ public final class ObjectService {
     /** The object tag on an entity, or null. */
     public static String objectTag(Entity entity) {
         for (String t : entity.getCommandTags()) {
-            if (!t.equals("aib_obj") && TAG.matcher(t).matches()) {
+            if (!t.equals("aib_obj") && !t.equals("aib_box") && TAG.matcher(t).matches()) {
                 return t;
             }
         }
@@ -55,7 +55,8 @@ public final class ObjectService {
     /** Delete key while aiming at an object's hitbox. */
     public static void removeByEntity(ServerPlayerEntity player, int entityId) {
         Entity target = player.getServerWorld().getEntityById(entityId);
-        if (!(target instanceof InteractionEntity) || !target.getCommandTags().contains("aib_obj")) {
+        if (!(target instanceof InteractionEntity) || objectTag(target) == null
+            || !(target.getCommandTags().contains("aib_obj") || target.getCommandTags().contains("aib_box"))) {
             AiNetworking.sendLog(player, "[History] 이건 AI로 놓은 소품이 아니에요.");
             return;
         }
@@ -112,7 +113,7 @@ public final class ObjectService {
             }
         }
         Map<String, String> names = new LinkedHashMap<>();
-        for (Entity e : world.getEntitiesByType(EntityType.INTERACTION, area, e -> e.getCommandTags().contains("aib_obj"))) {
+        for (Entity e : world.getEntitiesByClass(InteractionEntity.class, area, e -> e.getCommandTags().contains("aib_obj"))) {
             String tag = objectTag(e);
             if (tag != null && e.hasCustomName()) {
                 names.put(tag, e.getCustomName().getString());

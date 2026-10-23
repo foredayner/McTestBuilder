@@ -20,6 +20,7 @@ public class AiBuildAssistantMod implements ModInitializer {
         LOGGER.info("Minecraft AI Build Assistant starting...");
 
         AiBuilderConfig.load();
+        com.example.content.AibContent.register();
         BuildTaskQueue.register();
 
         AiNetworking.registerPayloads();
@@ -29,7 +30,7 @@ public class AiBuildAssistantMod implements ModInitializer {
         AiApprovalCommands.register();
         ChatMessageHandler.registerChatFilter();
 
-        // Blueprint papers: right-click a block to build there.
+        // Blueprint papers (buildings): right-click the top of a block to build there.
         net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
             net.minecraft.item.ItemStack stack = player.getStackInHand(hand);
             if (com.example.ai.build.BlueprintStore.idOf(stack) == null) {
@@ -39,7 +40,7 @@ public class AiBuildAssistantMod implements ModInitializer {
                 return net.minecraft.util.ActionResult.SUCCESS;
             }
             com.example.ai.build.BlueprintStore.use((net.minecraft.server.network.ServerPlayerEntity) player, stack,
-                hit.getBlockPos().offset(hit.getSide()));
+                hit.getBlockPos(), hit.getSide());
             return net.minecraft.util.ActionResult.SUCCESS;
         });
     }

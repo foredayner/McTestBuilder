@@ -98,8 +98,10 @@ public class AibGameTests implements FabricGameTest {
         int count = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag)).size();
         check(count == 22, "22 display entities summoned, got " + count);
 
-        var hitboxes = world.getEntitiesByType(EntityType.INTERACTION, area, e -> e.getCommandTags().contains(tag));
-        check(hitboxes.size() == 1, "one invisible hitbox for the object, got " + hitboxes.size());
+        var solid = world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area, e -> e.getCommandTags().contains(tag));
+        check(!solid.isEmpty() && solid.size() <= 60, "solid hitboxes follow the shape, got " + solid.size());
+        var hitboxes = solid.stream().filter(e -> e.getCommandTags().contains("aib_obj")).toList();
+        check(hitboxes.size() == 1, "one hitbox carries the object's name, got " + hitboxes.size());
         check(hitboxes.get(0).getCustomName() != null && "apple".equals(hitboxes.get(0).getCustomName().getString()),
             "hitbox carries the title");
         var listed = com.example.ai.build.ObjectService.nearby(player);
@@ -108,8 +110,7 @@ public class AibGameTests implements FabricGameTest {
         // Delete key path: remove by the hitbox entity id.
         com.example.ai.build.ObjectService.removeByEntity(player, hitboxes.get(0).getId());
         context.waitAndRun(2, () -> {
-            int left = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag)).size()
-                + world.getEntitiesByType(EntityType.INTERACTION, area, e -> e.getCommandTags().contains(tag)).size();
+            int left = world.getEntitiesByClass(net.minecraft.entity.Entity.class, area, e -> e.getCommandTags().contains(tag)).size();
             check(left == 0, "removing the object took every part and the hitbox, " + left + " left");
             context.complete();
         });
@@ -136,9 +137,10 @@ public class AibGameTests implements FabricGameTest {
 
         Demo.place(player, origin, big.plan, 0, "big apple");
         Box area = new Box(origin).expand(8);
-        var hitbox = world.getEntitiesByType(EntityType.INTERACTION, area, e -> e.getCommandTags().contains("aib_obj"));
-        check(hitbox.size() == 1, "one hitbox, got " + hitbox.size());
-        check(hitbox.get(0).getHeight() > 2.0f, "hitbox grew with the object: " + hitbox.get(0).getHeight());
+        var hitbox = world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area, e -> true);
+        check(!hitbox.isEmpty(), "solid hitboxes placed");
+        Box solid = hitbox.stream().map(net.minecraft.entity.Entity::getBoundingBox).reduce(Box::union).get();
+        check(solid.getLengthY() > 1.5, "hitboxes grew with the object: " + solid);
         var parts = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib"));
         check(parts.size() == 22, "22 parts, got " + parts.size());
         for (var part : parts) {
@@ -183,7 +185,9 @@ public class AibGameTests implements FabricGameTest {
         check(record.id.equals(com.example.ai.build.BlueprintStore.idOf(paper)), "paper points at the record");
 
         BlockPos target = origin.add(0, 0, -2);
-        check(com.example.ai.build.BlueprintStore.use(player, paper, target), "blueprint use handled");
+        check(com.example.ai.build.BlueprintStore.use(player, paper, target.down(), Direction.NORTH), "side click handled");
+        check(world.getBlockState(target).isAir(), "clicking the side of a block builds nothing");
+        check(com.example.ai.build.BlueprintStore.use(player, paper, target.down(), Direction.UP), "blueprint use handled");
         // The middle of the box's near (south) edge lands on the target; the box runs north from it.
         check(world.getBlockState(target).isOf(Blocks.STONE_BRICKS), "near edge sits on the clicked spot");
         check(world.getBlockState(target.add(-1, 0, -2)).isOf(Blocks.STONE_BRICKS), "far corner north of it");
@@ -192,6 +196,59 @@ public class AibGameTests implements FabricGameTest {
         UndoService.undo(player);
         check(world.getBlockState(target).isAir(), "undo removes a blueprint build too");
         context.complete();
+    }
+
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void objectItemSitsOnTheClickedBlockAndMinesBack(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f); // facing south
+        BuildRecord record = BuildRecord.create("apple", "TEST", "script", Demo.plan(world, origin, player, Demo.APPLE));
+        record.icon = new int[16 * 16];
+        record.icon[200] = 0xFFCC2222;
+
+        com.example.ai.build.BlueprintStore.give(player, record);
+        net.minecraft.item.ItemStack item = net.minecraft.item.ItemStack.EMPTY;
+        for (int i = 0; i < player.getInventory().size(); i++) {
+            if (com.example.ai.build.ObjectItems.idOf(player.getInventory().getStack(i)) != null) {
+                item = player.getInventory().getStack(i);
+            }
+        }
+        check(!item.isEmpty() && item.isOf(com.example.content.AibContent.OBJECT_ITEM), "an object comes as an object item");
+        check(com.example.ai.build.BlueprintStore.idOf(item) == null, "not a blueprint paper");
+        var data = item.get(net.minecraft.component.DataComponentTypes.CUSTOM_DATA).copyNbt();
+        check(data.getIntArray("aib_icon").length == 256 && data.getIntArray("aib_icon")[200] == 0xFFCC2222, "the icon picture rides on the item");
+
+        player.changeGameMode(net.minecraft.world.GameMode.SURVIVAL);
+        BlockPos clicked = origin.add(0, -1, 3);
+        int before = item.getCount();
+        check(com.example.ai.build.ObjectItems.use(player, item, clicked), "placed from the item");
+        check(item.getCount() == before - 1, "survival uses up one item");
+        net.minecraft.item.ItemStack placedFrom = item;
+
+        context.waitAndRun(60, () -> {
+            Box area = new Box(clicked).expand(4);
+            var boxes = world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area, e -> true);
+            check(!boxes.isEmpty(), "solid hitboxes placed");
+            Box all = boxes.stream().map(net.minecraft.entity.Entity::getBoundingBox).reduce(Box::union).get();
+            check(Math.abs(all.minY - (clicked.getY() + 1)) < 0.05, "sits on top of the clicked block: " + all.minY);
+            check(Math.abs(all.getCenter().x - (clicked.getX() + 0.5)) < 0.15
+                && Math.abs(all.getCenter().z - (clicked.getZ() + 0.5)) < 0.15, "centred over the clicked block: " + all.getCenter());
+            check(!world.getEntityCollisions(player, all.contract(0.02)).isEmpty(), "the object is solid");
+            check(boxes.stream().allMatch(b -> b.getCommandTags().contains("aibid_" + record.id)), "hitboxes know which item to drop");
+
+            com.example.ai.build.ObjectItems.breakObject(player, boxes.get(0).getId());
+            context.waitAndRun(2, () -> {
+                int left = world.getEntitiesByClass(net.minecraft.entity.Entity.class, area,
+                    e -> e.getCommandTags().contains("aib")).size();
+                check(left == 0, "mining removed every part and hitbox, " + left + " left");
+                var drops = world.getEntitiesByClass(net.minecraft.entity.ItemEntity.class, area, e -> true);
+                check(drops.size() == 1 && record.id.equals(com.example.ai.build.ObjectItems.idOf(drops.get(0).getStack())),
+                    "mining drops the object item, got " + drops.size());
+                check(placedFrom.getCount() == before - 1, "count unchanged");
+                context.complete();
+            });
+        });
     }
 
     @GameTest(templateName = EMPTY_STRUCTURE)

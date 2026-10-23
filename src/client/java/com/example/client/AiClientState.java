@@ -114,6 +114,13 @@ public final class AiClientState {
         return line;
     }
 
+    /** The AI 공방 starts empty every time the window is opened (the 작업 일지 keeps everything). */
+    public static void clearConversation() {
+        synchronized (LOGS) {
+            ENTRIES.clear();
+        }
+    }
+
     public static List<Entry> getEntries() {
         synchronized (LOGS) {
             return List.copyOf(ENTRIES);

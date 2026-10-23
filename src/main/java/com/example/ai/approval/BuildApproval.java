@@ -25,14 +25,13 @@ public final class BuildApproval {
     private BuildApproval() {
     }
 
+    /**
+     * There is no approval step any more: a design that passed the review and the dry run goes
+     * straight into the player's 보관함 (nothing is placed in the world).
+     */
     public static void requestApproval(ServerPlayerEntity player, BuildRecord record, String description, BlockPos origin) {
-        pendingRecord = record;
-        pendingDescription = description;
-        pendingPlayer = player;
-        pendingOrigin = origin;
-
-        AiNetworking.sendDebugLog(player, "[AI] Review the planned build below.");
-        AiNetworking.sendApprovalPending(player, description);
+        AiNetworking.sendLog(player, "[AI] 완성! " + record.plan.summary());
+        AiNetworking.sendBuildComplete(player, record);
     }
 
     public static void approveFor(ServerPlayerEntity player) {

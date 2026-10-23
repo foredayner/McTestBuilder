@@ -25,8 +25,8 @@ import static com.example.client.WoodUi.*;
 /**
  * Main window in a cozy farm-game style: a wooden frame around a parchment page, item tabs on
  * top, a red close button, a title plaque and speech-bubble chat.
- *   공방 (book)    - talk to the AI: request, review, place (설계 배치하기), cancel, undo
- *   보관함 (chest) - saved builds and objects with previews; open one to place it again
+ *   공방 (book)    - talk to the AI; finished designs go straight to 보관함 (cleared on every open)
+ *   보관함 (chest) - saved builds and objects with previews; open one to take it as an item
  *   일지 (paper)   - saved logs by day
  *   설정 (gear)    - settings
  */
@@ -164,21 +164,13 @@ public class AiPromptScreen extends Screen {
     // ---------------------------------------------------------------- AI 공방
 
     private int chatTop() { return top() + 22; }
-    private int chatBottom() { return bottom() - 48; }
+    private int chatBottom() { return AiClientState.isWebSearchAvailable() ? bottom() - 48 : bottom() - 26; }
 
     private void buildCreate() {
         boolean object = AiClientState.isObjectMode();
         button(object ? "모드: 소품" : "모드: 건물", right() - 84, top(), 84, b -> AiClientState.toggleObjectMode());
 
-        boolean pending = AiClientState.hasPendingApproval();
         int y = bottom() - 42;
-        button("보관함에 등록", left(), y, 84, b -> AiClientState.approve()).active = pending;
-        button("버리기", left() + 88, y, 46, b -> AiClientState.cancel()).active = pending;
-        button("   되돌리기", left() + 138, y, 74, b -> {
-            AiClientState.undo();
-            chatScroll = 0;
-        });
-        this.icons.add(new IconAt(new ItemStack(Items.CLOCK), left() + 141, y + 1));
         if (AiClientState.isWebSearchAvailable()) {
             button(AiClientState.willUseWebSearch() ? "웹 검색: 켬" : "웹 검색: 끔", right() - 76, y, 76, b -> {
                 AiClientState.toggleSessionWebSearch();
@@ -345,8 +337,6 @@ public class AiPromptScreen extends Screen {
     private void buildHistory() {
         BuildRecord record = selected();
         if (record == null) {
-            button("   되돌리기", right() - 162, top(), 74, b -> AiClientState.undo());
-            this.icons.add(new IconAt(new ItemStack(Items.CLOCK), right() - 159, top() + 1));
             String[] names = { "보기: 전체", "보기: 건물", "보기: 소품", "보기: 주변 배치" };
             button(names[filter], right() - 84, top(), 84, b -> {
                 filter = (filter + 1) % 4;
@@ -371,7 +361,7 @@ public class AiPromptScreen extends Screen {
         }
         int y = bottom() - 18;
         boolean object = "object".equals(record.kind);
-        int slots = object ? 5 : 4;
+        int slots = object ? 4 : 3;
         int quarter = (right() - left() - 4 * (slots - 1)) / slots;
         int scale = object ? SCALES[scaleIndex] : 100;
         String size = object ? " " + com.example.ai.build.RebuildService.scaleLabel(scale / 100.0) : "";
@@ -389,17 +379,12 @@ public class AiPromptScreen extends Screen {
             });
             x += quarter + 4;
         }
-        button("   배치", x, y, quarter, b -> {
-            AiClientNetworking.sendRebuild(record, com.example.ai.build.RebuildService.MODE_PLACE, scale);
-            AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\"" + size + " 배치를 요청했어요. 내 앞에, 바라보는 방향으로 놓입니다.");
-        });
-        this.icons.add(new IconAt(new ItemStack(Items.BRICKS), x + 3, y + 1));
-        x += quarter + 4;
         button("   손에 받기", x, y, quarter, b -> {
-            AiClientNetworking.sendRebuild(record, com.example.ai.build.RebuildService.MODE_GIVE, scale);
-            AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\"" + size + " 설계도를 요청했어요.");
+            AiClientNetworking.sendRebuild(withIcon(record), com.example.ai.build.RebuildService.MODE_GIVE, scale);
+            AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\"" + size
+                + (object ? " 소품 아이템을 요청했어요." : " 설계도를 요청했어요."));
         });
-        this.icons.add(new IconAt(new ItemStack(Items.PAPER), x + 3, y + 1));
+        this.icons.add(new IconAt(new ItemStack(object ? Items.ARMOR_STAND : Items.PAPER), x + 3, y + 1));
         x += quarter + 4;
         this.addDrawableChild(new WoodButton(x, y, right() - x, 18,
             Text.literal(this.confirmDelete ? "정말 삭제?" : "삭제"), b -> {
@@ -500,6 +485,16 @@ public class AiPromptScreen extends Screen {
                 n.distance, n.x, n.y, n.z, n.parts);
             ctx.drawText(this.textRenderer, ellipsize(info, r - textX - 64), textX, y + 21, INK_SOFT, false);
         }
+    }
+
+    /** A copy carrying the small front picture that becomes the item's icon. */
+    private static BuildRecord withIcon(BuildRecord record) {
+        if (!"object".equals(record.kind)) {
+            return record;
+        }
+        BuildRecord copy = BuildRecord.fromJson(record.toJson());
+        copy.icon = BuildPreview.of(record).icon();
+        return copy;
     }
 
     /** Placed objects are tagged "aib_<record id>" or "aib_<record id>_<time>": find that record. */

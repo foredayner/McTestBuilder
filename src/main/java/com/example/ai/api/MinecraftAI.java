@@ -542,8 +542,20 @@ public class MinecraftAI {
     }
 
     /** World-aligned box around all parts: {minX, minY, minZ, maxX, maxY, maxZ}, relative to at. */
-    static double[] objectBounds(BuildPlan plan, int turns) {
+    public static double[] objectBounds(BuildPlan plan, int turns) {
         double[] b = { Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE };
+        for (double[] p : partBoxes(plan, turns)) {
+            for (int i = 0; i < 3; i++) {
+                b[i] = Math.min(b[i], p[i]);
+                b[i + 3] = Math.max(b[i + 3], p[i + 3]);
+            }
+        }
+        return b;
+    }
+
+    /** One world-aligned box per part (turned), relative to at. */
+    public static List<double[]> partBoxes(BuildPlan plan, int turns) {
+        List<double[]> boxes = new ArrayList<>();
         for (BuildPlan.Part part : plan.parts) {
             double cx = part.x;
             double cz = part.z;
@@ -562,26 +574,45 @@ public class MinecraftAI {
             double ex = Math.abs(m.m00()) * hx + Math.abs(m.m10()) * hy + Math.abs(m.m20()) * hz;
             double ey = Math.abs(m.m01()) * hx + Math.abs(m.m11()) * hy + Math.abs(m.m21()) * hz;
             double ez = Math.abs(m.m02()) * hx + Math.abs(m.m12()) * hy + Math.abs(m.m22()) * hz;
-            b[0] = Math.min(b[0], cx - ex);
-            b[1] = Math.min(b[1], part.y - ey);
-            b[2] = Math.min(b[2], cz - ez);
-            b[3] = Math.max(b[3], cx + ex);
-            b[4] = Math.max(b[4], part.y + ey);
-            b[5] = Math.max(b[5], cz + ez);
+            boxes.add(new double[] { cx - ex, part.y - ey, cz - ez, cx + ex, part.y + ey, cz + ez });
         }
-        return b;
+        return boxes;
     }
 
-    static String interactionCommand(BuildPlan plan, BlockPos at, int turns, String tag, String title) {
-        double[] b = objectBounds(plan, turns);
-        double width = Math.max(0.2, Math.max(b[3] - b[0], b[5] - b[2]));
-        double height = Math.max(0.2, b[4] - b[1]);
+    /** Most solid boxes one object gets (before they are cut into squares). */
+    public static final int MAX_SOLID_BOXES = 10;
+
+    /**
+     * The object's solid hitboxes: its parts merged into a few boxes that follow its shape (a
+     * chair gets legs, seat and back), each cut into square pieces because a hitbox entity has a
+     * square footprint. They block movement, can be stood on, and are what the player aims at
+     * to break or remove the object. The first one carries the title ("aib_obj").
+     */
+    static List<String> hitboxCommands(BuildPlan plan, BlockPos at, int turns, String tag, String title, List<String> extraTags) {
+        List<double[]> squares = new ArrayList<>();
+        for (double[] box : BuildPlan.mergeBoxes(partBoxes(plan, turns), MAX_SOLID_BOXES)) {
+            squares.addAll(BuildPlan.squares(box));
+        }
         String json = new com.google.gson.Gson().toJson(title == null ? "" : title);
         String snbt = json.replace("\\", "\\\\").replace("'", "\\'");
-        return String.format(Locale.ROOT,
-            "summon minecraft:interaction %.4f %.4f %.4f {width:%.4ff,height:%.4ff,response:1b,Tags:[\"aib\",\"aib_obj\",\"%s\"],CustomName:'%s'}",
-            at.getX() + (b[0] + b[3]) / 2, at.getY() + b[1], at.getZ() + (b[2] + b[5]) / 2, width, height, tag, snbt);
+        StringBuilder extra = new StringBuilder();
+        for (String t : extraTags) {
+            extra.append(",\"").append(t).append('"');
+        }
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < squares.size(); i++) {
+            double[] s = squares.get(i); // {centreX, bottomY, centreZ, width, height}
+            boolean primary = i == 0;
+            out.add(String.format(Locale.ROOT,
+                "summon %s %.4f %.4f %.4f {width:%.4ff,height:%.4ff,response:1b,Tags:[\"aib\",\"aib_box\",\"%s\"%s%s]%s}",
+                HITBOX_ID, at.getX() + s[0], at.getY() + s[1], at.getZ() + s[2], s[3], s[4], tag,
+                primary ? ",\"aib_obj\"" : "", extra, primary ? ",CustomName:'" + snbt + "'" : ""));
+        }
+        return out;
     }
+
+    /** Id of the solid hitbox entity (registered in AibContent). */
+    public static final String HITBOX_ID = "minecraft-ai-build-assistant:hitbox";
 
     /** minecraft:oak_stairs[facing=east] -> {Name:"minecraft:oak_stairs",Properties:{facing:"east"}} */
     static String blockStateNbt(String block) {
@@ -670,10 +701,31 @@ public class MinecraftAI {
      * crosshair can target it (display entities have no hitbox). It carries the object's title.
      */
     public static int executePlan(BuildPlan plan, BlockPos at, int turns, String tag, String title) {
+        return executePlan(plan, at, turns, tag, title, List.of(), MinecraftAI::executeBuildCommand);
+    }
+
+    /**
+     * Same, run by the server itself instead of a player, so anyone may place an object from an
+     * item (no cheats needed). extraTags go on the hitboxes (e.g. which saved object to drop).
+     */
+    public static int executePlanAsServer(ServerWorld w, BuildPlan plan, BlockPos at, int turns, String tag, String title, List<String> extraTags) {
+        java.util.function.Consumer<String> run = command -> {
+            ServerCommandSource source = w.getServer().getCommandSource().withWorld(w).withLevel(4).withSilent();
+            try {
+                w.getServer().getCommandManager().executeWithPrefix(source, command);
+            } catch (Exception exception) {
+                System.out.println("[ERROR] Object command failed: /" + command + " -> " + exception.getMessage());
+            }
+        };
+        return executePlan(plan, at, turns, tag, title, extraTags, run);
+    }
+
+    private static int executePlan(BuildPlan plan, BlockPos at, int turns, String tag, String title, List<String> extraTags,
+                                   java.util.function.Consumer<String> runner) {
         int count = 0;
         if (!plan.parts.isEmpty()) {
-            String hitbox = interactionCommand(plan, at, turns, tag, title);
-            BuildTaskQueue.enqueue(() -> executeBuildCommand(hitbox));
+            List<String> hitboxes = hitboxCommands(plan, at, turns, tag, title, extraTags);
+            BuildTaskQueue.enqueue(() -> hitboxes.forEach(runner));
         }
         for (BuildPlan.Op op : plan.ops) {
             int[] a = BuildPlan.rotate(op.x1, op.z1, turns);
@@ -683,7 +735,7 @@ public class MinecraftAI {
                 ? "setblock " + (at.getX() + a[0]) + " " + (at.getY() + op.y1) + " " + (at.getZ() + a[1]) + " " + block + " replace"
                 : "fill " + (at.getX() + a[0]) + " " + (at.getY() + op.y1) + " " + (at.getZ() + a[1]) + " "
                     + (at.getX() + b[0]) + " " + (at.getY() + op.y2) + " " + (at.getZ() + b[1]) + " " + block + " " + op.mode;
-            BuildTaskQueue.enqueue(() -> executeBuildCommand(command));
+            BuildTaskQueue.enqueue(() -> runner.accept(command));
             count++;
         }
         // Object parts appear a few at a time so a model pops in quickly but visibly.
@@ -694,13 +746,13 @@ public class MinecraftAI {
             count++;
             if (batch.size() == 8) {
                 List<String> run = List.copyOf(batch);
-                BuildTaskQueue.enqueue(() -> run.forEach(MinecraftAI::executeBuildCommand));
+                BuildTaskQueue.enqueue(() -> run.forEach(runner));
                 batch.clear();
             }
         }
         if (!batch.isEmpty()) {
             List<String> run = List.copyOf(batch);
-            BuildTaskQueue.enqueue(() -> run.forEach(MinecraftAI::executeBuildCommand));
+            BuildTaskQueue.enqueue(() -> run.forEach(runner));
         }
         return count;
     }

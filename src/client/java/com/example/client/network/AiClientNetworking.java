@@ -44,7 +44,7 @@ public final class AiClientNetworking {
                 try {
                     BuildRecord record = BuildRecord.fromGzip(payload.data());
                     BuildHistory.save(record);
-                    AiClientState.addLog("[History] 보관함에 저장했어요. 보관함 탭에서 배치하거나 설계도로 받을 수 있어요.");
+                    AiClientState.addLog("[History] 보관함에 추가했어요. 보관함에서 \"손에 받기\"로 꺼내 쓰세요.");
                 } catch (RuntimeException exception) {
                     AiClientState.addLog("[History] Could not save this build: " + exception.getMessage());
                 }
@@ -66,6 +66,10 @@ public final class AiClientNetworking {
 
     public static void requestNearby() {
         ClientPlayNetworking.send(new AiNetworkPayloads.NearbyRequestC2SPayload());
+    }
+
+    public static void sendBreak(int entityId) {
+        ClientPlayNetworking.send(new AiNetworkPayloads.BreakObjectC2SPayload(entityId));
     }
 
     public static void sendUndo() {

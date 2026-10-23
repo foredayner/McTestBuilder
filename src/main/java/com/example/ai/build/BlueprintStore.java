@@ -67,7 +67,10 @@ public final class BlueprintStore {
         }
     }
 
-    /** "손에 받기": save the build with the world and hand the player a blueprint paper for it. */
+    /**
+     * "손에 받기": save the design with the world and hand it over: an object becomes an object
+     * item, a building a blueprint paper.
+     */
     public static void give(ServerPlayerEntity player, BuildRecord record) {
         String id = record.id.replaceAll("[^0-9a-z_]", "");
         if (!ID.matcher(id).matches()) {
@@ -83,8 +86,13 @@ public final class BlueprintStore {
             AiNetworking.sendLog(player, "[History] 설계도를 저장하지 못했어요: " + exception.getMessage());
             return;
         }
+        if (record.plan.isObject() && record.plan.ops.isEmpty()) {
+            player.getInventory().offerOrDrop(ObjectItems.stackFor(record));
+            AiNetworking.sendLog(player, "[History] 소품 아이템을 받았어요. 블록 윗면을 우클릭하면 그 위에 놓이고, 돌처럼 캐면 다시 아이템이 돼요.");
+            return;
+        }
         player.getInventory().offerOrDrop(paperFor(record));
-        AiNetworking.sendLog(player, "[History] 설계도를 받았어요. 들고 블록을 우클릭하면 그 자리에 지어집니다.");
+        AiNetworking.sendLog(player, "[History] 설계도를 받았어요. 블록 윗면을 우클릭하면 그 위에 건물 앞면 가운데가 오도록 지어집니다.");
     }
 
     public static ItemStack paperFor(BuildRecord record) {
@@ -100,17 +108,25 @@ public final class BlueprintStore {
         Style lore = Style.EMPTY.withItalic(false).withColor(Formatting.GRAY);
         paper.set(DataComponentTypes.LORE, new LoreComponent(List.of(
             Text.literal("크기 " + (b[3] - b[0] + 1) + " × " + (b[4] - b[1] + 1) + " × " + (b[5] - b[2] + 1)).setStyle(lore),
-            Text.literal("블록을 우클릭하면 그 자리부터").setStyle(lore),
-            Text.literal("바라보는 방향으로 지어집니다").setStyle(lore))));
+            Text.literal("블록 윗면을 우클릭하면 그 위에").setStyle(lore),
+            Text.literal("앞면 가운데를 맞춰 지어집니다").setStyle(lore))));
         paper.set(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
         return paper;
     }
 
-    /** Right-click with a blueprint: build at the spot next to the clicked face. True if handled. */
-    public static boolean use(ServerPlayerEntity player, ItemStack stack, net.minecraft.util.math.BlockPos target) {
+    /**
+     * Right-click with a blueprint on the top of {@code clicked}: the building's front edge,
+     * centred, lands on the block above it. True if handled.
+     */
+    public static boolean use(ServerPlayerEntity player, ItemStack stack, net.minecraft.util.math.BlockPos clicked,
+                              net.minecraft.util.math.Direction side) {
         String id = idOf(stack);
         if (id == null) {
             return false;
+        }
+        if (side != net.minecraft.util.math.Direction.UP) {
+            player.sendMessage(Text.literal("블록 윗면을 클릭해 주세요").formatted(Formatting.GRAY), true);
+            return true;
         }
         if (!MinecraftAI.canExecuteBuildCommands(player)) {
             AiNetworking.notify(player, "§c설계도를 쓰려면 치트(OP 권한 2)가 필요해요.§r");
@@ -121,7 +137,11 @@ public final class BlueprintStore {
             AiNetworking.notify(player, "§c이 설계도의 내용을 찾을 수 없어요 (다른 월드에서 받은 설계도일 수 있어요).§r");
             return true;
         }
-        RebuildService.placeAt(player, record, target);
+        if (record.plan.isObject() && record.plan.ops.isEmpty()) {
+            RebuildService.placeObjectOn(player, record, clicked); // blueprints made before object items
+        } else {
+            RebuildService.placeAt(player, record, clicked.up());
+        }
         if (!player.isCreative()) {
             stack.decrement(1);
         }

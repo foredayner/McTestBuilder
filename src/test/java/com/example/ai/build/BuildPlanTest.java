@@ -88,4 +88,36 @@ class BuildPlanTest {
         assertEquals("north", big.facing);
         assertEquals(8, plan.maxScale(), 1e-9, "capped at MAX_SCALE");
     }
+
+    @Test
+    void solidBoxesFollowTheShape() {
+        // A chair: four thin legs, a seat and a back.
+        java.util.List<double[]> parts = new java.util.ArrayList<>();
+        for (double[] leg : new double[][] { { 0, 0 }, { 0.8, 0 }, { 0, 0.8 }, { 0.8, 0.8 } }) {
+            parts.add(new double[] { leg[0], 0, leg[1], leg[0] + 0.2, 0.5, leg[1] + 0.2 });
+        }
+        parts.add(new double[] { 0, 0.5, 0, 1, 0.6, 1 });   // seat
+        parts.add(new double[] { 0, 0.6, 0, 1, 1.4, 0.15 }); // back
+        java.util.List<double[]> merged = BuildPlan.mergeBoxes(parts, 3);
+        assertEquals(3, merged.size());
+        double[] all = { 9, 9, 9, -9, -9, -9 };
+        for (double[] b : merged) {
+            for (int i = 0; i < 3; i++) {
+                all[i] = Math.min(all[i], b[i]);
+                all[i + 3] = Math.max(all[i + 3], b[i + 3]);
+            }
+        }
+        assertArrayEquals(new double[] { 0, 0, 0, 1, 1.4, 1 }, all, 1e-9, "nothing lost");
+        assertEquals(6, BuildPlan.mergeBoxes(parts, 10).size(), "fewer parts than the limit stay as they are");
+
+        // Square pieces: a 3 x 1 table top becomes three 1 x 1 squares in a row.
+        java.util.List<double[]> squares = BuildPlan.squares(new double[] { 0, 1, 0, 3, 1.1, 1 });
+        assertEquals(3, squares.size());
+        assertEquals(0.5, squares.get(0)[0], 1e-9);
+        assertEquals(2.5, squares.get(2)[0], 1e-9);
+        assertEquals(1, squares.get(1)[3], 1e-9);
+        assertEquals(0.1, squares.get(1)[4], 1e-9);
+        // A long thin rail is capped at MAX_SQUARES wider pieces.
+        assertEquals(BuildPlan.MAX_SQUARES, BuildPlan.squares(new double[] { 0, 0, 0, 10, 1, 0.1 }).size());
+    }
 }

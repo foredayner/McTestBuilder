@@ -151,6 +151,99 @@ public final class BuildPlan {
         return parts.isEmpty() ? new double[6] : b;
     }
 
+    /** A copy of an object moved by (dx, dy, dz). */
+    public BuildPlan translated(double dx, double dy, double dz) {
+        BuildPlan out = new BuildPlan();
+        out.facing = facing;
+        out.ops = new ArrayList<>(ops);
+        for (Part p : parts) {
+            out.parts.add(new Part(p.block, p.x + dx, p.y + dy, p.z + dz, p.sx, p.sy, p.sz, p.yaw, p.pitch, p.roll));
+        }
+        return out;
+    }
+
+    /** rotate() for decimals: (x, z) turned clockwise seen from above. */
+    public static double[] rotate(double x, double z, int turns) {
+        double rx = x;
+        double rz = z;
+        for (int i = 0; i < Math.floorMod(turns, 4); i++) {
+            double t = rx;
+            rx = -rz;
+            rz = t;
+        }
+        return new double[] { rx, rz };
+    }
+
+    private static double volume(double[] b) {
+        return Math.max(0.05, b[3] - b[0]) * Math.max(0.05, b[4] - b[1]) * Math.max(0.05, b[5] - b[2]);
+    }
+
+    private static double[] union(double[] a, double[] b) {
+        return new double[] {
+            Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2]),
+            Math.max(a[3], b[3]), Math.max(a[4], b[4]), Math.max(a[5], b[5])
+        };
+    }
+
+    /**
+     * Merge boxes {minX, minY, minZ, maxX, maxY, maxZ} until at most {@code max} are left,
+     * always joining the pair that adds the least empty space, so the result keeps the shape.
+     */
+    public static List<double[]> mergeBoxes(List<double[]> input, int max) {
+        List<double[]> boxes = new ArrayList<>();
+        for (double[] b : input) {
+            boxes.add(b.clone());
+        }
+        while (boxes.size() > Math.max(1, max)) {
+            int bi = 0;
+            int bj = 1;
+            double best = Double.MAX_VALUE;
+            for (int i = 0; i < boxes.size(); i++) {
+                double vi = volume(boxes.get(i));
+                for (int j = i + 1; j < boxes.size(); j++) {
+                    double cost = volume(union(boxes.get(i), boxes.get(j))) - vi - volume(boxes.get(j));
+                    if (cost < best) {
+                        best = cost;
+                        bi = i;
+                        bj = j;
+                    }
+                }
+            }
+            double[] merged = union(boxes.get(bi), boxes.get(bj));
+            boxes.remove(bj);
+            boxes.set(bi, merged);
+        }
+        return boxes;
+    }
+
+    /** Most square pieces one box is cut into. */
+    public static final int MAX_SQUARES = 6;
+
+    /**
+     * Cut a box into square-footprint pieces along its long side (a hitbox entity is square):
+     * each piece is {centreX, bottomY, centreZ, width, height}.
+     */
+    public static List<double[]> squares(double[] b) {
+        double dx = Math.max(0.1, b[3] - b[0]);
+        double dz = Math.max(0.1, b[5] - b[2]);
+        double h = Math.max(0.05, b[4] - b[1]);
+        double cx = (b[0] + b[3]) / 2;
+        double cz = (b[2] + b[5]) / 2;
+        double shortSide = Math.min(dx, dz);
+        double longSide = Math.max(dx, dz);
+        int n = Math.max(1, Math.min(MAX_SQUARES, (int) Math.ceil(longSide / shortSide - 1e-6)));
+        double step = longSide / n;
+        double width = Math.max(shortSide, step);
+        List<double[]> out = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            double along = -longSide / 2 + (i + 0.5) * step;
+            out.add(dx >= dz
+                ? new double[] { cx + along, b[1], cz, width, h }
+                : new double[] { cx, b[1], cz + along, width, h });
+        }
+        return out;
+    }
+
     /** Largest scale this object can take before a part grows past the size limit. */
     public double maxScale() {
         double biggest = 0;

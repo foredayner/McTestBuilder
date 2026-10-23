@@ -20,6 +20,14 @@ public class AiBuildAssistantClient implements ClientModInitializer {
         AiNetworking.registerPayloads();
         AiClientNetworking.registerReceivers();
 
+        // Solid object hitboxes are invisible; object items draw their own picture.
+        net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
+            com.example.content.AibContent.HITBOX, net.minecraft.client.render.entity.EmptyEntityRenderer::new);
+        net.minecraft.client.render.item.model.special.SpecialModelTypes.ID_MAPPER.put(
+            ObjectIconRenderer.TYPE_ID, ObjectIconRenderer.Unbaked.CODEC);
+        net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(
+            (context, tickCounter) -> ObjectBreaking.renderHud(context));
+
         OPEN_AI_UI_KEY = KeyBindingHelper.registerKeyBinding(
             new KeyBinding(
                 "key.minecraft-ai-build-assistant.open_ai_ui",
@@ -40,11 +48,13 @@ public class AiBuildAssistantClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (OPEN_AI_UI_KEY.wasPressed()) {
+                AiClientState.clearConversation();
                 client.setScreen(new AiPromptScreen());
             }
             while (REMOVE_OBJECT_KEY.wasPressed()) {
                 removeLookedAtObject(client);
             }
+            ObjectBreaking.tick(client);
         });
     }
 

@@ -1,0 +1,9 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft-ai-build-assistant:item/object",
+    "model": {
+      "type": "minecraft-ai-build-assistant:object_icon"
+    }
+  }
+}

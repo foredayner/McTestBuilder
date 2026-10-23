@@ -158,6 +158,20 @@ public final class AiNetworkPayloads {
         }
     }
 
+    /** Client -> server: I finished mining this object (by one of its hitbox entities). */
+    public record BreakObjectC2SPayload(int entityId) implements CustomPayload {
+        public static final CustomPayload.Id<BreakObjectC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "break_object"));
+        public static final PacketCodec<RegistryByteBuf, BreakObjectC2SPayload> CODEC = PacketCodec.tuple(
+            PacketCodecs.VAR_INT, BreakObjectC2SPayload::entityId,
+            BreakObjectC2SPayload::new
+        );
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     /** Client -> server: undo my last build. */
     public record UndoC2SPayload() implements CustomPayload {
         public static final CustomPayload.Id<UndoC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "undo"));

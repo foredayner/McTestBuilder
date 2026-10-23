@@ -1,5 +1,7 @@
 {
   "key.minecraft-ai-build-assistant.open_ai_ui": "AI 건축 공방 열기",
   "key.categories.minecraft-ai-build-assistant": "AI 건축 도우미",
-  "key.minecraft-ai-build-assistant.remove_object": "AI 소품 지우기 (조준 후 두 번)"
+  "key.minecraft-ai-build-assistant.remove_object": "AI 소품 지우기 (조준 후 두 번)",
+  "item.minecraft-ai-build-assistant.object": "AI 소품",
+  "entity.minecraft-ai-build-assistant.hitbox": "AI 소품 충돌 상자"
 }

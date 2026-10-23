@@ -61,16 +61,12 @@ public class AibClientGameTest implements FabricClientGameTest {
                 AiClientState.addLog("[Waiting...] 건물 설계 중입니다. 잠시 기다려 주세요.");
                 AiClientState.addLog("[Review] 1 problem(s) found before running:\n- line 4: placeWall got 6 argument(s), needs 7.");
                 AiClientState.addLog("[AI] Asking the AI to fix it (retry 1/2)...");
-                AiClientState.addLog("[AI] Approval required.");
-                AiClientState.addLog("  Build location: X=0 Y=-60 Z=4\n  Size: 7 x 6 x 7 (W x H x L), 9 command(s)");
-                AiClientState.setPendingApproval("Build location: X=0 Y=-60 Z=4");
+                AiClientState.addLog("[AI] 완성! Size: 7 x 6 x 7 (W x H x L), 9 command(s)");
+                AiClientState.addLog("[History] 보관함에 추가했어요. 보관함에서 \"손에 받기\"로 꺼내 쓰세요.");
             });
             shot(context, () -> AiPromptScreen.open("CREATE", null), "02_create_pending");
 
             context.runOnClient(client -> {
-                AiClientState.clearPendingApproval();
-                AiClientState.addLog("[AI] Complete!");
-                AiClientState.addLog("[History] Saved to the History tab.");
                 AiClientState.toggleObjectMode();
             });
             shot(context, () -> AiPromptScreen.open("CREATE", null), "03_create_object_mode");
@@ -84,22 +80,23 @@ public class AibClientGameTest implements FabricClientGameTest {
             shot(context, () -> AiPromptScreen.open("LOGS", null), "07_logs");
             shot(context, () -> new AiSettingsScreen(null), "08_settings");
 
-            // Blueprint paper: hand one to the player, then use it on the ground to the left of the house.
+            // Object item: hand one to the player (its icon is the front picture), then set it on the ground.
             context.setScreen(() -> null);
             game.getServer().runOnServer(server -> {
                 ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
                 BuildRecord apple = BuildRecord.fromJson(records.get(1));
+                apple.icon = BuildPreview.of(apple).icon();
                 com.example.ai.build.BlueprintStore.give(player, apple);
             });
             context.waitTicks(5);
-            context.takeScreenshot("11_blueprint_in_hand");
+            context.takeScreenshot("11_object_item_in_hand");
             game.getServer().runOnServer(server -> {
                 ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
                 var stack = player.getMainHandStack();
-                com.example.ai.build.BlueprintStore.use(player, stack, player.getBlockPos().add(-2, 0, 2));
+                com.example.ai.build.ObjectItems.use(player, stack, player.getBlockPos().add(-2, -1, 2));
             });
             context.waitTicks(10);
-            context.takeScreenshot("12_blueprint_used");
+            context.takeScreenshot("12_object_item_used");
             context.setScreen(AiPromptScreen::openNearby);
             context.waitTicks(10);
             context.setScreen(() -> AiPromptScreen.open("HISTORY", null)); // redraw with the server's answer
@@ -128,6 +125,32 @@ public class AibClientGameTest implements FabricClientGameTest {
             game.getClientWorld().waitForChunksRender();
             context.runOnClient(client -> client.inGameHud.getChatHud().clear(false));
             context.takeScreenshot("14_scaled_apples");
+
+            // Objects are solid: drop the player onto the x5 apple and they stay on top of it.
+            double[] top = game.getServer().computeOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                var boxes = player.getServerWorld().getEntitiesByClass(com.example.content.SolidHitboxEntity.class,
+                    player.getBoundingBox().expand(12), e -> e.getCommandTags().stream().anyMatch(t -> t.startsWith("aib_") && t.length() > 8));
+                net.minecraft.util.math.Box biggest = null;
+                for (var b : boxes) {
+                    var bb = b.getBoundingBox();
+                    if (biggest == null || bb.getLengthY() * bb.getLengthX() > biggest.getLengthY() * biggest.getLengthX()) {
+                        biggest = bb;
+                    }
+                }
+                return biggest == null ? new double[] { 0, 0, 0 } : new double[] { biggest.getCenter().x, biggest.maxY, biggest.getCenter().z };
+            });
+            game.getServer().runCommand(String.format(java.util.Locale.ROOT, "tp @a %.2f %.2f %.2f 0 70", top[0], top[1] + 1.5, top[2]));
+            context.waitTicks(40);
+            double standingY = context.computeOnClient(client -> client.player.getY());
+            if (standingY < top[1] - 0.1) {
+                throw new AssertionError("the player fell through the object: y " + standingY + ", top " + top[1]);
+            }
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
+            context.waitTicks(3);
+            context.runOnClient(client -> client.inGameHud.getChatHud().clear(false));
+            context.takeScreenshot("15_standing_on_big_apple");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
 
             // Small window: the settings form must scroll, nothing may overlap.
             context.getInput().resizeWindow(640, 360);

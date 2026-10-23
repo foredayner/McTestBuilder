@@ -284,6 +284,26 @@ public final class BuildPreview {
         }
     }
 
+    /** Item icon size in pixels. */
+    public static final int ICON = 16;
+
+    /** The front view fitted into a 16 x 16 icon, standing on the bottom edge (ARGB, 0 = clear). */
+    public int[] icon() {
+        int[] out = new int[ICON * ICON];
+        int w = Math.max(1, frontW), h = Math.max(1, frontH);
+        double s = Math.min((double) ICON / w, (double) ICON / h);
+        int nw = Math.max(1, Math.min(ICON, (int) Math.round(w * s)));
+        int nh = Math.max(1, Math.min(ICON, (int) Math.round(h * s)));
+        int ox = (ICON - nw) / 2, oy = ICON - nh;
+        for (int y = 0; y < nh; y++) {
+            for (int x = 0; x < nw; x++) {
+                int sy = Math.min(h - 1, (int) (y / s)), sx = Math.min(w - 1, (int) (x / s));
+                out[(oy + y) * ICON + ox + x] = front[sy * w + sx];
+            }
+        }
+        return out;
+    }
+
     /** Save both views as PNG files, scaled up so they are easy to look at. */
     public void writePngs(Path topFile, Path frontFile) throws IOException {
         writePng(topFile, top, topW, topH);

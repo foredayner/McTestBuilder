@@ -7,6 +7,7 @@
   "license": "CC0-1.0",
   "icon": "assets/minecraft-ai-build-assistant/icon.png",
   "environment": "*",
+  "accessWidener": "aib.accesswidener",
   "entrypoints": {
     "main": [
       "com.example.AiBuildAssistantMod"

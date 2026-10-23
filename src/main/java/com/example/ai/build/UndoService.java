@@ -108,7 +108,7 @@ public final class UndoService {
         }
         if (entry.tag() != null) {
             MinecraftAI.init(entry.world(), player.getBlockPos(), player.getYaw(), player.getPitch(), player);
-            MinecraftAI.runNow("kill @e[type=minecraft:block_display,tag=" + entry.tag() + "]");
+            MinecraftAI.runNow("kill @e[tag=" + entry.tag() + "]"); // display parts and hitboxes
         }
         AiNetworking.sendLog(player, "[AI] Undid \"" + entry.title() + "\" (" + restored + " block(s) restored"
             + (entry.tag() != null ? ", object removed" : "") + "). " + stack.size() + " more undo step(s).");

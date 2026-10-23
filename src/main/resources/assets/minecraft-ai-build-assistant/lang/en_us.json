@@ -1,5 +1,7 @@
 {
   "key.minecraft-ai-build-assistant.open_ai_ui": "Open Minecraft AI Build Assistant",
   "key.categories.minecraft-ai-build-assistant": "Minecraft AI Build Assistant",
-  "key.minecraft-ai-build-assistant.remove_object": "Remove AI object (look at it, press twice)"
+  "key.minecraft-ai-build-assistant.remove_object": "Remove AI object (look at it, press twice)",
+  "item.minecraft-ai-build-assistant.object": "AI Object",
+  "entity.minecraft-ai-build-assistant.hitbox": "AI Object Hitbox"
 }
