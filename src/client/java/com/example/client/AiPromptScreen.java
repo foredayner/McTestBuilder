@@ -517,8 +517,8 @@ public class AiPromptScreen extends Screen {
         y += 6;
         int room = b - (y + detailScroll) - (LINE + 3) - 8 - 3 * LINE - 4;
         int img = Math.max(48, Math.min(Math.min(140, (width - 8) / 2), room));
-        ctx.drawText(this.textRenderer, ellipsize("정면 (나를 보는 면)", img), x, y, INK_SOFT, false);
-        ctx.drawText(this.textRenderer, ellipsize("위에서 (정면이 아래)", img), x + img + 8, y, INK_SOFT, false);
+        ctx.drawText(this.textRenderer, ellipsize("정면", img), x, y, INK_SOFT, false);
+        ctx.drawText(this.textRenderer, ellipsize("위에서", img), x + img + 8, y, INK_SOFT, false);
         y += LINE + 3;
         inset(ctx, x, y, x + img, y + img, 0xFFE8C48A);
         inset(ctx, x + img + 8, y, x + 2 * img + 8, y + img, 0xFFE8C48A);
