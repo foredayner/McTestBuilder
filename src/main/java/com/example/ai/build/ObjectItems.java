@@ -155,9 +155,9 @@ public final class ObjectItems {
         }
         BuildRecord record = BlueprintStore.load(world.getServer(), id);
         if (record != null) {
-            ItemEntity drop = new ItemEntity(world, x, y + 0.25, z, stackFor(record));
-            drop.setToDefaultPickupDelay();
-            world.spawnEntity(drop);
+            ItemEntity item = new ItemEntity(world, x, y + 0.25, z, stackFor(record));
+            item.setToDefaultPickupDelay();
+            world.spawnEntity(item);
         }
     }
 }
