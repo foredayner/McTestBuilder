@@ -108,7 +108,7 @@ public class AibGameTests implements FabricGameTest {
             "hitbox carries the title");
         var listed = com.example.ai.build.ObjectService.nearby(player);
         // Other tests place objects close by at the same time: look for this one.
-        check(listed.stream().anyMatch(n -> n.tag.equals(tag) && n.parts == plan.parts.size() && "apple".equals(n.name)), "nearby list finds it");
+        check(listed.stream().anyMatch(o -> o.tag.equals(tag) && o.parts == n && "apple".equals(o.name)), "nearby list finds it");
 
         // Delete key path: remove by the hitbox entity id.
         com.example.ai.build.ObjectService.removeByEntity(player, hitboxes.get(0).getId());
