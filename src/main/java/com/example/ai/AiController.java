@@ -272,6 +272,7 @@ public class AiController {
             + "Rules:\n"
             + "- Use ONLY addPart / addCylinder / addSphere to build. Never placeBlock/placeBox.\n"
             + "- Coordinates are relative to the corner of the player's feet block: +X east, +Y up, +Z south.\n"
+            + "- Its FRONT (face, display side, opening) must face the player, i.e. point back toward (0, 0, 0).\n"
             + "- Put it 2 blocks in front of the player, standing on the ground: centre x = ai.getForwardX(2) + 0.5,\n"
             + "  centre z = ai.getForwardZ(2) + 0.5, bottom y = 0. Store these in variables and build around them.\n"
             + "- Unless the request gives a size, make it about 1 block tall. Keep it within 3 blocks in every direction.\n"
@@ -330,6 +331,8 @@ public class AiController {
         prompt.append("- Always prefix calls with ai. Match argument count exactly (5 or 6 for clearArea).\n");
         prompt.append("- Coordinates are RELATIVE to player feet (0,0,0). getGroundLevel returns relative Y.\n");
         prompt.append("- Use searchBlocks/listBlocks for block names. Forbidden blocks cannot be placed.\n");
+        prompt.append("- Build in front of the player. The FRONT of the building (main door, facade, windows of the main\n");
+        prompt.append("  face) must face the player, i.e. point back toward (0, 0, 0).\n");
         prompt.append("- Inspect terrain before building. Output Groovy only. No markdown, no comments, no explanation.\n");
 
         return prompt.toString();

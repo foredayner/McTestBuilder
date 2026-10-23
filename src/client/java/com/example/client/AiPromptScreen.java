@@ -430,7 +430,7 @@ public class AiPromptScreen extends Screen {
             }
             inset(ctx, l + 6, y + 3, l + ROW + 2, y + ROW - 6, 0xFFE8C48A); // item slot
             BuildPreview p = BuildPreview.of(rec);
-            BuildPreview.draw(ctx, p.top, p.topW, p.topH, l + 8, y + 5, ROW - 10, ROW - 14);
+            BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, l + 8, y + 5, ROW - 10, ROW - 14);
             boolean object = "object".equals(rec.kind);
             String tag = object ? "소품" : "건물";
             int tagW = this.textRenderer.getWidth(tag) + 6;
@@ -469,7 +469,7 @@ public class AiPromptScreen extends Screen {
             BuildRecord source = recordForTag(n.tag);
             if (source != null) {
                 BuildPreview p = BuildPreview.of(source);
-                BuildPreview.draw(ctx, p.top, p.topW, p.topH, l + 8, y + 5, ROW - 10, ROW - 14);
+                BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, l + 8, y + 5, ROW - 10, ROW - 14);
             } else {
                 ctx.drawItem(new ItemStack(Items.ARMOR_STAND), l + 12, y + 8); // not in my 보관함 (deleted, or another player's)
             }
@@ -517,13 +517,13 @@ public class AiPromptScreen extends Screen {
         y += 6;
         int room = b - (y + detailScroll) - (LINE + 3) - 8 - 3 * LINE - 4;
         int img = Math.max(48, Math.min(Math.min(140, (width - 8) / 2), room));
-        ctx.drawText(this.textRenderer, ellipsize("위에서 (앞쪽이 위)", img), x, y, INK_SOFT, false);
-        ctx.drawText(this.textRenderer, ellipsize("정면에서", img), x + img + 8, y, INK_SOFT, false);
+        ctx.drawText(this.textRenderer, ellipsize("정면 (나를 보는 면)", img), x, y, INK_SOFT, false);
+        ctx.drawText(this.textRenderer, ellipsize("위에서 (정면이 아래)", img), x + img + 8, y, INK_SOFT, false);
         y += LINE + 3;
         inset(ctx, x, y, x + img, y + img, 0xFFE8C48A);
         inset(ctx, x + img + 8, y, x + 2 * img + 8, y + img, 0xFFE8C48A);
-        BuildPreview.draw(ctx, p.top, p.topW, p.topH, x + 3, y + 3, img - 6, img - 6);
-        BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, x + img + 11, y + 3, img - 6, img - 6);
+        BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, x + 3, y + 3, img - 6, img - 6);
+        BuildPreview.draw(ctx, p.top, p.topW, p.topH, x + img + 11, y + 3, img - 6, img - 6);
         y += img + 8;
         String[] info = {
             "크기 " + p.sizeX + " × " + p.sizeY + " × " + p.sizeZ + " (가로 × 높이 × 세로) · "

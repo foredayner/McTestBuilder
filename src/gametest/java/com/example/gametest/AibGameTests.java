@@ -159,4 +159,24 @@ public class AibGameTests implements FabricGameTest {
         check(world.getBlockState(target).isAir(), "undo removes a blueprint build too");
         context.complete();
     }
+
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void placedBuildsShowTheirFrontToThePlayer(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 4));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f); // designed facing south: door on the near side
+        BuildPlan plan = Demo.plan(world, origin, player, Demo.HOUSE);
+        check("south".equals(plan.facing), "designed facing south, got " + plan.facing);
+        BuildRecord record = BuildRecord.create("house", "TEST", "script", plan);
+        com.example.config.AiBuilderConfig.get().ticksPerBlock = 1;
+
+        player.setYaw(-90f); // now facing east
+        com.example.ai.build.RebuildService.placeInFront(player, record);
+        BlockState door = world.getBlockState(origin.add(4, 0, 0));
+        check(door.isOf(Blocks.OAK_DOOR), "door on the side nearest the player, got " + door);
+        check(door.get(net.minecraft.block.DoorBlock.FACING) == Direction.WEST, "door faces back toward the player: " + door);
+        check(world.getBlockState(origin.add(4, 1, 3)).isOf(Blocks.STONE_BRICKS), "the house is east of the player");
+        UndoService.undo(player);
+        context.complete();
+    }
 }
