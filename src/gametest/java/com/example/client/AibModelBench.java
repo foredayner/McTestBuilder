@@ -52,12 +52,13 @@ public class AibModelBench implements FabricClientGameTest {
 
     private static final List<Case> CASES = List.of(
         new Case("b1_cabin", "참나무와 조약돌로 만든 작은 오두막, 굴뚝과 현관 계단", false),
-        new Case("b2_tower", "돌벽돌 감시탑, 4층 높이, 꼭대기에 총안", false),
-        new Case("b3_pavilion", "작은 일본식 정자, 기와 지붕", false),
+        new Case("b2_house", "거실, 부엌, 침실 두 개가 있는 2층 집", false),
         new Case("o1_apple", "빨간 사과", true),
-        new Case("o2_chair", "나무 의자", true),
-        new Case("o3_lamp", "책상 스탠드 램프", true),
-        new Case("o4_cactus", "화분에 심은 선인장", true)
+        new Case("o2_duck", "모자를 쓴 노란 오리", true),
+        new Case("o3_unicorn", "흰 유니콘", true),
+        new Case("o4_golem", "이끼 낀 돌 골렘", true),
+        new Case("o5_chair", "나무 의자", true),
+        new Case("o6_lamp", "책상 스탠드 램프", true)
     );
 
     /** One AI call. */
