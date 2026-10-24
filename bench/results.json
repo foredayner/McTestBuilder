@@ -1,0 +1,80 @@
+{
+  "route": "claude",
+  "results": [
+    {
+      "model": "claude-haiku-5-5",
+      "id": "a1_holy",
+      "prompt": "성스러운 빛의 장검",
+      "object": true,
+      "success": true,
+      "calls": 1,
+      "summary": "Size: 2 x 3 x 2 (W x H x L), 19 part(s) | anims 0 [] | hit glow x10 | idle none",
+      "totalMs": 10823,
+      "inputTokens": 223,
+      "outputTokens": 2185,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 3463,
+      "attempts": [
+        {
+          "route": "claude",
+          "status": 200,
+          "ms": 9998,
+          "inputTokens": 223,
+          "outputTokens": 2185,
+          "cacheRead": 0,
+          "cacheWrite": 3463
+        }
+      ]
+    },
+    {
+      "model": "claude-haiku-5-5",
+      "id": "a2_void",
+      "prompt": "공허의 낫 모양 지팡이",
+      "object": true,
+      "success": true,
+      "calls": 1,
+      "summary": "Size: 2 x 3 x 2 (W x H x L), 37 part(s) | anims 3 [swing, glow, pulse] | hit portal x10 | idle portal x3",
+      "totalMs": 10735,
+      "inputTokens": 182,
+      "outputTokens": 2315,
+      "cacheReadTokens": 3463,
+      "cacheWriteTokens": 0,
+      "attempts": [
+        {
+          "route": "claude",
+          "status": 200,
+          "ms": 10610,
+          "inputTokens": 182,
+          "outputTokens": 2315,
+          "cacheRead": 3463,
+          "cacheWrite": 0
+        }
+      ]
+    },
+    {
+      "model": "claude-haiku-5-5",
+      "id": "a3_crown",
+      "prompt": "태양 왕관",
+      "object": true,
+      "success": true,
+      "calls": 1,
+      "summary": "Size: 2 x 1 x 2 (W x H x L), 80 part(s) | anims 1 [glow] | hit none | idle none",
+      "totalMs": 13062,
+      "inputTokens": 182,
+      "outputTokens": 2643,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 3500,
+      "attempts": [
+        {
+          "route": "claude",
+          "status": 200,
+          "ms": 12871,
+          "inputTokens": 182,
+          "outputTokens": 2643,
+          "cacheRead": 0,
+          "cacheWrite": 3500
+        }
+      ]
+    }
+  ]
+}

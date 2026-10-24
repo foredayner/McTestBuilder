@@ -1,0 +1,1 @@
+ad5b8eb5d76bffeb879ec5cc10a061691563f2ca bench=success models=claude-haiku-5-5
