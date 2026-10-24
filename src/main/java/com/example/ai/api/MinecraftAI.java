@@ -179,9 +179,26 @@ public class MinecraftAI {
 
     /** Particles where a hit lands (weapons). */
     public static void hitEffect(String particle, String color, Number count) {
-        if (recorder != null) {
-            recorder.hit = fx(particle, color, count);
+        hitEffect(particle, color, count, "burst", 1);
+    }
+
+    /** Shapes a hit effect can take. */
+    public static final java.util.List<String> PATTERNS = java.util.List.of(
+        "burst", "shockwave", "cone", "slash", "spiral", "pillar", "magic_circle", "lightning");
+
+    /** A hit effect with a shape (see PATTERNS) and a size in blocks (0.5-4). */
+    public static void hitEffect(String particle, String color, Number count, String pattern, Number size) {
+        if (recorder == null) {
+            return;
         }
+        String p = pattern == null ? "burst" : pattern.trim().toLowerCase(Locale.ROOT);
+        if (!PATTERNS.contains(p)) {
+            throw new IllegalArgumentException("unknown hit pattern '" + pattern + "'; use one of " + PATTERNS);
+        }
+        BuildPlan.Fx fx = fx(particle, color, count);
+        fx.pattern = p;
+        fx.size = Math.max(0.5, Math.min(4, Math.abs(toDouble(size))));
+        recorder.hit = fx;
     }
 
     /** Particles around the item while it is held or worn. */

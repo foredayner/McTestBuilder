@@ -62,11 +62,10 @@ public class AibModelBench implements FabricClientGameTest {
     }
 
     private static final List<Case> CASES = List.of(
-        new Case("e1_sword", "불꽃이 타오르는 용사의 대검", "gear:sword", "맞은 곳에 불꽃이 터짐", "칼날에서 불티가 피어오름"),
-        new Case("e2_staff", "얼음 결정이 달린 마법사의 지팡이", "gear:staff", "눈송이가 흩날림", "끝의 결정이 천천히 돌며 빛나고 눈송이가 떨어짐"),
-        new Case("e3_wings", "불사조 날개", "gear:back", "", "날개가 천천히 퍼덕이고 불티가 날림"),
-        new Case("e4_halo", "천사의 빛나는 고리 머리장식", "gear:hat", "", "머리 위 고리가 둥실둥실 떠다니며 빛남"),
-        new Case("e5_plain", "불꽃이 타오르는 용사의 대검", "gear:sword", "", "")
+        new Case("h1_fire", "불꽃이 타오르는 용사의 대검", "gear:sword", "화염이 앞으로 넓게 퍼짐", ""),
+        new Case("h2_circle", "보라색 마도서 지팡이", "gear:staff", "적 발밑에 보라색 마법진이 생김", "끝의 보석이 빛남"),
+        new Case("h3_thunder", "천둥의 망치", "gear:hammer", "번개가 내리꽂히고 충격파가 퍼짐", ""),
+        new Case("h4_frost", "서리 도끼", "gear:axe", "눈송이 회오리가 감아 올라감", "")
     );
 
     /** One AI call. */
@@ -299,6 +298,22 @@ public class AibModelBench implements FabricClientGameTest {
             // A newly held weapon is raised only after its attack cooldown (an axe: about 1 s).
             context.waitTicks(40);
             context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_hand");
+            if (record.plan.hit != null) {
+                // Hit something 3 blocks ahead and photograph the hit effect a few ticks in.
+                game.getServer().runOnServer(server -> {
+                    ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                    var w = p.getServerWorld();
+                    var stand = new net.minecraft.entity.decoration.ArmorStandEntity(w,
+                        p.getX(), p.getY(), p.getZ() + 3);
+                    stand.addCommandTag("aib_bench_target");
+                    w.spawnEntity(stand);
+                    com.example.ai.build.GearEffects.onHit(p.getMainHandStack(), stand, p);
+                });
+                context.waitTicks(8);
+                context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_hit");
+                context.waitTicks(40);
+                game.getServer().runCommand("kill @e[tag=aib_bench_target]");
+            }
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
             context.waitTicks(5);
             context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_front");

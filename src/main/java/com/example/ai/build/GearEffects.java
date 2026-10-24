@@ -44,6 +44,8 @@ public final class GearEffects {
         c.putString("p", fx.particle);
         c.putInt("c", fx.color & 0xFFFFFF);
         c.putInt("n", Math.max(1, Math.min(12, fx.count)));
+        c.putString("t", fx.pattern == null ? "burst" : fx.pattern);
+        c.putDouble("s", fx.size);
         nbt.put(key, c);
     }
 
@@ -58,10 +60,17 @@ public final class GearEffects {
         }
         NbtCompound c = nbt.getCompound(key);
         String p = c.getString("p");
-        return MinecraftAI.PARTICLES.contains(p) ? new BuildPlan.Fx(p, c.getInt("c"), c.getInt("n")) : null;
+        if (!MinecraftAI.PARTICLES.contains(p)) {
+            return null;
+        }
+        BuildPlan.Fx fx = new BuildPlan.Fx(p, c.getInt("c"), c.getInt("n"));
+        String t = c.getString("t");
+        fx.pattern = MinecraftAI.PATTERNS.contains(t) ? t : "burst";
+        fx.size = c.contains("s") ? Math.max(0.5, Math.min(4, c.getDouble("s"))) : 1;
+        return fx;
     }
 
-    static ParticleEffect particle(BuildPlan.Fx fx) {
+    public static ParticleEffect particle(BuildPlan.Fx fx) {
         if ("dust".equals(fx.particle)) {
             return new DustParticleEffect(fx.color, 1.2F);
         }
@@ -91,6 +100,14 @@ public final class GearEffects {
         BuildPlan.Fx fx = read(stack, HIT);
         ParticleEffect effect = fx == null ? null : particle(fx);
         if (effect == null) {
+            return;
+        }
+        if (!"burst".equals(fx.pattern)) {
+            HitEffects.start(world, attacker, target, fx, effect);
+            SoundEvent sound = hitSound(fx.particle);
+            if (sound != null) {
+                world.playSound(null, target.getBlockPos(), sound, SoundCategory.PLAYERS, 0.5F, 1.0F);
+            }
             return;
         }
         Vec3d at = target.getPos().add(0, target.getHeight() * 0.6, 0);

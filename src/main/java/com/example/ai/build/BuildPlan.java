@@ -118,6 +118,10 @@ public final class BuildPlan {
         public String particle;
         public int color;
         public int count;
+        /** Hit effects: burst, shockwave, cone, slash, spiral, pillar, magic_circle or lightning. */
+        public String pattern = "burst";
+        /** Hit effects: how big (blocks). */
+        public double size = 1;
 
         public Fx() {
         }

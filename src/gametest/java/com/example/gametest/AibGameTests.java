@@ -257,6 +257,31 @@ public class AibGameTests implements FabricGameTest {
     }
 
     @GameTest(templateName = EMPTY_STRUCTURE)
+    public void magicCircleAppearsAndCleansUp(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        var target = context.spawnEntity(EntityType.ARMOR_STAND, new BlockPos(2, 1, 5));
+        BuildPlan.Fx fx = new BuildPlan.Fx("enchant", 0x9933ff, 4);
+        fx.pattern = "magic_circle";
+        fx.size = 1.5;
+        check(com.example.ai.build.HitEffects.start(world, player, target, fx, com.example.ai.build.GearEffects.particle(fx)),
+            "the effect starts");
+        check(!com.example.ai.build.HitEffects.start(world, player, target, fx, com.example.ai.build.GearEffects.particle(fx)),
+            "one shaped effect per attacker at a time");
+        Box area = new Box(target.getBlockPos()).expand(4);
+        context.waitAndRun(6, () -> {
+            int pieces = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib_fx")).size();
+            check(pieces == 25, "20 ring pieces and 5 star lines, got " + pieces);
+            context.waitAndRun(40, () -> {
+                int left = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib_fx")).size();
+                check(left == 0, "the circle is removed when the effect ends, " + left + " left");
+                context.complete();
+            });
+        });
+    }
+
+    @GameTest(templateName = EMPTY_STRUCTURE)
     public void reviewRejectsBadScriptsBeforeRunning(TestContext context) {
         ServerWorld world = context.getWorld();
         BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
