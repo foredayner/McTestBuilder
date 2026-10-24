@@ -302,6 +302,68 @@ public class AibGameTests implements FabricGameTest {
         context.complete();
     }
 
+    /**
+     * Two operators build at the same time with slow placement. Each queued command must still run
+     * as its own player at its own spot, and undo must stop only the undoing player's build.
+     */
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 200)
+    public void twoPlayersBuildAtOnceWithoutMixingUp(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos a = context.getAbsolutePos(new BlockPos(2, 1, 7));
+        BlockPos b = context.getAbsolutePos(new BlockPos(7, 1, 7));
+        ServerPlayerEntity alice = opPlayer(context, a, 180f);
+        ServerPlayerEntity bob = opPlayer(context, b, 180f);
+        check(!alice.getUuid().equals(bob.getUuid()), "two different players");
+        BuildPlan planA = Demo.plan(world, a, alice, SMALL);
+        BuildPlan planB = Demo.plan(world, b, bob, SMALL);
+        BuildPlan planC = Demo.plan(world, a, alice, SMALL);
+
+        com.example.config.AiBuilderConfig.get().ticksPerBlock = 2;
+        // Alice starts, then Bob starts before Alice's commands have run (this used to make
+        // Alice's remaining commands run as Bob).
+        UndoService.capture(alice, planA, a, 0, "aib_twoA", "A");
+        com.example.ai.api.MinecraftAI.init(world, a, alice.getYaw(), alice.getPitch(), alice);
+        com.example.ai.api.MinecraftAI.executePlan(planA, a, 0, "aib_twoA", "A");
+        UndoService.capture(bob, planB, b, 0, "aib_twoB", "B");
+        com.example.ai.api.MinecraftAI.init(world, b, bob.getYaw(), bob.getPitch(), bob);
+        com.example.ai.api.MinecraftAI.executePlan(planB, b, 0, "aib_twoB", "B");
+        check(world.getBlockState(a.add(0, 0, -4)).isAir() && world.getBlockState(b.add(0, 0, -4)).isAir(),
+            "slow placement has not run yet");
+        // Alice undoes right away: her build stops, Bob's keeps going.
+        UndoService.undo(alice);
+        check(com.example.ai.build.BuildTaskQueue.pendingCount() > 0, "Bob's build is still queued");
+
+        context.runAtTick(40, () -> {
+            check(world.getBlockState(b.add(0, 0, -4)).isOf(Blocks.STONE_BRICKS), "Bob's box was built at Bob's spot");
+            check(world.getBlockState(b.add(1, 2, -3)).isOf(Blocks.OAK_STAIRS), "Bob's stairs too");
+            check(world.getBlockState(a.add(0, 0, -4)).isAir(), "Alice's cancelled build did not appear");
+            // Now both build at once again; both finish, each at their own place.
+            UndoService.capture(alice, planC, a, 0, "aib_twoC", "C");
+            com.example.ai.api.MinecraftAI.init(world, a, alice.getYaw(), alice.getPitch(), alice);
+            com.example.ai.api.MinecraftAI.executePlan(planC, a, 0, "aib_twoC", "C");
+            com.example.ai.api.MinecraftAI.init(world, b, bob.getYaw(), bob.getPitch(), bob);
+        });
+        context.runAtTick(80, () -> {
+            check(world.getBlockState(a.add(0, 0, -4)).isOf(Blocks.STONE_BRICKS), "Alice's second build finished");
+            check(world.getBlockState(a.add(1, 2, -3)).isOf(Blocks.OAK_STAIRS), "with its stairs");
+            com.example.config.AiBuilderConfig.get().ticksPerBlock = 1;
+            context.complete();
+        });
+    }
+
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void onlyOperatorsCanUseTheWorkshop(TestContext context) {
+        ServerPlayerEntity guest = context.createMockCreativeServerPlayerInWorld();
+        check(!com.example.network.AiNetworking.allowed(guest), "a non-operator is turned away");
+        ServerPlayerEntity op = opPlayer(context, context.getAbsolutePos(new BlockPos(1, 1, 1)), 0f);
+        check(com.example.network.AiNetworking.allowed(op), "an operator may use it");
+        var root = context.getWorld().getServer().getCommandManager().getDispatcher().getRoot().getChild("aibuild");
+        check(root != null, "/aibuild exists");
+        check(!root.canUse(guest.getCommandSource()), "/aibuild is hidden from non-operators");
+        check(root.canUse(op.getCommandSource()), "/aibuild works for operators");
+        context.complete();
+    }
+
     @GameTest(templateName = EMPTY_STRUCTURE)
     public void blueprintPaperBuildsWhereClicked(TestContext context) {
         ServerWorld world = context.getWorld();

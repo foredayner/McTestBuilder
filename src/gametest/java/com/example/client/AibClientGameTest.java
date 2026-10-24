@@ -38,6 +38,7 @@ public class AibClientGameTest implements FabricClientGameTest {
                 // The GameTest server gives new operators level 0; set level 4 directly.
                 server.getPlayerManager().getOpList().add(
                     new net.minecraft.server.OperatorEntry(player.getGameProfile(), 4, false));
+                server.getPlayerManager().sendCommandTree(player); // tells the client it is an operator
                 var world = player.getServerWorld();
                 var origin = player.getBlockPos();
                 BuildPlan house = Demo.plan(world, origin, player, Demo.HOUSE);

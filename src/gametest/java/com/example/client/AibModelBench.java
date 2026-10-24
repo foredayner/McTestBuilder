@@ -134,6 +134,7 @@ public class AibModelBench implements FabricClientGameTest {
             game.getServer().runOnServer(server -> {
                 ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
                 server.getPlayerManager().getOpList().add(new net.minecraft.server.OperatorEntry(p.getGameProfile(), 4, false));
+                server.getPlayerManager().sendCommandTree(p); // tells the client it is an operator
             });
             game.getServer().runCommand("execute as @a at @s run tp @s ~ ~ ~ 0 18");
             context.runOnClient(client -> client.options.hudHidden = true);

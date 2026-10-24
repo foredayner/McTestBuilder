@@ -88,7 +88,7 @@ public final class UndoService {
             AiNetworking.sendLog(player, "[AI] Nothing to undo.");
             return;
         }
-        BuildTaskQueue.clear(); // stop a build that is still going
+        BuildTaskQueue.clear(player.getUuid()); // stop this player's build if it is still going
         int restored = 0;
         if (entry.states() != null) {
             BlockPos.Mutable pos = new BlockPos.Mutable();

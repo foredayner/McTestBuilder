@@ -51,17 +51,34 @@ public class AiBuildAssistantClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (OPEN_AI_UI_KEY.wasPressed()) {
+                if (!isOperator(client)) {
+                    continue;
+                }
                 AiClientState.clearConversation();
                 client.setScreen(new AiPromptScreen());
             }
             while (REMOVE_OBJECT_KEY.wasPressed()) {
-                removeLookedAtObject(client);
+                if (isOperator(client)) {
+                    removeLookedAtObject(client);
+                }
             }
             ObjectBreaking.tick(client);
         });
     }
 
     private static KeyBinding REMOVE_OBJECT_KEY;
+
+    /** The AI 공방 is for operators only (the server checks again); others get a short notice. */
+    static boolean isOperator(net.minecraft.client.MinecraftClient client) {
+        if (client.player == null) {
+            return false;
+        }
+        if (client.player.hasPermissionLevel(com.example.network.AiNetworking.OP_LEVEL)) {
+            return true;
+        }
+        client.player.sendMessage(net.minecraft.text.Text.literal(com.example.network.AiNetworking.OP_ONLY), true);
+        return false;
+    }
     private static int pendingRemoveId = -1;
     private static long pendingRemoveAt = 0;
 

@@ -20,6 +20,7 @@ public class AiBuildCommand {
 
             dispatcher.register(
                 literal("aibuild")
+                    .requires(source -> source.hasPermissionLevel(com.example.network.AiNetworking.OP_LEVEL))
                     .then(literal("--web")
                         .then(argument("prompt", StringArgumentType.greedyString())
                             .executes(context -> executeBuild(context.getSource(), StringArgumentType.getString(context, "prompt"), true))

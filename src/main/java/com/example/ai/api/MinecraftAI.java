@@ -934,7 +934,9 @@ public class MinecraftAI {
             recorder.ops.add(new BuildPlan.Op("set", x, y, z, x, y, z, blockId, "replace"));
             return;
         }
-        BuildTaskQueue.enqueue(() -> executeBuildCommand(
+        ServerPlayerEntity who = actor;
+        ServerWorld where = world;
+        BuildTaskQueue.enqueue(ownerOf(who), () -> executeBuildCommandAs(who, where,
             "setblock " + pos.getX() + " " + pos.getY() + " " + pos.getZ() + " " + blockId + " replace"
         ));
     }
@@ -949,7 +951,9 @@ public class MinecraftAI {
                 blockId, fillMode));
             return;
         }
-        BuildTaskQueue.enqueue(() -> executeBuildCommand(
+        ServerPlayerEntity who = actor;
+        ServerWorld where = world;
+        BuildTaskQueue.enqueue(ownerOf(who), () -> executeBuildCommandAs(who, where,
             "fill "
                 + from.getX() + " " + from.getY() + " " + from.getZ() + " "
                 + to.getX() + " " + to.getY() + " " + to.getZ() + " "
@@ -970,7 +974,11 @@ public class MinecraftAI {
      * crosshair can target it (display entities have no hitbox). It carries the object's title.
      */
     public static int executePlan(BuildPlan plan, BlockPos at, int turns, String tag, String title) {
-        return executePlan(plan, at, turns, tag, title, List.of(), MinecraftAI::executeBuildCommand);
+        // Remember who builds and where now: other players may start their own builds before this
+        // one has finished, and every queued command must still run as this player in this world.
+        ServerPlayerEntity who = actor;
+        ServerWorld where = world;
+        return executePlan(plan, at, turns, tag, title, List.of(), command -> executeBuildCommandAs(who, where, command), ownerOf(who));
     }
 
     /**
@@ -986,15 +994,19 @@ public class MinecraftAI {
                 System.out.println("[ERROR] Object command failed: /" + command + " -> " + exception.getMessage());
             }
         };
-        return executePlan(plan, at, turns, tag, title, extraTags, run);
+        return executePlan(plan, at, turns, tag, title, extraTags, run, BuildTaskQueue.SERVER);
+    }
+
+    private static java.util.UUID ownerOf(ServerPlayerEntity player) {
+        return player == null ? BuildTaskQueue.SERVER : player.getUuid();
     }
 
     private static int executePlan(BuildPlan plan, BlockPos at, int turns, String tag, String title, List<String> extraTags,
-                                   java.util.function.Consumer<String> runner) {
+                                   java.util.function.Consumer<String> runner, java.util.UUID owner) {
         int count = 0;
         if (!plan.parts.isEmpty()) {
             List<String> hitboxes = hitboxCommands(plan, at, turns, tag, title, extraTags);
-            BuildTaskQueue.enqueue(() -> hitboxes.forEach(runner));
+            BuildTaskQueue.enqueue(owner, () -> hitboxes.forEach(runner));
         }
         for (BuildPlan.Op op : plan.ops) {
             int[] a = BuildPlan.rotate(op.x1, op.z1, turns);
@@ -1004,7 +1016,7 @@ public class MinecraftAI {
                 ? "setblock " + (at.getX() + a[0]) + " " + (at.getY() + op.y1) + " " + (at.getZ() + a[1]) + " " + block + " replace"
                 : "fill " + (at.getX() + a[0]) + " " + (at.getY() + op.y1) + " " + (at.getZ() + a[1]) + " "
                     + (at.getX() + b[0]) + " " + (at.getY() + op.y2) + " " + (at.getZ() + b[1]) + " " + block + " " + op.mode;
-            BuildTaskQueue.enqueue(() -> runner.accept(command));
+            BuildTaskQueue.enqueue(owner, () -> runner.accept(command));
             count++;
         }
         // Object parts appear a few at a time so a model pops in quickly but visibly.
@@ -1015,20 +1027,20 @@ public class MinecraftAI {
             count++;
             if (batch.size() == 8) {
                 List<String> run = List.copyOf(batch);
-                BuildTaskQueue.enqueue(() -> run.forEach(runner));
+                BuildTaskQueue.enqueue(owner, () -> run.forEach(runner));
                 batch.clear();
             }
         }
         if (!batch.isEmpty()) {
             List<String> run = List.copyOf(batch);
-            BuildTaskQueue.enqueue(() -> run.forEach(runner));
+            BuildTaskQueue.enqueue(owner, () -> run.forEach(runner));
         }
         return count;
     }
 
     /** Run one command now as the build actor (used by undo). */
     public static void runNow(String command) {
-        executeBuildCommand(command);
+        executeBuildCommandAs(actor, world, command);
     }
 
     /** Turn stairs, doors, logs... with the structure. Unknown or stateless blocks pass through. */
@@ -1051,23 +1063,31 @@ public class MinecraftAI {
         }
     }
 
-    private static void executeBuildCommand(String command) {
-        if (actor == null || !actor.isAlive()) {
-            System.out.println("[WARNING] No actor for build command: " + command);
-            return;
-        }
-
-        MinecraftServer server = actor.getServer();
+    /**
+     * Run one build command as {@code who} (whose permission was checked when the build started)
+     * in {@code where}. If they have left meanwhile, the server finishes their build in that world.
+     */
+    private static void executeBuildCommandAs(ServerPlayerEntity who, ServerWorld where, String command) {
+        MinecraftServer server = who != null ? who.getServer() : where != null ? where.getServer() : null;
         if (server == null) {
+            System.out.println("[WARNING] No world for build command: " + command);
             return;
         }
-
-        if (!canExecuteBuildCommands(actor)) {
-            System.out.println("[WARNING] Actor lacks permission for: " + command);
+        ServerCommandSource source;
+        if (who != null && !who.isRemoved() && who.getServer() != null) {
+            if (!canExecuteBuildCommands(who)) {
+                System.out.println("[WARNING] Actor lacks permission for: " + command);
+                return;
+            }
+            source = who.getCommandSource().withSilent();
+            if (where != null) {
+                source = source.withWorld(where); // they may have changed dimension since
+            }
+        } else if (where != null) {
+            source = server.getCommandSource().withWorld(where).withLevel(2).withSilent();
+        } else {
             return;
         }
-
-        ServerCommandSource source = actor.getCommandSource().withSilent();
         try {
             server.getCommandManager().executeWithPrefix(source, command); // 1.21.4 name of parseAndExecute
         } catch (Exception exception) {

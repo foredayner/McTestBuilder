@@ -215,7 +215,7 @@ public final class RebuildService {
         UndoService.capture(player, record.plan, origin, turns, tag, title);
         int commands = MinecraftAI.executePlan(record.plan, origin, turns, tag, title);
         AiNetworking.sendLog(player, "[History] \"" + title + "\" 배치 중 (" + facingKo(facing) + "쪽 방향, 명령 " + commands + "개)...");
-        BuildTaskQueue.whenEmpty(() -> AiNetworking.sendLog(player, "[History] 배치 완료! 되돌리기로 취소할 수 있어요."));
+        BuildTaskQueue.whenEmpty(player.getUuid(), () -> AiNetworking.sendLog(player, "[History] 배치 완료! 되돌리기로 취소할 수 있어요."));
     }
 
     static String facingKo(String facing) {

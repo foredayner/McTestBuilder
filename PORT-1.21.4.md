@@ -76,6 +76,18 @@ server and the client of the player who builds. That player needs operator level
 - **Ollama**: `keep_alive` (Settings > "Keep model loaded", default 30 min) so the model is not
   unloaded after 5 minutes, and `num_ctx` 8192 so the long build prompt is not cut off.
 
+## Multiplayer
+
+- **Operators only**: the AI 공방 (O key), the Delete-key object removal, `/aibuild`, settings
+  sync (provider, model, API key), 손에 받기, undo, approve/cancel and the nearby list need
+  permission level 2. Others see "관리자(OP)만 사용할 수 있어요." and the server checks again, so
+  a modified client cannot get around it. The API key lives only in the server's config.
+  Everyone can still use what was made: place object items, wear and swing gear, mine objects.
+  Singleplayer: worlds need cheats on (as before for /fill and undo).
+- **Builds at the same time**: each player's placement has its own lane in the queue (one step
+  each per turn), every queued command remembers who started it and in which world, undo stops
+  only your own build, and "배치 완료" goes to the right person.
+
 ## Fixed in this fork
 
 - Classic `for (int i = 0; i < n; i++)` loops were rejected by the sandbox as "closures" (Groovy

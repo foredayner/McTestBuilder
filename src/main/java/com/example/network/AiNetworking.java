@@ -45,19 +45,35 @@ public final class AiNetworking {
 
     public static void registerServerReceivers() {
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.ApprovalAcceptC2SPayload.ID, (payload, context) -> {
-            context.server().execute(() -> BuildApproval.approveFor(context.player()));
+            context.server().execute(() -> {
+                if (allowed(context.player())) {
+                    BuildApproval.approveFor(context.player());
+                }
+            });
         });
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.ApprovalDenyC2SPayload.ID, (payload, context) -> {
-            context.server().execute(() -> BuildApproval.denyFor(context.player()));
+            context.server().execute(() -> {
+                if (allowed(context.player())) {
+                    BuildApproval.denyFor(context.player());
+                }
+            });
         });
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.AiSettingsSyncC2SPayload.ID, (payload, context) -> {
-            context.server().execute(() -> applySettings(payload));
+            context.server().execute(() -> {
+                // The server's AI settings (and API key) are only changed by operators.
+                if (allowed(context.player())) {
+                    applySettings(payload);
+                }
+            });
         });
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.RemoveObjectC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> {
+                if (!allowed(context.player())) {
+                    return;
+                }
                 if (payload.tag().isEmpty()) {
                     ObjectService.removeByEntity(context.player(), payload.entityId());
                 } else {
@@ -67,19 +83,49 @@ public final class AiNetworking {
         });
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.NearbyRequestC2SPayload.ID, (payload, context) -> {
-            context.server().execute(() -> ObjectService.sendNearby(context.player()));
+            context.server().execute(() -> {
+                if (allowed(context.player())) {
+                    ObjectService.sendNearby(context.player());
+                }
+            });
         });
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.BreakObjectC2SPayload.ID, (payload, context) ->
             context.server().execute(() -> com.example.ai.build.ObjectItems.breakObject(context.player(), payload.entityId())));
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.UndoC2SPayload.ID, (payload, context) -> {
-            context.server().execute(() -> UndoService.undo(context.player()));
+            context.server().execute(() -> {
+                if (allowed(context.player())) {
+                    UndoService.undo(context.player());
+                }
+            });
         });
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.RebuildPartC2SPayload.ID, (payload, context) -> {
-            context.server().execute(() -> RebuildService.receivePart(
-                context.player(), payload.id(), payload.index(), payload.total(), payload.mode(), payload.scalePercent(), payload.data()));
+            context.server().execute(() -> {
+                if (allowed(context.player())) {
+                    RebuildService.receivePart(context.player(), payload.id(), payload.index(), payload.total(),
+                        payload.mode(), payload.scalePercent(), payload.data());
+                }
+            });
         });
+    }
+
+    /** Permission level that may use the AI 공방 (requests, settings, 손에 받기, undo, removal). */
+    public static final int OP_LEVEL = 2;
+    public static final String OP_ONLY = "관리자(OP)만 사용할 수 있어요.";
+
+    /**
+     * Everything that talks to the AI or changes the server's settings is for operators only.
+     * Using what was made (placing object items, wearing gear, mining objects) stays open to all.
+     */
+    public static boolean allowed(ServerPlayerEntity player) {
+        if (player != null && player.hasPermissionLevel(OP_LEVEL)) {
+            return true;
+        }
+        if (player != null) {
+            player.sendMessage(Text.literal(OP_ONLY), true);
+        }
+        return false;
     }
 
     private static void applySettings(AiNetworkPayloads.AiSettingsSyncC2SPayload payload) {
