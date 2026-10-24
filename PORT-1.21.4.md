@@ -54,6 +54,9 @@ server and the client of the player who builds. That player needs operator level
     Worn kinds (투구, 모자, 갑옷, 등 장식) are equipped on the head or chest, give iron (투구, 갑옷) or leather
     (모자, 등 장식) armour, and are drawn on the head or torso bone (Fabric ArmorRenderer), so they move with the
     wearer.
+    The order has effect fields (공격 시 / 대기 시, or 착용 시); left empty there is no effect. Effects are
+    whitelisted particles sent by the server (hit bursts, steady puffs while held or worn) and looping
+    movements of part groups (spin, swing, bob, pulse) plus glow, drawn by the client from game time.
   - **Claude (Anthropic)** provider: Messages API with the fixed instructions as a cached system prompt,
     optional web search (`web_search` tool, at most 3 searches per build).
   - Objects are **solid**: their parts are merged into a few boxes that follow the shape (an
