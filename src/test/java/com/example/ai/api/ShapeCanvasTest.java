@@ -47,7 +47,8 @@ class ShapeCanvasTest {
             MinecraftAI.stopRecording();
         }
         assertTrue(plan.oversize);
-        assertTrue(plan.parts.stream().anyMatch(p -> Math.abs(p.sx * 16 - Math.round(p.sx * 16)) > 1e-6), "1/32 sizes");
+        // Some box edge lies between two 1/16 lines: the grid is 1/32.
+        assertTrue(plan.parts.stream().anyMatch(p -> offSixteenth(p.x - p.sx / 2) || offSixteenth(p.sx)), "1/32 grid");
         for (BuildPlan.Part p : plan.parts) {
             assertEquals(0, (p.sx * 32) % 1, 1e-6);
         }
@@ -57,6 +58,10 @@ class ShapeCanvasTest {
         for (BuildPlan.Part p : object.parts) {
             assertEquals(0, (p.sx * 16) % 1, 1e-6);
         }
+    }
+
+    private static boolean offSixteenth(double v) {
+        return Math.abs(v * 16 - Math.round(v * 16)) > 1e-6;
     }
 
     @Test

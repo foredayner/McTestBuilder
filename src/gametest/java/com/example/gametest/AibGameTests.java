@@ -206,8 +206,8 @@ public class AibGameTests implements FabricGameTest {
         check(com.example.ai.AiController.gearProblem(helmet, com.example.content.GearKind.HELMET) == null,
             "helmet example fits: " + com.example.ai.AiController.gearProblem(helmet, com.example.content.GearKind.HELMET));
         check(helmet.parts.size() <= BuildPlan.MAX_PARTS, "mask within the part limit: " + helmet.parts.size());
-        check(helmet.parts.stream().anyMatch(q -> Math.abs(q.sx * 16 - Math.round(q.sx * 16)) > 1e-6),
-            "the mask uses the finer equipment grid");
+        check(helmet.parts.stream().anyMatch(q -> Math.abs((q.x - q.sx / 2) * 16 - Math.round((q.x - q.sx / 2) * 16)) > 1e-6
+            || Math.abs(q.sx * 16 - Math.round(q.sx * 16)) > 1e-6), "the mask uses the finer equipment grid");
         BuildPlan hat = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HAT, true);
         check(com.example.ai.AiController.gearProblem(hat, com.example.content.GearKind.HAT) == null,
             "hat example fits: " + com.example.ai.AiController.gearProblem(hat, com.example.content.GearKind.HAT));
