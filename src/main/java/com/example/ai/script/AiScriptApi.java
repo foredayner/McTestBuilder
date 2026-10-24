@@ -35,7 +35,13 @@ public final class AiScriptApi {
         "addTube",
         "addRoundBox",
         "mirrorOn",
-        "mirrorOff"
+        "mirrorOff",
+        "groupStart",
+        "groupEnd",
+        "animate",
+        "glow",
+        "hitEffect",
+        "idleEffect"
     );
 
     private AiScriptApi() {

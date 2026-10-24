@@ -47,7 +47,11 @@ public class AibModelBench implements FabricClientGameTest {
     private static final Path OUT = Path.of("bench");
     private static final int RETRIES = 2;
 
-    private record Case(String id, String prompt, String mode) {
+    private record Case(String id, String prompt, String mode, String hit, String idle) {
+        Case(String id, String prompt, String mode) {
+            this(id, prompt, mode, "", "");
+        }
+
         boolean object() {
             return !"build".equals(mode);
         }
@@ -58,12 +62,11 @@ public class AibModelBench implements FabricClientGameTest {
     }
 
     private static final List<Case> CASES = List.of(
-        new Case("w1_helmet", "용의 뿔이 달린 기사 투구", "gear:helmet"),
-        new Case("w2_hat", "별무늬 마법사 모자", "gear:hat"),
-        new Case("w3_chest", "황금 장식의 성기사 갑옷", "gear:chestplate"),
-        new Case("w4_back", "불사조 날개", "gear:back"),
-        new Case("w5_back", "모험가의 가죽 배낭", "gear:back"),
-        new Case("g1_sword", "불꽃이 타오르는 용사의 대검", "gear:sword")
+        new Case("e1_sword", "불꽃이 타오르는 용사의 대검", "gear:sword", "맞은 곳에 불꽃이 터짐", "칼날에서 불티가 피어오름"),
+        new Case("e2_staff", "얼음 결정이 달린 마법사의 지팡이", "gear:staff", "눈송이가 흩날림", "끝의 결정이 천천히 돌며 빛나고 눈송이가 떨어짐"),
+        new Case("e3_wings", "불사조 날개", "gear:back", "", "날개가 천천히 퍼덕이고 불티가 날림"),
+        new Case("e4_halo", "천사의 빛나는 고리 머리장식", "gear:hat", "", "머리 위 고리가 둥실둥실 떠다니며 빛남"),
+        new Case("e5_plain", "불꽃이 타오르는 용사의 대검", "gear:sword", "", "")
     );
 
     /** One AI call. */
@@ -173,7 +176,7 @@ public class AibModelBench implements FabricClientGameTest {
         r.prompt = c.prompt();
         r.object = c.object();
         com.example.ai.AiPrompt base = game.getServer().computeOnServer(server ->
-            AiController.promptFor(server.getPlayerManager().getPlayerList().get(0), c.prompt(), c.mode()));
+            AiController.promptFor(server.getPlayerManager().getPlayerList().get(0), c.prompt(), c.mode(), c.hit(), c.idle()));
         com.example.ai.AiPrompt prompt = base;
         long start = System.currentTimeMillis();
         for (int attempt = 0; attempt <= RETRIES; attempt++) {
@@ -201,6 +204,9 @@ public class AibModelBench implements FabricClientGameTest {
                 if (c.gear()) {
                     record.kind = "gear";
                     record.gear = c.mode().substring(5);
+                    AiController.applyEffectRequest(record.plan, com.example.content.GearKind.of(record.gear), c.hit(), c.idle());
+                    r.summary += " | anims " + record.plan.anims.size() + " " + animTypes(record.plan)
+                        + " | hit " + fxText(record.plan.hit) + " | idle " + fxText(record.plan.idle);
                 }
                 save(model, c.id() + ".record.json", record.toJson());
                 break;
@@ -240,6 +246,18 @@ public class AibModelBench implements FabricClientGameTest {
             call.error = e.getClass().getSimpleName() + ": " + e.getMessage();
             return null;
         }
+    }
+
+    private static String fxText(com.example.ai.build.BuildPlan.Fx fx) {
+        return fx == null ? "none" : fx.particle + " x" + fx.count;
+    }
+
+    private static String animTypes(com.example.ai.build.BuildPlan plan) {
+        List<String> types = new ArrayList<>();
+        for (var a : plan.anims) {
+            types.add(a.type);
+        }
+        return types.toString();
     }
 
     /** Place the accepted design in front of the player, take a picture, save the front view, then undo. */

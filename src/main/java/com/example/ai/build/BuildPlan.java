@@ -63,6 +63,8 @@ public final class BuildPlan {
         public double yaw;
         public double pitch;
         public double roll;
+        /** Animation group (index into the plan's groups, 1-based); 0 = does not move. */
+        public int group;
 
         public Part() {
         }
@@ -81,6 +83,52 @@ public final class BuildPlan {
         }
     }
 
+    /** A looping movement of one group of parts (equipment only), around a pivot point. */
+    public static final class Anim {
+        public int group;
+        /** spin, swing, bob, pulse or glow. */
+        public String type;
+        public double px;
+        public double py;
+        public double pz;
+        /** x, y or z. */
+        public String axis;
+        /** spin: turns per second; swing / bob / pulse: cycles per second. */
+        public double speed;
+        /** swing: degrees; bob: blocks; pulse: fraction of the size. */
+        public double amount;
+
+        public Anim() {
+        }
+
+        public Anim(int group, String type, double px, double py, double pz, String axis, double speed, double amount) {
+            this.group = group;
+            this.type = type;
+            this.px = px;
+            this.py = py;
+            this.pz = pz;
+            this.axis = axis;
+            this.speed = speed;
+            this.amount = amount;
+        }
+    }
+
+    /** A particle effect (equipment only): which particle, its colour (dust), how many at a time. */
+    public static final class Fx {
+        public String particle;
+        public int color;
+        public int count;
+
+        public Fx() {
+        }
+
+        public Fx(String particle, int color, int count) {
+            this.particle = particle;
+            this.color = color;
+            this.count = count;
+        }
+    }
+
     public static final int MAX_PARTS = 400;
     public static final double MAX_PART_SIZE = 16;
     public static final double MAX_PART_OFFSET = 64;
@@ -88,6 +136,11 @@ public final class BuildPlan {
     public List<Op> ops = new ArrayList<>();
     public List<Part> parts = new ArrayList<>();
     public String facing = "north";
+    /** Equipment: movements of part groups (only when the order asked for an effect). */
+    public List<Anim> anims = new ArrayList<>();
+    /** Equipment: particles on hit / while held or worn (null = none). */
+    public Fx hit;
+    public Fx idle;
 
     public boolean isEmpty() {
         return (ops == null || ops.isEmpty()) && (parts == null || parts.isEmpty());
@@ -134,6 +187,7 @@ public final class BuildPlan {
             out.parts.add(new Part(p.block,
                 px + (p.x - px) * s, py + (p.y - py) * s, pz + (p.z - pz) * s,
                 p.sx * s, p.sy * s, p.sz * s, p.yaw, p.pitch, p.roll));
+            out.parts.get(out.parts.size() - 1).group = p.group;
         }
         return out;
     }
@@ -168,6 +222,7 @@ public final class BuildPlan {
         out.ops = new ArrayList<>(ops);
         for (Part p : parts) {
             out.parts.add(new Part(p.block, p.x + dx, p.y + dy, p.z + dz, p.sx, p.sy, p.sz, p.yaw, p.pitch, p.roll));
+            out.parts.get(out.parts.size() - 1).group = p.group;
         }
         return out;
     }

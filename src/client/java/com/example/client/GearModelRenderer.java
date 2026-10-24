@@ -40,7 +40,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     public static final Identifier TYPE_ID = Identifier.of(AiBuildAssistantMod.MOD_ID, "gear_model");
 
     /** A decoded model: parts with their textures, and its outline after the sword tilt. */
-    public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn) {
+    public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn,
+                        Map<Integer, List<BuildPlan.Anim>> anims) {
     }
 
     public record Unbaked() implements SpecialModelRenderer.Unbaked {
@@ -93,7 +94,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         return model;
     }
 
-    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false);
+    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of());
 
     private static Model decode(BuildPlan plan, boolean worn) {
         List<Sprite> sprites = new ArrayList<>();
@@ -111,7 +112,13 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
                 minY = Math.min(minY, ty); maxY = Math.max(maxY, ty);
             }
         }
-        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn);
+        Map<Integer, List<BuildPlan.Anim>> anims = new java.util.HashMap<>();
+        if (plan.anims != null) {
+            for (BuildPlan.Anim a : plan.anims) {
+                anims.computeIfAbsent(a.group, k -> new ArrayList<>()).add(a);
+            }
+        }
+        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims);
     }
 
     private static Sprite spriteOf(String block) {
@@ -160,11 +167,71 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         matrices.pop();
     }
 
-    /** Every part of the model as a textured box, in the current matrix. */
+    /** Every part of the model as a textured box, in the current matrix, moving parts at this moment. */
     static void draw(MatrixStack matrices, VertexConsumer buffer, Model model, int light, int overlay) {
+        double seconds = seconds();
         for (int i = 0; i < model.parts().size(); i++) {
-            box(matrices, buffer, model.parts().get(i), model.sprites().get(i), light, overlay);
+            BuildPlan.Part part = model.parts().get(i);
+            List<BuildPlan.Anim> anims = part.group == 0 ? null : model.anims().get(part.group);
+            if (anims == null) {
+                box(matrices, buffer, part, model.sprites().get(i), light, overlay);
+                continue;
+            }
+            matrices.push();
+            int partLight = light;
+            for (BuildPlan.Anim a : anims) {
+                partLight = animate(matrices, a, seconds, partLight);
+            }
+            box(matrices, buffer, part, model.sprites().get(i), partLight, overlay);
+            matrices.pop();
         }
+    }
+
+    /** Game time in seconds (smooth between ticks), so every player sees the same movement. */
+    private static double seconds() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.world == null) {
+            return System.currentTimeMillis() / 1000.0;
+        }
+        return (client.world.getTime() + client.getRenderTickCounter().getTickDelta(true)) / 20.0;
+    }
+
+    /** Apply one movement to the matrix; returns the light to use (glow = full brightness). */
+    private static int animate(MatrixStack m, BuildPlan.Anim a, double t, int light) {
+        if ("glow".equals(a.type)) {
+            return 0xF000F0;
+        }
+        double wave = Math.sin(2 * Math.PI * a.speed * t);
+        org.joml.Vector3f axis = switch (a.axis == null ? "y" : a.axis) {
+            case "x" -> new org.joml.Vector3f(1, 0, 0);
+            case "z" -> new org.joml.Vector3f(0, 0, 1);
+            default -> new org.joml.Vector3f(0, 1, 0);
+        };
+        float px = (float) a.px, py = (float) a.py, pz = (float) a.pz;
+        switch (a.type) {
+            case "spin" -> {
+                double turns = (a.speed * t) % 1.0;
+                m.translate(px, py, pz);
+                m.multiply(new Quaternionf().rotateAxis((float) (turns * 2 * Math.PI), axis));
+                m.translate(-px, -py, -pz);
+            }
+            case "swing" -> {
+                m.translate(px, py, pz);
+                m.multiply(new Quaternionf().rotateAxis((float) Math.toRadians(a.amount * wave), axis));
+                m.translate(-px, -py, -pz);
+            }
+            case "bob" -> m.translate(axis.x * (float) (a.amount * wave), axis.y * (float) (a.amount * wave),
+                axis.z * (float) (a.amount * wave));
+            case "pulse" -> {
+                float s = (float) (1 + a.amount * wave);
+                m.translate(px, py, pz);
+                m.scale(s, s, s);
+                m.translate(-px, -py, -pz);
+            }
+            default -> {
+            }
+        }
+        return light;
     }
 
     private static final int[][] FACES = {

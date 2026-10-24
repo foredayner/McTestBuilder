@@ -38,6 +38,7 @@ public final class GearItems {
         model.plan = new BuildPlan();
         model.plan.facing = plan.facing;
         model.plan.parts = new java.util.ArrayList<>(plan.parts);
+        model.plan.anims = plan.anims == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(plan.anims);
         return model.toGzip();
     }
 
@@ -50,6 +51,8 @@ public final class GearItems {
         if (model.length <= MAX_MODEL_BYTES) {
             nbt.putByteArray(MODEL, model);
         }
+        GearEffects.write(nbt, GearEffects.HIT, record.plan.hit);
+        GearEffects.write(nbt, GearEffects.IDLE, record.plan.idle);
         stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbt));
         stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(RebuildService.title(record))
             .setStyle(Style.EMPTY.withItalic(false).withColor(Formatting.AQUA)));

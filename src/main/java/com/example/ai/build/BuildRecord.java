@@ -54,6 +54,9 @@ public final class BuildRecord {
         if (record.plan.parts == null) {
             record.plan.parts = new java.util.ArrayList<>();
         }
+        if (record.plan.anims == null) {
+            record.plan.anims = new java.util.ArrayList<>();
+        }
         if (record.kind == null) {
             record.kind = record.plan.isObject() ? "object" : "build";
         }

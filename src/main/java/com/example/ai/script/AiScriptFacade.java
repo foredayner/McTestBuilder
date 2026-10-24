@@ -196,4 +196,28 @@ public final class AiScriptFacade {
     public void mirrorOff() {
         MinecraftAI.mirrorOff();
     }
+
+    public void groupStart(String name) {
+        MinecraftAI.groupStart(name);
+    }
+
+    public void groupEnd() {
+        MinecraftAI.groupEnd();
+    }
+
+    public void animate(String group, String type, Number px, Number py, Number pz, String axis, Number speed, Number amount) {
+        MinecraftAI.animate(group, type, px, py, pz, axis, speed, amount);
+    }
+
+    public void glow(String group) {
+        MinecraftAI.glow(group);
+    }
+
+    public void hitEffect(String particle, String color, Number count) {
+        MinecraftAI.hitEffect(particle, color, count);
+    }
+
+    public void idleEffect(String particle, String color, Number count) {
+        MinecraftAI.idleEffect(particle, color, count);
+    }
 }

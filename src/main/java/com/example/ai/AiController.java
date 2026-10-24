@@ -26,7 +26,8 @@ import java.util.regex.Pattern;
 public class AiController {
 
     /** One build request, kept across automatic retries. */
-    private record BuildRequest(String userPrompt, AiPrompt basePrompt, boolean webSearch, long startTime, String mode) {
+    private record BuildRequest(String userPrompt, AiPrompt basePrompt, boolean webSearch, long startTime, String mode,
+                                String fxHit, String fxIdle) {
     }
 
     /** Request modes: "build", "object", or "gear:<kind>" (sword, axe, ...). */
@@ -52,6 +53,17 @@ public class AiController {
     }
 
     public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch, String mode) {
+        requestBuild(player, prompt, useWebSearch, mode, "", "");
+    }
+
+    /**
+     * fxHit / fxIdle: what the order's effect fields say (equipment only). Empty = no such effect;
+     * the AI is told so, and anything it adds anyway is removed.
+     */
+    public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch, String mode,
+                                    String fxHit, String fxIdle) {
+        String hitText = fxHit == null ? "" : fxHit.trim();
+        String idleText = fxIdle == null ? "" : fxIdle.trim();
         boolean objectMode = !"build".equals(mode);
         long startTime = System.currentTimeMillis();
         AiBuilderConfig config = AiBuilderConfig.get();
@@ -86,13 +98,13 @@ public class AiController {
 
             debug("[DEBUG] Building prompt...");
             AiPrompt promptText = gearOf(mode) != null
-                ? gearPrompt(prompt, gearOf(mode))
+                ? gearPrompt(prompt, gearOf(mode), hitText, idleText)
                 : objectMode ? objectPrompt(prompt) : buildingPrompt(prompt, worldInfo, webSearch);
 
             debug("[DEBUG] Sending to AI provider...");
             AiNetworking.sendDebugLog(player, "[AI] Requesting from AI model (" + config.provider.getDisplayName() + ")...");
 
-            sendToAi(player, new BuildRequest(prompt, promptText, webSearch, startTime, mode), promptText, 0);
+            sendToAi(player, new BuildRequest(prompt, promptText, webSearch, startTime, mode, hitText, idleText), promptText, 0);
 
         } catch (Exception exception) {
             debug("[ERROR] Fatal error: " + exception.getMessage());
@@ -187,6 +199,7 @@ public class AiController {
             if (gear != null) {
                 record.kind = "gear";
                 record.gear = gear.id();
+                applyEffectRequest(plan, gear, req.fxHit(), req.fxIdle());
             }
             BuildApproval.requestApproval(player, record, description, origin);
             debug("[TIMER] ===== PENDING USER APPROVAL =====");
@@ -261,8 +274,12 @@ public class AiController {
     }
 
     public static AiPrompt promptFor(ServerPlayerEntity player, String userPrompt, String mode) {
+        return promptFor(player, userPrompt, mode, "", "");
+    }
+
+    public static AiPrompt promptFor(ServerPlayerEntity player, String userPrompt, String mode, String fxHit, String fxIdle) {
         if (gearOf(mode) != null) {
-            return gearPrompt(userPrompt, gearOf(mode));
+            return gearPrompt(userPrompt, gearOf(mode), fxHit, fxIdle);
         }
         boolean objectMode = "object".equals(mode);
         MinecraftAI.init(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player.getPitch());
@@ -527,7 +544,64 @@ public class AiController {
             %s
             """;
 
+    /**
+     * Keep only the effects the order asked for: no hit text = no hit particles; no idle text =
+     * no idle particles, no movement and no glow (worn equipment has no hit effect).
+     */
+    public static void applyEffectRequest(BuildPlan plan, GearKind kind, String fxHit, String fxIdle) {
+        if (fxHit == null || fxHit.isBlank() || kind.worn()) {
+            plan.hit = null;
+        }
+        if (fxIdle == null || fxIdle.isBlank()) {
+            plan.idle = null;
+            plan.anims.clear();
+        }
+    }
+
+    /** API and rules for effects, added to the equipment prompts. */
+    static final String EFFECT_API = """
+            EFFECTS AND MOVEMENT (use ONLY what the request's effect lines ask for; if a line says "none", make nothing for it):
+              ai.hitEffect(particle, '#rrggbb', count)      // weapons: burst where a hit lands (count 1-12)
+              ai.idleEffect(particle, '#rrggbb', count)     // steady puffs while held or worn (count 1-6 looks best)
+                particle: flame, soul_fire_flame, small_flame, lava, snowflake, electric_spark, enchant, end_rod, glow,
+                portal, witch, dragon_breath, smoke, large_smoke, cloud, heart, crit, enchanted_hit, cherry_leaves,
+                totem_of_undying, sculk_soul, dust (dust uses the colour; others ignore it)
+              ai.groupStart('name') ... ai.groupEnd()       // pieces made in between move together
+              ai.animate('name', type, pivotX, pivotY, pivotZ, axis, speed, amount)
+                type 'spin'  : turns around the axis through the pivot, speed = turns per second (amount unused)
+                type 'swing' : rocks back and forth, amount = degrees (flapping wings, swaying plumes), speed = cycles/s
+                type 'bob'   : floats up and down, amount = blocks (0.02-0.15), speed = cycles/s
+                type 'pulse' : grows and shrinks, amount = fraction (0.05-0.2), speed = cycles/s
+                axis: 'x', 'y' or 'z'. A group made with mirrorOn() gets a mirrored twin that moves as its mirror image.
+              ai.glow('name')                               // the group glows in the dark (gems, flames, runes)
+            Movement and glow are part of the while-held/worn effect: make them only if that line is not "none".
+            Example (a staff whose crystal spins and glows, with sparkles):
+              ai.groupStart('crystal')
+              ai.addEllipsoid('amethyst_block', 0, 1.6, 0, 0.1, 0.16, 0.1)
+              ai.groupEnd()
+              ai.animate('crystal', 'spin', 0, 1.6, 0, 'y', 0.4, 0)
+              ai.animate('crystal', 'bob', 0, 1.6, 0, 'y', 0.5, 0.04)
+              ai.glow('crystal')
+              ai.idleEffect('end_rod', '#ffffff', 2)
+            """;
+
     public static AiPrompt gearPrompt(String userPrompt, GearKind kind) {
+        return gearPrompt(userPrompt, kind, "", "");
+    }
+
+    public static AiPrompt gearPrompt(String userPrompt, GearKind kind, String fxHit, String fxIdle) {
+        AiPrompt base = gearPromptBase(userPrompt, kind);
+        String hit = kind.worn() ? "none (worn equipment has no hit effect)" : blankToNone(fxHit);
+        String effects = "\nEffect on hit: " + hit + "\nEffect while " + (kind.worn() ? "worn" : "held")
+            + " (particles, movement, glow): " + blankToNone(fxIdle);
+        return new AiPrompt(base.system() + "\n" + EFFECT_API, base.user().replace("\nWrite the Groovy script", effects + "\nWrite the Groovy script"));
+    }
+
+    private static String blankToNone(String text) {
+        return text == null || text.isBlank() ? "none" : text.trim();
+    }
+
+    private static AiPrompt gearPromptBase(String userPrompt, GearKind kind) {
         String shapes = OBJECT_SYSTEM.substring(OBJECT_SYSTEM.indexOf("SMOOTH SHAPES"), OBJECT_SYSTEM.indexOf("STYLE (this"));
         if (kind.worn()) {
             String system = WEAR_SYSTEM.formatted(shapes, EXAMPLE_HELMET.strip(), EXAMPLE_WINGS.strip());

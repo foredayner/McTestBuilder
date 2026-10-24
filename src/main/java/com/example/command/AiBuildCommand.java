@@ -51,6 +51,21 @@ public class AiBuildCommand {
                 break;
             }
         }
+        // Equipment effect fields ride after the request: "<request>||hit:<text>||idle:<text>".
+        String fxHit = "";
+        String fxIdle = "";
+        int idle = prompt.indexOf("||idle:");
+        if (idle >= 0) {
+            fxIdle = prompt.substring(idle + 7).trim();
+            prompt = prompt.substring(0, idle).trim();
+        }
+        int hit = prompt.indexOf("||hit:");
+        if (hit >= 0) {
+            fxHit = prompt.substring(hit + 6).trim();
+            prompt = prompt.substring(0, hit).trim();
+        }
+        final String finalHit = fxHit;
+        final String finalIdle = fxIdle;
         final String finalPrompt = prompt;
         final String finalMode = mode;
         final boolean web = useWebSearch;
@@ -58,7 +73,7 @@ public class AiBuildCommand {
             () -> Text.literal("AI " + finalMode + " request" + (web ? " (web search)" : "") + ": " + finalPrompt),
             false
         );
-        AiController.requestBuild(source.getPlayer(), finalPrompt, web, finalMode);
+        AiController.requestBuild(source.getPlayer(), finalPrompt, web, finalMode, finalHit, finalIdle);
         return 1;
     }
 }

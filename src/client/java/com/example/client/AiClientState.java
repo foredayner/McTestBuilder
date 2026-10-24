@@ -278,7 +278,34 @@ public final class AiClientState {
         }
 
         String flag = mode == 1 ? "--object " : mode == 2 ? "--gear=" + gearKind.id() + " " : "";
-        ClientAiBuildNetworking.sendAiBuildRequest(trimmed, willUseWebSearch(), flag);
+        String effects = "";
+        if (mode == 2) {
+            String hit = clean(fxHit);
+            String idle = clean(fxIdle);
+            effects = (!gearKind.worn() && !hit.isEmpty() ? "||hit:" + hit : "") + (idle.isEmpty() ? "" : "||idle:" + idle);
+        }
+        ClientAiBuildNetworking.sendAiBuildRequest(trimmed.replace("||", "|") + effects, willUseWebSearch(), flag);
+    }
+
+    /** Effect fields of the equipment order (empty = no such effect). */
+    private static String fxHit = "";
+    private static String fxIdle = "";
+
+    public static void setEffects(String hit, String idle) {
+        fxHit = hit == null ? "" : hit;
+        fxIdle = idle == null ? "" : idle;
+    }
+
+    public static String getFxHit() {
+        return fxHit;
+    }
+
+    public static String getFxIdle() {
+        return fxIdle;
+    }
+
+    private static String clean(String text) {
+        return text == null ? "" : text.replace("||", "|").replace("\n", " ").trim();
     }
 
     public static void approve() {

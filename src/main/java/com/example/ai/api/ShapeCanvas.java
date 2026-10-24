@@ -32,7 +32,7 @@ public final class ShapeCanvas {
         double[] bounds();
     }
 
-    private record Painted(String block, Shape shape, double mirrorX, boolean mirrored) {
+    private record Painted(String block, Shape shape, double mirrorX, boolean mirrored, int group) {
         boolean inside(double x, double y, double z) {
             return shape.inside(mirrored ? 2 * mirrorX - x : x, y, z);
         }
@@ -59,12 +59,20 @@ public final class ShapeCanvas {
     }
 
     public void add(String block, Shape shape, Double mirrorX) {
-        shapes.add(new Painted(block, shape, 0, false));
+        add(block, shape, mirrorX, 0, 0);
+    }
+
+    /**
+     * group: animation group of the shape (0 = still); mirrorGroup: the group its mirrored copy
+     * goes into (a mirrored wing flaps on its own pivot).
+     */
+    public void add(String block, Shape shape, Double mirrorX, int group, int mirrorGroup) {
+        shapes.add(new Painted(block, shape, 0, false, group));
         if (mirrorX != null) {
             double[] b = shape.bounds();
             // A shape centred on the mirror line is its own mirror image.
             if (Math.abs((b[0] + b[3]) / 2 - mirrorX) > 1e-6) {
-                shapes.add(new Painted(block, shape, mirrorX, true));
+                shapes.add(new Painted(block, shape, mirrorX, true, mirrorGroup));
             }
         }
     }
@@ -100,12 +108,35 @@ public final class ShapeCanvas {
         return best == null ? paint(RESOLUTIONS[RESOLUTIONS.length - 1]) : best;
     }
 
-    /** Paint every shape into a grid of {@code res} cells per block and cover each block's cells with boxes. */
+    /**
+     * Paint every shape into a grid of {@code res} cells per block and cover each block's cells
+     * with boxes. Each animation group is painted on its own, since its parts move separately.
+     */
     List<BuildPlan.Part> paint(int res) {
+        List<Integer> groups = new ArrayList<>();
+        for (Painted p : shapes) {
+            if (!groups.contains(p.group())) {
+                groups.add(p.group());
+            }
+        }
+        List<BuildPlan.Part> all = new ArrayList<>();
+        for (int group : groups) {
+            for (BuildPlan.Part part : paint(res, group)) {
+                part.group = group;
+                all.add(part);
+            }
+        }
+        return all;
+    }
+
+    private List<BuildPlan.Part> paint(int res, int group) {
         Map<Long, Integer> cells = new HashMap<>();
         List<String> blocks = new ArrayList<>();
         Map<String, Integer> index = new LinkedHashMap<>();
         for (Painted p : shapes) {
+            if (p.group() != group) {
+                continue;
+            }
             int id = index.computeIfAbsent(p.block(), k -> {
                 blocks.add(k);
                 return blocks.size() - 1;

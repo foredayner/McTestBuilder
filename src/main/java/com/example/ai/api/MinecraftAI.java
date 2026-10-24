@@ -45,6 +45,8 @@ public class MinecraftAI {
         recorder = plan;
         canvas = new ShapeCanvas();
         mirrorX = null;
+        group = 0;
+        groupIds = new java.util.LinkedHashMap<>();
     }
 
     /** Ends recording; smooth shapes are turned into parts now (see ShapeCanvas). */
@@ -56,6 +58,137 @@ public class MinecraftAI {
         recorder = null;
         canvas = null;
         mirrorX = null;
+        group = 0;
+    }
+
+    /** Current animation group (0 = none) and the groups by name ("name~m" = its mirrored twin). */
+    private static int group;
+    private static Map<String, Integer> groupIds = new java.util.LinkedHashMap<>();
+
+    private static int groupId(String name) {
+        return groupIds.computeIfAbsent(name, k -> groupIds.size() + 1);
+    }
+
+    /** The group mirrored pieces of the current group go into. */
+    private static int mirrorGroup() {
+        if (group == 0) {
+            return 0;
+        }
+        for (Map.Entry<String, Integer> e : groupIds.entrySet()) {
+            if (e.getValue() == group) {
+                return groupId(e.getKey() + "~m");
+            }
+        }
+        return 0;
+    }
+
+    /** Pieces made until groupEnd() belong to the named group, which animate() can move. */
+    public static void groupStart(String name) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("groupStart needs a name, e.g. ai.groupStart('wing')");
+        }
+        group = groupId(name.trim());
+    }
+
+    public static void groupEnd() {
+        group = 0;
+    }
+
+    private static final java.util.Set<String> ANIMS = java.util.Set.of("spin", "swing", "bob", "pulse");
+
+    /**
+     * Loop a movement of a group: spin (turns per second), swing (back and forth, amount degrees),
+     * bob (up and down, amount blocks), pulse (grow and shrink, amount = fraction). A mirrored
+     * twin of the group moves as its mirror image.
+     */
+    public static void animate(String name, String type, Number px, Number py, Number pz, String axis, Number speed, Number amount) {
+        if (recorder == null) {
+            return;
+        }
+        String t = type == null ? "" : type.trim().toLowerCase(Locale.ROOT);
+        String a = axis == null ? "" : axis.trim().toLowerCase(Locale.ROOT);
+        if (!ANIMS.contains(t)) {
+            throw new IllegalArgumentException("animate type must be one of " + ANIMS + ", got '" + type + "'");
+        }
+        if (!a.equals("x") && !a.equals("y") && !a.equals("z")) {
+            throw new IllegalArgumentException("animate axis must be 'x', 'y' or 'z', got '" + axis + "'");
+        }
+        if (name == null || !groupIds.containsKey(name.trim())) {
+            throw new IllegalArgumentException("animate: no group '" + name + "' (make it with ai.groupStart('" + name + "') first)");
+        }
+        double s = Math.max(0.05, Math.min(4, Math.abs(toDouble(speed))));
+        double amt = toDouble(amount);
+        amt = switch (t) {
+            case "swing" -> Math.max(-90, Math.min(90, amt));
+            case "bob" -> Math.max(-0.4, Math.min(0.4, amt));
+            case "pulse" -> Math.max(-0.4, Math.min(0.4, amt));
+            default -> amt;
+        };
+        String key = name.trim();
+        recorder.anims.add(new BuildPlan.Anim(groupIds.get(key), t, toDouble(px), toDouble(py), toDouble(pz), a, s, amt));
+        Integer twin = groupIds.get(key + "~m");
+        if (twin != null) {
+            // Mirror image: pivot across the mirror line, turning the other way around y and z.
+            double mx = mirrorX == null ? 0 : mirrorX;
+            boolean flip = (t.equals("spin") || t.equals("swing")) && !a.equals("x");
+            recorder.anims.add(new BuildPlan.Anim(twin, t, 2 * mx - toDouble(px), toDouble(py), toDouble(pz), a,
+                s, flip ? -amt : amt));
+            if (flip && t.equals("spin")) {
+                recorder.anims.get(recorder.anims.size() - 1).speed = -s;
+            }
+        }
+    }
+
+    /** Draw a group at full brightness (glowing even in the dark). */
+    public static void glow(String name) {
+        if (recorder == null) {
+            return;
+        }
+        if (name == null || !groupIds.containsKey(name.trim())) {
+            throw new IllegalArgumentException("glow: no group '" + name + "' (make it with ai.groupStart('" + name + "') first)");
+        }
+        recorder.anims.add(new BuildPlan.Anim(groupIds.get(name.trim()), "glow", 0, 0, 0, "y", 1, 0));
+        Integer twin = groupIds.get(name.trim() + "~m");
+        if (twin != null) {
+            recorder.anims.add(new BuildPlan.Anim(twin, "glow", 0, 0, 0, "y", 1, 0));
+        }
+    }
+
+    /** Particles allowed for equipment effects. */
+    public static final java.util.List<String> PARTICLES = java.util.List.of(
+        "flame", "soul_fire_flame", "small_flame", "lava", "snowflake", "electric_spark", "enchant", "end_rod",
+        "glow", "portal", "witch", "dragon_breath", "smoke", "large_smoke", "cloud", "heart", "crit",
+        "enchanted_hit", "cherry_leaves", "totem_of_undying", "sculk_soul", "dust");
+
+    private static BuildPlan.Fx fx(String particle, String color, Number count) {
+        String p = particle == null ? "" : particle.trim().toLowerCase(Locale.ROOT).replace("minecraft:", "");
+        if (!PARTICLES.contains(p)) {
+            throw new IllegalArgumentException("unknown particle '" + particle + "'; use one of " + PARTICLES);
+        }
+        int rgb = 0xFFFFFF;
+        if (color != null && !color.isBlank()) {
+            try {
+                rgb = Integer.parseInt(color.trim().replace("#", ""), 16) & 0xFFFFFF;
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("colour must look like '#ff6600', got '" + color + "'");
+            }
+        }
+        int n = Math.max(1, Math.min(12, toInt(count)));
+        return new BuildPlan.Fx(p, rgb, n);
+    }
+
+    /** Particles where a hit lands (weapons). */
+    public static void hitEffect(String particle, String color, Number count) {
+        if (recorder != null) {
+            recorder.hit = fx(particle, color, count);
+        }
+    }
+
+    /** Particles around the item while it is held or worn. */
+    public static void idleEffect(String particle, String color, Number count) {
+        if (recorder != null) {
+            recorder.idle = fx(particle, color, count);
+        }
     }
 
     private static ShapeCanvas canvas;
@@ -474,10 +607,13 @@ public class MinecraftAI {
         double cx = toDouble(x) + w / 2;
         BuildPlan.Part part = new BuildPlan.Part(block, cx, toDouble(y) + h / 2, toDouble(z) + l / 2, w, h, l,
             toDouble(yaw), toDouble(pitch), toDouble(roll));
+        part.group = group;
         recorder.parts.add(part);
         if (mirrorX != null && Math.abs(cx - mirrorX) > 1e-6) {
-            recorder.parts.add(new BuildPlan.Part(mirrorBlockState(block), 2 * mirrorX - cx, part.y, part.z, w, h, l,
-                -part.yaw, part.pitch, -part.roll));
+            BuildPlan.Part twin = new BuildPlan.Part(mirrorBlockState(block), 2 * mirrorX - cx, part.y, part.z, w, h, l,
+                -part.yaw, part.pitch, -part.roll);
+            twin.group = group == 0 ? 0 : mirrorGroup();
+            recorder.parts.add(twin);
         }
     }
 
@@ -501,7 +637,7 @@ public class MinecraftAI {
         if (recorder == null || canvas == null || blockName == null || ForbiddenBlockRegistry.isForbidden(blockName)) {
             return;
         }
-        canvas.add(normalizeBlockId(blockName), shape, mirrorX);
+        canvas.add(normalizeBlockId(blockName), shape, mirrorX, group, mirrorX != null && group != 0 ? mirrorGroup() : 0);
     }
 
     /** Upright cylinder: centre (cx, cz), bottom at y. */

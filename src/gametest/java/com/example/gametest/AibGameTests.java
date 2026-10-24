@@ -219,6 +219,37 @@ public class AibGameTests implements FabricGameTest {
         check(helmStack.get(net.minecraft.component.DataComponentTypes.ATTRIBUTE_MODIFIERS) != null
             && !helmStack.get(net.minecraft.component.DataComponentTypes.ATTRIBUTE_MODIFIERS).modifiers().isEmpty(), "it gives armour");
 
+        // Effects and movement: recorded, carried by the item, and dropped when the order did not ask.
+        BuildPlan fx = Demo.plan(world, origin, player, """
+            ai.addCapsule('oak_planks', 0, -0.1, 0, 0, 1.4, 0, 0.04)
+            ai.mirrorOn()
+            ai.groupStart('gem')
+            ai.addSphere('amethyst_block', 0.12, 1.45, 0, 0.06)
+            ai.groupEnd()
+            ai.mirrorOff()
+            ai.animate('gem', 'spin', 0.12, 1.45, 0, 'y', 0.5, 0)
+            ai.glow('gem')
+            ai.hitEffect('flame', '#ff6600', 6)
+            ai.idleEffect('dust', '#33ccff', 2)
+            """);
+        check(fx.parts.stream().anyMatch(q -> q.group > 0), "group parts are marked");
+        check(fx.anims.size() == 4, "spin + glow for the gem and its mirrored twin, got " + fx.anims.size());
+        check(fx.hit != null && "flame".equals(fx.hit.particle) && fx.idle != null && fx.idle.color == 0x33ccff, "effects recorded");
+        BuildRecord fxRecord = BuildRecord.create("staff", "TEST", "script", fx);
+        fxRecord.kind = "gear";
+        fxRecord.gear = "staff";
+        net.minecraft.item.ItemStack fxStack = com.example.ai.build.GearItems.stackFor(fxRecord);
+        check(com.example.ai.build.GearEffects.read(fxStack, com.example.ai.build.GearEffects.HIT) != null, "hit effect on the item");
+        check(com.example.ai.build.GearItems.modelOf(fxStack).anims.size() == 4, "movements ride in the model");
+        com.example.ai.AiController.applyEffectRequest(fx, com.example.content.GearKind.STAFF, "", "");
+        check(fx.hit == null && fx.idle == null && fx.anims.isEmpty(), "empty effect fields = no effects at all");
+        try {
+            Demo.plan(world, origin, player, "ai.addSphere('stone', 0, 0.5, 0, 0.2)\nai.hitEffect('nuke', '#ffffff', 3)");
+            throw new GameTestException("an unknown particle should be refused");
+        } catch (IllegalStateException expected) {
+            check(expected.getMessage().contains("unknown particle"), expected.getMessage());
+        }
+
         // Too long for the hand: refused with a reason the AI can fix.
         BuildPlan pole = Demo.plan(world, origin, player, "ai.addCapsule('oak_planks', 0, 0, 0, 0, 4, 0, 0.05)");
         check(com.example.ai.AiController.gearProblem(pole) != null, "a 4-block pole is too long");

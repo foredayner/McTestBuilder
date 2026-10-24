@@ -116,6 +116,7 @@ public class AiPromptScreen extends Screen {
         if (this.promptField != null) {
             this.draftPrompt = this.promptField.getText();
         }
+        saveEffects();
         this.clearChildren();
         this.init();
     }
@@ -173,7 +174,30 @@ public class AiPromptScreen extends Screen {
     // ---------------------------------------------------------------- AI 공방
 
     private int chatTop() { return top() + 22; }
-    private int chatBottom() { return AiClientState.isWebSearchAvailable() ? bottom() - 48 : bottom() - 26; }
+    private int chatBottom() {
+        return AiClientState.isWebSearchAvailable() || AiClientState.isGearMode() ? bottom() - 48 : bottom() - 26;
+    }
+
+    /** Equipment order: effect fields (empty = no such effect). */
+    private TextFieldWidget hitField;
+    private TextFieldWidget idleField;
+
+    private void saveEffects() {
+        if (this.idleField != null) {
+            AiClientState.setEffects(this.hitField == null ? "" : this.hitField.getText(), this.idleField.getText());
+        }
+    }
+
+    private TextFieldWidget effectField(int x, int y, int width, String placeholder, String text) {
+        TextFieldWidget field = new TextFieldWidget(this.textRenderer, x + 5, y + 5, width - 10, 12, Text.literal(""));
+        field.setDrawsBackground(false);
+        field.setEditableColor(PAPER);
+        field.setMaxLength(45);
+        field.setPlaceholder(Text.literal(placeholder));
+        field.setText(text);
+        this.addSelectableChild(field);
+        return field;
+    }
 
     private void buildCreate() {
         boolean object = AiClientState.isObjectMode();
@@ -187,6 +211,21 @@ public class AiPromptScreen extends Screen {
         }
 
         int y = bottom() - 42;
+        this.hitField = null;
+        this.idleField = null;
+        if (gear) {
+            // Effect fields: left empty, the equipment has no such effect.
+            int end = AiClientState.isWebSearchAvailable() ? right() - 80 : right();
+            int span = end - left();
+            if (AiClientState.getGearKind().worn()) {
+                this.idleField = effectField(left(), y, span, "착용 시 이펙트·애니메이션 (비우면 없음)", AiClientState.getFxIdle());
+            } else {
+                int half = (span - 4) / 2;
+                this.hitField = effectField(left(), y, half, "공격 시 이펙트 (비우면 없음)", AiClientState.getFxHit());
+                this.idleField = effectField(left() + half + 4, y, span - half - 4, "대기 시 이펙트·애니메이션 (비우면 없음)",
+                    AiClientState.getFxIdle());
+            }
+        }
         if (AiClientState.isWebSearchAvailable()) {
             button(AiClientState.willUseWebSearch() ? "웹 검색: 켬" : "웹 검색: 끔", right() - 76, y, 76, b -> {
                 AiClientState.toggleSessionWebSearch();
@@ -198,7 +237,8 @@ public class AiPromptScreen extends Screen {
         this.promptField = new TextFieldWidget(this.textRenderer, left() + 5, fy + 6, right() - left() - 78, 12, Text.literal(""));
         this.promptField.setDrawsBackground(false);
         this.promptField.setEditableColor(PAPER);
-        this.promptField.setMaxLength(220); // the chat command that carries it is limited to 256 characters
+        // The chat command that carries the order is limited to 256 characters.
+        this.promptField.setMaxLength(gear ? 150 : 220);
         this.promptField.setPlaceholder(Text.literal(gear ? "어떤 " + AiClientState.getGearKind().korean + "인지 적어 주세요…"
             : object ? "만들 소품을 적어 주세요…" : "지을 건물을 적어 주세요…"));
         this.promptField.setText(this.draftPrompt);
@@ -224,6 +264,17 @@ public class AiPromptScreen extends Screen {
         }
         String what = AiClientState.isGearMode() ? AiClientState.getGearKind().korean
             : AiClientState.isObjectMode() ? "소품" : "건물";
+        if (AiClientState.isGearMode()) {
+            saveEffects();
+            String hit = AiClientState.getGearKind().worn() ? "" : AiClientState.getFxHit().trim();
+            String idle = AiClientState.getFxIdle().trim();
+            if (!hit.isEmpty()) {
+                AiClientState.addLog("[Request] 공격 시: " + hit);
+            }
+            if (!idle.isEmpty()) {
+                AiClientState.addLog("[Request] " + (AiClientState.getGearKind().worn() ? "착용 시: " : "대기 시: ") + idle);
+            }
+        }
         AiClientState.addLog("[Waiting...] " + what + " 설계 중입니다. 잠시 기다려 주세요.");
         AiClientState.sendPromptText(prompt);
         this.promptField.setText("");
@@ -240,6 +291,11 @@ public class AiPromptScreen extends Screen {
         int l = left(), r = right(), t = chatTop(), b = chatBottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);
         well(ctx, l, bottom() - 20, r - 68, bottom() - 2, this.promptField != null && this.promptField.isFocused());
+        for (TextFieldWidget f : new TextFieldWidget[] { this.hitField, this.idleField }) {
+            if (f != null && page == Page.CREATE) {
+                well(ctx, f.getX() - 5, f.getY() - 5, f.getX() + f.getWidth() + 5, f.getY() + 17, f.isFocused());
+            }
+        }
 
         List<AiClientState.Entry> entries = new ArrayList<>(AiClientState.getEntries());
         if (entries.isEmpty()) {
@@ -718,6 +774,11 @@ public class AiPromptScreen extends Screen {
         super.render(ctx, mouseX, mouseY, delta);
         for (IconAt icon : this.icons) {
             ctx.drawItem(icon.stack(), icon.x(), icon.y());
+        }
+        for (TextFieldWidget f : new TextFieldWidget[] { this.hitField, this.idleField }) {
+            if (f != null && page == Page.CREATE) {
+                f.render(ctx, mouseX, mouseY, delta);
+            }
         }
         if (this.promptField != null) {
             this.promptField.render(ctx, mouseX, mouseY, delta);

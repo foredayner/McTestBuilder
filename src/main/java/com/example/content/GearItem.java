@@ -36,7 +36,14 @@ public class GearItem extends Item {
 
     @Override
     public boolean postHit(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+        com.example.ai.build.GearEffects.onHit(stack, target, attacker);
         return kind.base.postHit(stack, target, attacker);
+    }
+
+    @Override
+    public void inventoryTick(ItemStack stack, World world, net.minecraft.entity.Entity entity, int slot, boolean selected) {
+        super.inventoryTick(stack, world, entity, slot, selected);
+        com.example.ai.build.GearEffects.onTick(stack, entity, selected, kind);
     }
 
     @Override
