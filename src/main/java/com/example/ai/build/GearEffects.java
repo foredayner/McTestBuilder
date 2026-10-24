@@ -97,19 +97,30 @@ public final class GearEffects {
         if (!(target.getWorld() instanceof ServerWorld world)) {
             return;
         }
-        BuildPlan.Fx fx = read(stack, HIT);
-        ParticleEffect effect = fx == null ? null : particle(fx);
-        if (effect == null) {
-            return;
-        }
-        if (!"burst".equals(fx.pattern)) {
-            HitEffects.start(world, attacker, target, fx, effect);
-            SoundEvent sound = hitSound(fx.particle);
-            if (sound != null) {
-                world.playSound(null, target.getBlockPos(), sound, SoundCategory.PLAYERS, 0.5F, 1.0F);
+        boolean busy = HitEffects.busy(attacker);
+        for (String key : new String[] { HIT, HIT + 2, HIT + 3 }) {
+            BuildPlan.Fx fx = read(stack, key);
+            ParticleEffect effect = fx == null ? null : particle(fx);
+            if (effect == null) {
+                continue;
             }
-            return;
+            if (!"burst".equals(fx.pattern)) {
+                // Shaped effects: one set per attacker at a time (fast hits only get the plain burst).
+                if (!busy) {
+                    HitEffects.start(world, attacker, target, fx, effect, true);
+                    SoundEvent sound = hitSound(fx.particle);
+                    if (sound != null) {
+                        world.playSound(null, target.getBlockPos(), sound, SoundCategory.PLAYERS, 0.5F, 1.0F);
+                    }
+                    continue;
+                }
+                fx = new BuildPlan.Fx(fx.particle, fx.color, fx.count);
+            }
+            burst(world, target, fx, effect);
         }
+    }
+
+    private static void burst(ServerWorld world, LivingEntity target, BuildPlan.Fx fx, ParticleEffect effect) {
         Vec3d at = target.getPos().add(0, target.getHeight() * 0.6, 0);
         world.spawnParticles(effect, at.x, at.y, at.z, fx.count * 3, target.getWidth() * 0.4, target.getHeight() * 0.3,
             target.getWidth() * 0.4, 0.08);

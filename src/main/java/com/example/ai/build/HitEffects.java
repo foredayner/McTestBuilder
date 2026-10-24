@@ -81,9 +81,24 @@ public final class HitEffects {
         }
     }
 
+    /** True while this attacker's last shaped effect is still playing. */
+    public static boolean busy(LivingEntity attacker) {
+        for (Effect e : ACTIVE) {
+            if (e.attacker.equals(attacker.getUuid()) && e.age < e.duration) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean start(ServerWorld world, LivingEntity attacker, LivingEntity target, BuildPlan.Fx fx, ParticleEffect particle) {
-        Effect running = BY_ATTACKER.get(attacker.getUuid());
-        if (running != null && running.age < running.duration) {
+        return start(world, attacker, target, fx, particle, false);
+    }
+
+    /** together: part of a set started by the same hit (does not wait for the attacker's last effect). */
+    public static boolean start(ServerWorld world, LivingEntity attacker, LivingEntity target, BuildPlan.Fx fx, ParticleEffect particle,
+                                boolean together) {
+        if (!together && busy(attacker)) {
             return false;
         }
         if (ACTIVE.size() >= MAX_ACTIVE) {
@@ -200,7 +215,7 @@ public final class HitEffects {
                     ring(e, c, size * 0.62, turn);
                     star(e, c, size * 0.62, turn);
                 }
-                if (e.age % 4 == 0) {
+                if (e.age % 3 == 0) {
                     turnCircle(e);
                 }
             }
@@ -258,7 +273,7 @@ public final class HitEffects {
             for (int i = 0; i < RING_PIECES + 5; i++) {
                 String snbt = String.format(Locale.ROOT,
                     "{block_state:{Name:\"%s\"},brightness:{sky:15,block:15},transformation:%s,Tags:[\"%s\"]}",
-                    block, transform(e, i, 0, 0.01f), TAG);
+                    block, transform(e, i, 0, 0.5f), TAG);
                 var piece = new net.minecraft.entity.decoration.DisplayEntity.BlockDisplayEntity(
                     net.minecraft.entity.EntityType.BLOCK_DISPLAY, e.world);
                 piece.readNbt(net.minecraft.nbt.StringNbtReader.parse(snbt));
@@ -277,13 +292,13 @@ public final class HitEffects {
     private static void turnCircle(Effect e) {
         double t = e.age / (double) e.duration;
         // Grow in quickly, turn, shrink away at the end.
-        float grow = (float) Math.min(1, Math.min(t * 5, (1 - t) * 4));
+        float grow = (float) Math.min(1, Math.min(0.5 + t * 8, (1 - t) * 4));
         for (int i = 0; i < e.pieces.size(); i++) {
             Entity piece = e.world.getEntity(e.pieces.get(i));
             if (piece == null) {
                 continue;
             }
-            String snbt = "{start_interpolation:0,interpolation_duration:4,transformation:"
+            String snbt = "{start_interpolation:0,interpolation_duration:3,transformation:"
                 + transform(e, i, e.age * 0.05 + 0.2, Math.max(0.01f, grow)) + "}";
             try {
                 // Same as /data merge entity: write, merge, read back (keeps position and tags).

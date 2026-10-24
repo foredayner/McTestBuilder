@@ -551,6 +551,7 @@ public class AiController {
     public static void applyEffectRequest(BuildPlan plan, GearKind kind, String fxHit, String fxIdle) {
         if (fxHit == null || fxHit.isBlank() || kind.worn()) {
             plan.hit = null;
+            plan.moreHits.clear();
         }
         if (fxIdle == null || fxIdle.isBlank()) {
             plan.idle = null;
@@ -567,6 +568,7 @@ public class AiController {
                 the swing: breath of fire, frost, spores), 'slash' (crescent arc of the swing), 'spiral' (winding up around
                 the target), 'pillar' (column rising from the target), 'magic_circle' (glowing circle with a star on the
                 ground, turning, coloured by '#rrggbb'), 'lightning' (bolt striking the target)
+                Call hitEffect up to 3 times to combine effects (e.g. lightning + shockwave); they play together.
               ai.idleEffect(particle, '#rrggbb', count)     // steady puffs while held or worn (count 1-6 looks best)
                 particle: flame, soul_fire_flame, small_flame, lava, snowflake, electric_spark, enchant, end_rod, glow,
                 portal, witch, dragon_breath, smoke, large_smoke, cloud, heart, crit, enchanted_hit, cherry_leaves,

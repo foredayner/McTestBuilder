@@ -198,7 +198,12 @@ public class MinecraftAI {
         BuildPlan.Fx fx = fx(particle, color, count);
         fx.pattern = p;
         fx.size = Math.max(0.5, Math.min(4, Math.abs(toDouble(size))));
-        recorder.hit = fx;
+        // Up to three hit effects play together (e.g. a lightning bolt and a shockwave).
+        if (recorder.hit == null) {
+            recorder.hit = fx;
+        } else if (recorder.moreHits.size() < 2) {
+            recorder.moreHits.add(fx);
+        }
     }
 
     /** Particles around the item while it is held or worn. */

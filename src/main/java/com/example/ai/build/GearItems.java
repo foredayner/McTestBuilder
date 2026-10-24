@@ -52,6 +52,11 @@ public final class GearItems {
             nbt.putByteArray(MODEL, model);
         }
         GearEffects.write(nbt, GearEffects.HIT, record.plan.hit);
+        if (record.plan.moreHits != null) {
+            for (int i = 0; i < Math.min(2, record.plan.moreHits.size()); i++) {
+                GearEffects.write(nbt, GearEffects.HIT + (i + 2), record.plan.moreHits.get(i));
+            }
+        }
         GearEffects.write(nbt, GearEffects.IDLE, record.plan.idle);
         stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbt));
         stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(RebuildService.title(record))

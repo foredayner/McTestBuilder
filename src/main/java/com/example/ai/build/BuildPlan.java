@@ -144,6 +144,8 @@ public final class BuildPlan {
     public List<Anim> anims = new ArrayList<>();
     /** Equipment: particles on hit / while held or worn (null = none). */
     public Fx hit;
+    /** More hit effects played together with {@code hit} (e.g. lightning + shockwave), at most 2. */
+    public List<Fx> moreHits = new ArrayList<>();
     public Fx idle;
 
     public boolean isEmpty() {
