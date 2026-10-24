@@ -195,6 +195,10 @@ public class AibModelBench implements FabricClientGameTest {
                 AiController.evaluate(server.getPlayerManager().getPlayerList().get(0), code));
             String gearProblem = eval.ok() && c.gear()
                 ? AiController.gearProblem(eval.plan(), com.example.content.GearKind.of(c.mode().substring(5))) : null;
+            if (gearProblem == null && eval.ok() && c.gear()) {
+                gearProblem = AiController.effectProblem(eval.plan(), com.example.content.GearKind.of(c.mode().substring(5)),
+                    c.hit(), c.idle());
+            }
             if (eval.ok() && gearProblem == null) {
                 r.success = true;
                 r.summary = eval.plan().summary();

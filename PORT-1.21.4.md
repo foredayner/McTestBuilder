@@ -59,7 +59,10 @@ server and the client of the player who builds. That player needs operator level
     movements of part groups (spin, swing, bob, pulse) plus glow, drawn by the client from game time.
     Hit effects can be shaped and combined (up to three): burst, shockwave, cone, slash, spiral, pillar,
     lightning, and a magic circle drawn with particles plus glowing display pieces that open, turn and vanish.
-    One shaped set per attacker plays at a time; faster hits get a plain burst.
+    One shaped set per attacker plays at a time; faster hits get a plain burst. Also 'expand' (sphere growing
+    out) and 'converge' (sphere shrinking in). Effects make no sounds. An aura (ai.aura) draws a see-through,
+    breathing shell of light around every piece while held or worn. If an effect field is filled but the
+    script makes nothing for it, the script goes back to the AI.
   - **Claude (Anthropic)** provider: Messages API with the fixed instructions as a cached system prompt,
     optional web search (`web_search` tool, at most 3 searches per build).
   - Objects are **solid**: their parts are merged into a few boxes that follow the shape (an

@@ -180,6 +180,9 @@ public class AiController {
         GearKind gear = gearOf(req.mode());
         if (failure == null && gear != null) {
             failure = gearProblem(plan, gear);
+            if (failure == null) {
+                failure = effectProblem(plan, gear, req.fxHit(), req.fxIdle());
+            }
             if (failure != null) {
                 AiNetworking.sendLog(player, "[Review] " + failure);
             }
@@ -558,6 +561,23 @@ public class AiController {
             plan.anims.clear();
             plan.aura = null;
         }
+    }
+
+    /**
+     * The order asked for an effect but the script made none for it: send it back. (The other
+     * way round, effects that were not asked for, is handled by removing them.)
+     */
+    public static String effectProblem(BuildPlan plan, GearKind kind, String fxHit, String fxIdle) {
+        List<String> problems = new java.util.ArrayList<>();
+        if (!kind.worn() && fxHit != null && !fxHit.isBlank() && plan.hit == null) {
+            problems.add("the order asks for an effect on hit (\"" + fxHit.trim() + "\") but the script makes none: "
+                + "call ai.hitEffect(...) with a fitting particle and pattern.");
+        }
+        if (fxIdle != null && !fxIdle.isBlank() && plan.idle == null && plan.anims.isEmpty() && plan.aura == null) {
+            problems.add("the order asks for an effect while " + (kind.worn() ? "worn" : "held") + " (\"" + fxIdle.trim()
+                + "\") but the script makes none: use ai.idleEffect, ai.groupStart/animate, ai.glow and/or ai.aura.");
+        }
+        return problems.isEmpty() ? null : PLAN_PROBLEMS + "\n- " + String.join("\n- ", problems);
     }
 
     /** API and rules for effects, added to the equipment prompts. */
