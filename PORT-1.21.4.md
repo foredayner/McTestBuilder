@@ -46,6 +46,11 @@ server and the client of the player who builds. That player needs operator level
     (dry-run by the game tests). Objects are designed in a fixed frame (front toward -Z) and turned on
     placement.
   - Buildings: the prompt asks for real-world scale (rooms 5×5+, 3-4 blocks of headroom, houses 11×11+).
+  - **Equipment** (AI 공방 mode 장비): pick a kind (검, 도끼, 곡괭이, 삽, 괭이, 창, 망치, 지팡이), describe it,
+    and the AI models it with the same shapes (grip at the origin, pointing up, at most 2.6 long). 손에 받기
+    gives an item with iron stats of that kind (damage, mining, durability, enchanting via item tags, axe
+    stripping / shovel paths / hoe tilling) that is drawn as the 3D model in the hand and in slots; the stack
+    carries the model, so it works anywhere. 보관함 has 건축 / 소품 / 장비 tabs.
   - **Claude (Anthropic)** provider: Messages API with the fixed instructions as a cached system prompt,
     optional web search (`web_search` tool, at most 3 searches per build).
   - Objects are **solid**: their parts are merged into a few boxes that follow the shape (an
