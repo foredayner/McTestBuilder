@@ -134,6 +134,21 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.setScreen(() -> null);
             context.waitTicks(5);
             context.takeScreenshot("19_sword_in_hand");
+            // Reference: a vanilla iron sword in the same hand, same view.
+            game.getServer().runOnServer(server -> server.getPlayerManager().getPlayerList().get(0)
+                .setStackInHand(net.minecraft.util.Hand.MAIN_HAND, new net.minecraft.item.ItemStack(net.minecraft.item.Items.IRON_SWORD)));
+            context.waitTicks(5);
+            context.takeScreenshot("19b_vanilla_sword_in_hand");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
+            context.waitTicks(5);
+            context.takeScreenshot("19c_vanilla_sword_third_person");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND,
+                    com.example.ai.build.GearItems.stackFor(BuildRecord.fromJson(gear.get(0))));
+            });
+            context.waitTicks(5);
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
             context.waitTicks(5);
             context.takeScreenshot("20_sword_third_person");
