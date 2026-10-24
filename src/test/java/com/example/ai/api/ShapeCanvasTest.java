@@ -37,6 +37,29 @@ class ShapeCanvasTest {
     }
 
     @Test
+    void equipmentUsesTheFinerGrid() {
+        BuildPlan plan = new BuildPlan();
+        MinecraftAI.startRecording(plan, true);
+        try {
+            MinecraftAI.addSphere("white_concrete", 0, 0.4, 0, 0.07);
+            MinecraftAI.oversize();
+        } finally {
+            MinecraftAI.stopRecording();
+        }
+        assertTrue(plan.oversize);
+        assertTrue(plan.parts.stream().anyMatch(p -> Math.abs(p.sx * 16 - Math.round(p.sx * 16)) > 1e-6), "1/32 sizes");
+        for (BuildPlan.Part p : plan.parts) {
+            assertEquals(0, (p.sx * 32) % 1, 1e-6);
+        }
+        // Objects stay on the 1/16 grid.
+        BuildPlan object = record(() -> MinecraftAI.addSphere("white_concrete", 0, 0.4, 0, 0.07));
+        assertFalse(object.oversize);
+        for (BuildPlan.Part p : object.parts) {
+            assertEquals(0, (p.sx * 16) % 1, 1e-6);
+        }
+    }
+
+    @Test
     void sphereIsSmoothAndFitsTheBudget() {
         BuildPlan plan = record(() -> MinecraftAI.addSphere("red_concrete", 0, 0.5, 2, 0.5));
         assertFalse(plan.parts.isEmpty());

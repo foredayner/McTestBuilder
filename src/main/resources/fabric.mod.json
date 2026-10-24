@@ -8,6 +8,12 @@
   "icon": "assets/minecraft-ai-build-assistant/icon.png",
   "environment": "*",
   "accessWidener": "aib.accesswidener",
+  "mixins": [
+    {
+      "config": "aib.client.mixins.json",
+      "environment": "client"
+    }
+  ],
   "entrypoints": {
     "main": [
       "com.example.AiBuildAssistantMod"

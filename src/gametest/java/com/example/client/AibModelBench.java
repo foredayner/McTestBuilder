@@ -193,7 +193,7 @@ public class AibModelBench implements FabricClientGameTest {
             }
             save(model, c.id() + "_try" + attempt + ".groovy", code);
             AiController.Evaluation eval = game.getServer().computeOnServer(server ->
-                AiController.evaluate(server.getPlayerManager().getPlayerList().get(0), code));
+                AiController.evaluate(server.getPlayerManager().getPlayerList().get(0), code, c.gear()));
             String gearProblem = eval.ok() && c.gear()
                 ? AiController.gearProblem(eval.plan(), com.example.content.GearKind.of(c.mode().substring(5))) : null;
             if (gearProblem == null && eval.ok() && c.gear()) {

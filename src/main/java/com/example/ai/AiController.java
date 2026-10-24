@@ -173,11 +173,11 @@ public class AiController {
      */
     private static void planAndApprove(ServerPlayerEntity player, BuildRequest req, String aiCode, int attempt) {
         BlockPos origin = player.getBlockPos();
-        Evaluation eval = evaluate(player, aiCode);
+        GearKind gear = gearOf(req.mode());
+        Evaluation eval = evaluate(player, aiCode, gear != null);
         BuildPlan plan = eval.plan();
         ScriptExecutor.ExecutionResult result = eval.result();
         String failure = eval.failure();
-        GearKind gear = gearOf(req.mode());
         if (failure == null && gear != null) {
             failure = gearProblem(plan, gear);
             if (failure == null) {
@@ -242,6 +242,11 @@ public class AiController {
      * place. Nothing touches the world. Used by the game and by the model benchmark.
      */
     public static Evaluation evaluate(ServerPlayerEntity player, String aiCode) {
+        return evaluate(player, aiCode, false);
+    }
+
+    /** gear: equipment, drawn on a finer grid. */
+    public static Evaluation evaluate(ServerPlayerEntity player, String aiCode, boolean gear) {
         MinecraftAI.init(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player.getPitch(), player);
         BuildPlan plan = new BuildPlan();
         plan.facing = BuildPlan.normalizeFacing(MinecraftAI.getFacing());
@@ -252,7 +257,7 @@ public class AiController {
         if (!review.isEmpty()) {
             failure = "Code review found problems:\n- " + String.join("\n- ", review);
         } else {
-            MinecraftAI.startRecording(plan);
+            MinecraftAI.startRecording(plan, gear);
             try {
                 result = ScriptExecutor.executeScript(aiCode);
             } finally {
@@ -397,11 +402,38 @@ public class AiController {
         return gearProblem(plan, GearKind.SWORD);
     }
 
+    /** Largest size (blocks) of equipment the order asked to be big (ai.oversize()). */
+    public static final double OVERSIZE_MAX = 5.0;
+
     /**
      * Hand-held equipment must fit in the hand (about the size of vanilla tools, at most 2.6
-     * long); worn equipment must stay close to the head or torso it is worn on.
+     * long); worn equipment must stay close to the head or torso it is worn on. Equipment the
+     * order asked to be big (ai.oversize()) may be up to {@link #OVERSIZE_MAX} blocks.
      */
     public static String gearProblem(BuildPlan plan, GearKind kind) {
+        if (plan.oversize && plan.ops.isEmpty() && plan.isObject()) {
+            double[] b = plan.partBounds();
+            List<String> problems = new java.util.ArrayList<>();
+            String[] axis = { "x", "y", "z" };
+            for (int i = 0; i < 3; i++) {
+                if (b[i + 3] - b[i] > OVERSIZE_MAX + 0.1) {
+                    problems.add(String.format(java.util.Locale.ROOT, "it is %.2f blocks along %s; even a big item is at most %.1f.",
+                        b[i + 3] - b[i], axis[i], OVERSIZE_MAX));
+                }
+            }
+            double reach = 0;
+            for (int i = 0; i < 6; i++) {
+                reach = Math.max(reach, Math.abs(b[i]));
+            }
+            if (reach > OVERSIZE_MAX + 1.1) {
+                problems.add(String.format(java.util.Locale.ROOT, "it reaches %.2f blocks from (0, 0, 0); keep it within %.1f.",
+                    reach, OVERSIZE_MAX + 1));
+            }
+            if (!kind.worn() && (b[1] > 0.05 || b[0] > 0.05 || b[3] < -0.05)) {
+                problems.add("the hand holds it at (0, 0, 0): the handle must pass through that point.");
+            }
+            return problems.isEmpty() ? null : PLAN_PROBLEMS + "\n- " + String.join("\n- ", problems);
+        }
         if (kind.worn() && plan.ops.isEmpty() && plan.isObject()) {
             double[] b = plan.partBounds();
             boolean head = kind.slot == net.minecraft.entity.EquipmentSlot.HEAD;
@@ -414,7 +446,8 @@ public class AiController {
                 // A little slack: smooth shapes may grow by part of a grid pixel.
                 if (b[i] < lim[i] - 0.08 || b[i + 3] > lim[i + 3] + 0.08) {
                     problems.add(String.format(java.util.Locale.ROOT, "it reaches %s = %.2f..%.2f; keep it within %.2f..%.2f "
-                        + "(it must stay on the %s).", axis[i], b[i], b[i + 3], lim[i], lim[i + 3], head ? "head" : "torso"));
+                        + "(it must stay on the %s; only if the request asks for it to be big, call ai.oversize()).",
+                        axis[i], b[i], b[i + 3], lim[i], lim[i + 3], head ? "head" : "torso"));
                 }
             }
             return problems.isEmpty() ? null : PLAN_PROBLEMS + "\n- " + String.join("\n- ", problems);
@@ -425,7 +458,8 @@ public class AiController {
         double[] b = plan.partBounds();
         List<String> problems = new java.util.ArrayList<>();
         if (b[4] - b[1] > 2.6) {
-            problems.add(String.format(java.util.Locale.ROOT, "it is %.2f blocks long; keep it at most 2.6.", b[4] - b[1]));
+            problems.add(String.format(java.util.Locale.ROOT, "it is %.2f blocks long; keep it at most 2.6 "
+                + "(only if the request asks for it to be big, call ai.oversize()).", b[4] - b[1]));
         }
         if (b[3] - b[0] > 1.3 || b[5] - b[2] > 1.3) {
             problems.add(String.format(java.util.Locale.ROOT, "it is %.2f wide (X) and %.2f deep (Z); keep both at most 1.3.",
@@ -438,72 +472,102 @@ public class AiController {
     }
 
     public static final String EXAMPLE_SWORD = """
-        // longsword, about 1.45 long; the hand holds it at (0, 0, 0), blade up (+Y), flat side facing -Z
+        // plain steel sword, about 1.45 long; the hand holds it at (0, 0, 0), blade up (+Y), flat side facing -Z
         ai.addCapsule('dark_oak_planks', 0, -0.12, 0, 0, 0.22, 0, 0.045)            // grip
         ai.addSphere('gold_block', 0, -0.15, 0, 0.06)                               // pommel
         ai.addRoundBox('gold_block', -0.2, 0.22, -0.05, 0.4, 0.07, 0.1, 0.02)      // cross guard
-        ai.addSphere('emerald_block', 0, 0.255, -0.05, 0.035)                       // gem in the guard
         ai.addRoundBox('iron_block', -0.075, 0.29, -0.025, 0.15, 0.95, 0.05, 0.01) // blade
-        ai.addRoundBox('light_gray_concrete', -0.02, 0.32, -0.03, 0.04, 0.85, 0.06, 0)  // fuller (groove)
+        ai.addRoundBox('light_gray_concrete', -0.02, 0.32, -0.03, 0.04, 0.85, 0.06, 0)  // groove down the blade
         ai.addCone('iron_block', 0, 1.24, 0, 0.075, 0.16)                           // tip
         """;
 
     public static final String EXAMPLE_AXE = """
-        // battle axe, about 1.2 long; hand at (0, 0, 0), handle up (+Y), blade out to +X
-        ai.addCapsule('spruce_planks', 0, -0.1, 0, 0, 1.15, 0, 0.04)                // handle
-        ai.addRoundBox('dark_oak_planks', -0.05, 0.05, -0.05, 0.1, 0.2, 0.1, 0.02)  // leather wrap
-        ai.addRoundBox('iron_block', -0.08, 0.85, -0.06, 0.18, 0.24, 0.12, 0.02)   // head socket
-        ai.addEllipsoid('iron_block', 0.26, 0.97, 0, 0.17, 0.2, 0.025)              // blade
-        ai.addEllipsoid('quartz_block', 0.37, 0.97, 0, 0.07, 0.18, 0.027)           // bright cutting edge
-        ai.addCone('iron_block', 0, 1.09, 0, 0.05, 0.12)                            // top spike
+        // red fire axe, about 1.2 long; hand at (0, 0, 0), handle up (+Y), blade out to +X
+        ai.addCapsule('red_concrete', 0, -0.1, 0, 0, 1.15, 0, 0.04)                 // painted handle
+        ai.addRoundBox('black_concrete', -0.05, -0.05, -0.05, 0.1, 0.3, 0.1, 0.03)  // rubber grip
+        ai.addRoundBox('red_concrete', -0.08, 0.88, -0.06, 0.18, 0.2, 0.12, 0.02)   // head socket
+        ai.addEllipsoid('red_concrete', 0.24, 0.98, 0, 0.16, 0.16, 0.03)            // blade
+        ai.addEllipsoid('iron_block', 0.36, 0.98, 0, 0.06, 0.15, 0.032)             // sharpened steel edge
+        ai.addCone('red_concrete', -0.1, 0.98, 0, 0.05, 0.14)                       // back spike (pointing up is fine)
         """;
+
+    /** What every equipment prompt says about style: make what was asked, in its own style. */
+    static final String GEAR_STYLE = """
+            STYLE (this decides the quality):
+            - Make exactly what the request describes, in the style it implies (everyday, realistic, cute, toy, sci-fi,
+              fantasy, a joke...). Do not add armour, gems or fantasy decoration it did not ask for.
+            - Get the subject right first: its recognisable silhouette, proportions and colours. If it names a known
+              thing, reproduce that thing's distinctive features.
+            - Big shapes first, then medium parts, then small details. Details (eyes, mouths, buttons, patterns, emblems,
+              seams) are 3D shapes standing a little out of the surface, big enough to read from a few blocks away.
+            - Pick blocks for colour and texture that match the real material: *_concrete (flat, bright colours),
+              *_terracotta (muted colours, skin, earth), *_wool (cloth, fur, knit), planks and logs (wood), iron_block /
+              light_gray_concrete (metal), gold_block, glass, glowstone / sea_lantern (lights), white and black concrete
+              (eyes). ai.searchBlocks(keyword) finds others.
+            - One darker shade for undersides and creases, one lighter shade for highlights.
+            - Overlap pieces slightly so nothing floats (a floating thing hangs on a thin string or rod).
+            - Keep parts at least 0.03 thick. Prefer a few smooth shapes over many tiny boxes. At most 400 pieces after merging.
+            """;
 
     /** Instructions for equipment (fixed part); the kind and the request come in the user message. */
     static final String GEAR_SYSTEM = """
-            You are an expert designer of fantasy weapons and tools for Minecraft. Write ONLY executable Groovy using the `ai` API.
+            You are an expert 3D modeller of hand-held items for Minecraft. Write ONLY executable Groovy using the `ai` API.
 
-            Model ONE hand-held item (weapon or tool) out of pieces. It is drawn as the item itself, held in the hand,
-            in first and third person. Smooth shapes are drawn on a fine 1/16-block grid.
+            Model ONE hand-held item out of pieces. It is drawn as the item itself, held in the hand, in first and third
+            person. Smooth shapes are drawn on a fine 1/32-block grid (a coarser one if the item is very big or busy).
 
             FRAME:
             - Units are blocks (a vanilla sword is about 1.2 long). +X = right, +Y = up, +Z = away from the viewer.
-            - The hand holds it at (0, 0, 0). The handle passes through that point and the item goes UP (+Y);
-              the end of the handle/pommel may go a little below (to about y = -0.2).
-            - The wide, decorated side faces -Z (the viewer). Keep it thin in Z unless the design needs depth.
-            - Size limits: at most 2.6 long (Y) and 1.3 wide (X and Z). Use the kind's guide below.
+            - The hand holds it at (0, 0, 0). The handle (or the part you hold) passes through that point and the item
+              goes UP (+Y); the end below the hand may go to about y = -0.2.
+            - The front (the side with the most detail) faces -Z, the viewer.
+
+            SIZE:
+            - Normal: like a vanilla tool. At most 2.6 long (Y) and 1.3 wide (X and Z). Use the kind's typical shape.
+            - Only if the request asks for it to be big (big, huge, giant, 거대한, 큰, or a size in blocks): call
+              ai.oversize() first; then it may be up to 5 blocks in each direction.
 
             %s
-            STYLE (this decides the quality):
-            - A clear silhouette that reads at a glance: handle, guard or socket, head or blade, a few accents.
-            - Materials: iron_block / light_gray_concrete / quartz_block (steel and bright edges), gold_block (trim),
-              diamond_block, emerald_block, amethyst_block, redstone_block, lapis_block (gems), oak/spruce/dark_oak_planks
-              and brown or black terracotta (wood and leather), glowstone / sea_lantern / magma_block (glow, fire, magic),
-              obsidian / crying_obsidian / blackstone (dark), packed_ice / blue_ice (ice).
-            - Use one lighter shade for edges and highlights and one darker shade for grooves and wraps.
-            - Overlap pieces slightly so nothing floats. Keep parts at least 0.04 thick.
-            - Prefer a few smooth shapes over many tiny boxes. At most 400 pieces after merging.
-
+            %s
             CODE RULES:
             - Block names are quoted strings: 'iron_block'.
             - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
             - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
 
-            EXAMPLES (style reference; make your own design, do not copy):
+            EXAMPLES (only to show the API and the frame; make what the request asks, do not copy):
             %s
             %s
             """;
 
     public static final String EXAMPLE_HELMET = """
-        // knight helmet; the head is the box x -0.25..0.25, y 0..0.5, z -0.25..0.25, face toward -Z
-        ai.addRoundBox('iron_block', -0.29, 0.0, -0.29, 0.58, 0.58, 0.58, 0.1)          // helm around the head
-        ai.addRoundBox('gray_concrete', -0.3, 0.0, -0.3, 0.6, 0.06, 0.6, 0.02)           // darker lower rim
-        ai.addRoundBox('black_concrete', -0.2, 0.3, -0.32, 0.4, 0.04, 0.05, 0)           // eye slit
-        ai.addRoundBox('gold_block', -0.03, 0.06, -0.32, 0.06, 0.48, 0.05, 0.01)         // nose guard
-        ai.addTube('red_wool', [[0, 0.56, 0.05], [0, 0.78, 0.0], [0, 0.82, 0.25], [0, 0.6, 0.38]], 0.07, 0.03)  // plume
+        // bear mascot head, bigger than the head, face toward -Z; the head is the box x -0.25..0.25, y 0..0.5, z -0.25..0.25
+        ai.addEllipsoid('brown_terracotta', 0, 0.3, 0, 0.4, 0.38, 0.38)             // round head around the wearer's head
+        ai.addCylinder('brown_concrete', 0, -0.1, 0, 0.27, 0.08)                     // darker neck rim
+        ai.addEllipsoid('white_terracotta', 0, 0.2, -0.33, 0.17, 0.12, 0.1)         // muzzle standing out
+        ai.addEllipsoid('black_concrete', 0, 0.26, -0.43, 0.06, 0.04, 0.03)         // nose
+        ai.addCapsule('black_concrete', -0.05, 0.15, -0.42, 0.05, 0.15, -0.42, 0.015)  // mouth line
+        ai.mirrorOn()
+        ai.addSphere('white_concrete', 0.14, 0.4, -0.31, 0.065)                     // eye
+        ai.addSphere('black_concrete', 0.14, 0.4, -0.355, 0.04)                     // pupil
+        ai.addSphere('white_concrete', 0.155, 0.415, -0.39, 0.014)                  // shine
+        ai.addEllipsoid('pink_terracotta', 0.24, 0.24, -0.3, 0.05, 0.03, 0.025)     // cheek
+        ai.addSphere('brown_terracotta', 0.3, 0.62, 0, 0.12)                        // ear
+        ai.addEllipsoid('pink_terracotta', 0.3, 0.62, -0.1, 0.07, 0.07, 0.03)       // inside of the ear
+        ai.mirrorOff()
+        """;
+
+    public static final String EXAMPLE_HAT = """
+        // knitted beanie with a pompom; sits on the top of the head and leaves the face free
+        ai.addEllipsoid('red_wool', 0, 0.5, 0, 0.29, 0.21, 0.29)                    // knitted crown
+        ai.addCylinder('white_wool', 0, 0.38, 0, 0.3, 0.1)                           // folded cuff
+        ai.addSphere('white_wool', 0, 0.75, 0, 0.09)                                 // pompom
+        for (int i = 0; i < 3; i++) {
+            ai.addCylinder('red_terracotta', 0, 0.52 + i * 0.07, 0, 0.27 - i * 0.04, 0.015)  // knit rows (darker)
+        }
         """;
 
     public static final String EXAMPLE_WINGS = """
-        // angel wings; the torso is the box x -0.25..0.25, y -0.75..0, z -0.125..0.125, back toward +Z
+        // white bird wings on a harness; the torso is the box x -0.25..0.25, y -0.75..0, z -0.125..0.125, back toward +Z
         ai.addRoundBox('brown_terracotta', -0.27, -0.45, -0.15, 0.54, 0.06, 0.32, 0.02)  // harness around the chest
         ai.mirrorOn()
         ai.addEllipsoid('white_wool', 0.45, -0.2, 0.22, 0.4, 0.18, 0.05)                 // upper wing
@@ -515,34 +579,39 @@ public class AiController {
 
     /** Instructions for worn equipment (fixed part). */
     static final String WEAR_SYSTEM = """
-            You are an expert designer of fantasy armour and accessories for Minecraft. Write ONLY executable Groovy using the `ai` API.
+            You are an expert 3D modeller of things people wear in Minecraft: hats, masks, costume and mascot heads,
+            helmets, glasses, hair, clothes, armour, backpacks, wings, capes, balloons and anything else asked for.
+            Write ONLY executable Groovy using the `ai` API.
 
-            Model ONE piece of worn equipment out of pieces. It is drawn on the wearer and moves with their head or torso.
-            Smooth shapes are drawn on a fine 1/16-block grid.
+            Model ONE worn item out of pieces. It is drawn on the wearer and moves with their head or torso.
+            Smooth shapes are drawn on a fine 1/32-block grid (a coarser one if the item is very big or busy).
 
             FRAME (units are blocks; +Y = up, -Z = the wearer's front, +X = the right side as seen by someone facing them):
             - HEAD items: the head is the box x -0.25..0.25, y 0..0.5, z -0.25..0.25; (0, 0, 0) is the bottom centre of
-              the head (the neck). The face is on the -Z side. Stay within x and z -0.7..0.7 and y -0.25..1.3.
+              the head (the neck). The face is on the -Z side.
             - CHEST items: the torso is the box x -0.25..0.25, y -0.75..0, z -0.125..0.125; (0, 0, 0) is the top centre of
-              the torso (between the shoulders). The front is -Z, the back is +Z. Stay within x -1.3..1.3, y -1.1..0.7,
-              z -0.5..1.0. The arms hang beside the torso (x beyond +-0.25), so keep armour off them.
-            - Wrap the body part closely (0.02-0.06 outside it); pieces inside it are hidden, which is fine.
+              the torso (between the shoulders). The front is -Z, the back is +Z. The head is above, y 0..0.5.
+              The arms hang beside the torso (x beyond +-0.25), so keep clothes off them.
+            - Pieces inside the body part are hidden, which is fine.
+
+            SIZE (decide from what it is):
+            - Fitted things (helmets, hoods, glasses, clothes, armour) sit 0.02-0.06 outside the body part.
+            - Things that are naturally bigger (mascot or animal heads, big masks, big hair, tall hats, wings) may be
+              bigger: a mask or costume head can be about 1.5 times the head, with its face features standing out.
+            - Normal limits: HEAD x and z -0.7..0.7, y -0.25..1.3; CHEST x -1.3..1.3, y -1.1..0.7, z -0.5..1.0.
+            - Only if the request asks for it to be big (big, huge, giant, 거대한, 큰, or a size in blocks, e.g. a
+              4-block balloon floating above the head): call ai.oversize() first; then it may be up to 5 blocks in each
+              direction, within 6 blocks of (0, 0, 0). Something floating above is held by a thin string (ai.addTube).
 
             %s
-            STYLE (this decides the quality):
-            - A clear, bold silhouette; a few big shapes, then trims, rivets, gems, straps.
-            - Materials: iron_block / light_gray_concrete / quartz_block (steel), gold_block (trim), leather in
-              brown_terracotta / brown_concrete, cloth in *_wool, gems (diamond_block, emerald_block, amethyst_block,
-              redstone_block, lapis_block), feathers in white_wool, magic glow in glowstone / sea_lantern.
-            - One darker shade for rims, gaps and the underside, one lighter for highlights. Symmetric with ai.mirrorOn().
-            - Overlap pieces slightly so nothing floats. At most 400 pieces after merging.
-
+            %s
             CODE RULES:
-            - Block names are quoted strings: 'iron_block'.
+            - Block names are quoted strings: 'red_wool'.
             - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
             - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
 
-            EXAMPLES (style reference; make your own design, do not copy):
+            EXAMPLES (only to show the API and the frame; make what the request asks, do not copy):
+            %s
             %s
             %s
             """;
@@ -638,14 +707,16 @@ public class AiController {
     private static AiPrompt gearPromptBase(String userPrompt, GearKind kind) {
         String shapes = OBJECT_SYSTEM.substring(OBJECT_SYSTEM.indexOf("SMOOTH SHAPES"), OBJECT_SYSTEM.indexOf("STYLE (this"));
         if (kind.worn()) {
-            String system = WEAR_SYSTEM.formatted(shapes, EXAMPLE_HELMET.strip(), EXAMPLE_WINGS.strip());
+            String system = WEAR_SYSTEM.formatted(shapes, GEAR_STYLE, EXAMPLE_HELMET.strip(), EXAMPLE_HAT.strip(), EXAMPLE_WINGS.strip());
             String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "), worn on the "
-                + (kind.slot == net.minecraft.entity.EquipmentSlot.HEAD ? "HEAD" : "CHEST (torso)") + ". What to make: " + kind.guide
+                + (kind.slot == net.minecraft.entity.EquipmentSlot.HEAD ? "HEAD" : "CHEST (torso)")
+                + ". What this kind covers (the request decides what it actually is): " + kind.guide
                 + "\nRequest: " + userPrompt + "\nWrite the Groovy script for it now.";
             return new AiPrompt(system, user);
         }
-        String system = GEAR_SYSTEM.formatted(shapes, EXAMPLE_SWORD.strip(), EXAMPLE_AXE.strip());
-        String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "). Shape guide for this kind: " + kind.guide
+        String system = GEAR_SYSTEM.formatted(shapes, GEAR_STYLE, EXAMPLE_SWORD.strip(), EXAMPLE_AXE.strip());
+        String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "). Typical shape for this kind "
+            + "(follow the request where it differs): " + kind.guide
             + "\nRequest: " + userPrompt + "\nWrite the Groovy script for it now.";
         return new AiPrompt(system, user);
     }

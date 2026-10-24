@@ -42,7 +42,8 @@ public final class AiScriptApi {
         "glow",
         "hitEffect",
         "idleEffect",
-        "aura"
+        "aura",
+        "oversize"
     );
 
     private AiScriptApi() {

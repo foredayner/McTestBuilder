@@ -63,6 +63,13 @@ server and the client of the player who builds. That player needs operator level
     out) and 'converge' (sphere shrinking in). Effects make no sounds. An aura (ai.aura) draws a see-through,
     breathing shell of light around every piece while held or worn. If an effect field is filled but the
     script makes nothing for it, the script goes back to the AI.
+    Equipment prompts are neutral: the AI makes what was asked in the style the request implies (everyday,
+    cute, realistic, sci-fi, fantasy...) instead of fantasy armour; kinds only say where it is worn. Masks and
+    costume heads may be about 1.5x the head, with eyes, nose and mouth as 3D shapes. Equipment is painted on a
+    1/32-block grid (objects stay 1/16; coarser when 400 pieces are not enough). Only when the order asks for
+    something big does the AI call `ai.oversize()`: then up to 5 blocks (e.g. a 4-block balloon on a string
+    above the head). Big equipment widens the wearer's on-screen check (a client mixin on
+    `EntityRenderer.getBoundingBox`) so it does not vanish when the wearer is off screen.
   - **Claude (Anthropic)** provider: Messages API with the fixed instructions as a cached system prompt,
     optional web search (`web_search` tool, at most 3 searches per build).
   - Objects are **solid**: their parts are merged into a few boxes that follow the shape (an

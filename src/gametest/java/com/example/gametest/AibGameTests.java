@@ -178,7 +178,7 @@ public class AibGameTests implements FabricGameTest {
         BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
         ServerPlayerEntity player = opPlayer(context, origin, 0f);
         for (String example : new String[] { com.example.ai.AiController.EXAMPLE_SWORD, com.example.ai.AiController.EXAMPLE_AXE }) {
-            BuildPlan plan = Demo.plan(world, origin, player, example);
+            BuildPlan plan = Demo.plan(world, origin, player, example, true);
             String problem = com.example.ai.AiController.gearProblem(plan);
             check(problem == null, "example fits the hand: " + problem);
         }
@@ -202,10 +202,25 @@ public class AibGameTests implements FabricGameTest {
         check(stack.isIn(net.minecraft.registry.tag.ItemTags.SWORDS), "it counts as a sword (enchantments)");
         check(stack.getMaxCount() == 1, "does not stack");
         // Worn equipment: the examples stay on the head / torso; a helmet is a head item with iron armour.
-        BuildPlan helmet = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HELMET);
+        BuildPlan helmet = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HELMET, true);
         check(com.example.ai.AiController.gearProblem(helmet, com.example.content.GearKind.HELMET) == null,
             "helmet example fits: " + com.example.ai.AiController.gearProblem(helmet, com.example.content.GearKind.HELMET));
-        BuildPlan wings = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_WINGS);
+        check(helmet.parts.size() <= BuildPlan.MAX_PARTS, "mask within the part limit: " + helmet.parts.size());
+        check(helmet.parts.stream().anyMatch(q -> Math.abs(q.sx * 16 - Math.round(q.sx * 16)) > 1e-6),
+            "the mask uses the finer equipment grid");
+        BuildPlan hat = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HAT, true);
+        check(com.example.ai.AiController.gearProblem(hat, com.example.content.GearKind.HAT) == null,
+            "hat example fits: " + com.example.ai.AiController.gearProblem(hat, com.example.content.GearKind.HAT));
+        // Big only when asked: the balloon passes with ai.oversize(), fails without it, and nothing passes 5 blocks.
+        BuildPlan balloon = Demo.plan(world, origin, player, Demo.BALLOON, true);
+        check(balloon.oversize, "oversize recorded");
+        check(com.example.ai.AiController.gearProblem(balloon, com.example.content.GearKind.BACK) == null,
+            "a big balloon fits when asked: " + com.example.ai.AiController.gearProblem(balloon, com.example.content.GearKind.BACK));
+        BuildPlan small = Demo.plan(world, origin, player, Demo.BALLOON.replace("ai.oversize()\n", ""), true);
+        check(com.example.ai.AiController.gearProblem(small, com.example.content.GearKind.BACK) != null, "not big unless asked");
+        BuildPlan huge = Demo.plan(world, origin, player, "ai.oversize()\nai.addEllipsoid('red_concrete', 0, 4, 0, 3.5, 3, 3)\n", true);
+        check(com.example.ai.AiController.gearProblem(huge, com.example.content.GearKind.BACK) != null, "at most 5 blocks");
+        BuildPlan wings = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_WINGS, true);
         check(com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.BACK) == null,
             "wings example fits: " + com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.BACK));
         check(com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.HELMET) != null, "wings are too wide for a head");

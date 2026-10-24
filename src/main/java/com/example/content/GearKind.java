@@ -13,8 +13,9 @@ import java.util.Locale;
  */
 public enum GearKind {
     SWORD("검", Items.IRON_SWORD, Items.IRON_SWORD,
-        "a grip (0.25-0.35 long) around the hand, a cross guard just above it, then the blade straight up; total 1.0-1.6 "
-            + "(a greatsword up to 2.2). Blade 0.12-0.3 wide (X) and 0.04-0.08 thick (Z), ending in a point."),
+        "anything swung to hit (a sword, katana, bat, club, stick, toy sword, fish...). For a blade: a grip (0.25-0.35 "
+            + "long) around the hand, a guard above it if it has one, then the blade straight up; total 1.0-1.6 (a long "
+            + "one up to 2.2), the blade 0.12-0.3 wide (X) and 0.04-0.08 thick (Z)."),
     AXE("도끼", Items.IRON_AXE, Items.IRON_AXE,
         "a handle 0.9-1.3 long going up; near the top a head whose blade sticks out to +X (0.25-0.5 wide), "
             + "thin in Z (0.04-0.1), with a curved cutting edge."),
@@ -32,22 +33,23 @@ public enum GearKind {
     HAMMER("망치", Items.IRON_AXE, Items.MACE,
         "a handle 0.9-1.4 long going up; at the top a heavy head across X (0.4-0.7 wide, 0.2-0.35 tall and deep)."),
     STAFF("지팡이", Items.IRON_SWORD, Items.BLAZE_ROD,
-        "a shaft (1.2-2.0) going up, with an ornament on top: an orb, crystal, crescent or carved head; "
-            + "rings or wraps along the shaft."),
+        "a long held thing (a staff, wand, walking stick, umbrella, flag, microphone stand...): a shaft (1.2-2.0) going "
+            + "up with whatever sits on top."),
 
     // Worn equipment: drawn on the wearer's head or torso and following its movement.
     HELMET("투구", Items.IRON_HELMET, Items.IRON_HELMET, EquipmentSlot.HEAD,
-        "a helmet that encloses the head box (start 0.02-0.06 outside it): a shell, a darker rim, a visor or eye slit "
-            + "on the front, maybe horns, a crest or a plume on top."),
+        "anything that covers the whole head: a helmet, a mask, a mascot, animal or character head, a diving helmet, "
+            + "a box or pumpkin head... Fitted ones start 0.02-0.06 outside the head box; masks and costume heads may be "
+            + "bigger, with eyes, nose and mouth as 3D shapes on the front."),
     HAT("모자", Items.LEATHER_HELMET, Items.LEATHER_HELMET, EquipmentSlot.HEAD,
-        "a hat, crown, hood or ears sitting on or around the top of the head box (from about y = 0.35 up); "
-            + "brims stick out around the head; keep the face (front, y 0.05-0.4) free."),
+        "something on or around the top of the head that leaves the face (front, y 0.05-0.4) free: hats, caps, "
+            + "crowns, hoods, ears, hair, headphones, glasses pushed up, a halo; mostly from about y = 0.35 up."),
     CHESTPLATE("갑옷", Items.IRON_CHESTPLATE, Items.IRON_CHESTPLATE, EquipmentSlot.CHEST,
-        "armour around the torso box (0.02-0.06 outside it): breastplate on the front, back plate, a belt at the "
-            + "bottom, shoulder pads at the top corners (they may stick out to x = +-0.4), emblems and rivets."),
+        "something worn on the torso: clothes, a jacket, a vest, a costume body, armour, a necklace, a scarf; "
+            + "0.02-0.06 outside the torso box, shoulder parts may stick out to x = +-0.4."),
     BACK("등 장식", Items.LEATHER_CHESTPLATE, Items.ELYTRA, EquipmentSlot.CHEST,
-        "something worn on the back (z from 0.125 outward): wings (may spread to x = +-1.2), a backpack, a quiver, "
-            + "a sheathed sword, a shell; straps over the front of the torso hold it on.");
+        "something on the back or behind or above the wearer: wings, a backpack, a cape, a shell, a tail, a balloon "
+            + "on a string; carried things are held on by straps over the front of the torso.");
 
     /** Where it is worn (head or chest), or null for hand-held equipment. */
     public final EquipmentSlot slot;

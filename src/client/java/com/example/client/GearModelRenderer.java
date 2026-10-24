@@ -41,8 +41,31 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
 
     /** A decoded model: parts with their textures, and its outline after the sword tilt. */
     public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn,
-                        Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura) {
+                        Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura, float reach) {
     }
+
+    /**
+     * How far (blocks) the biggest AI equipment this entity holds or wears reaches from it, or 0.
+     * Used to keep big equipment (a balloon above the head) from vanishing when the wearer's own
+     * outline is off screen.
+     */
+    public static float reachOf(net.minecraft.entity.LivingEntity entity) {
+        float reach = 0;
+        for (net.minecraft.entity.EquipmentSlot slot : REACH_SLOTS) {
+            ItemStack stack = entity.getEquippedStack(slot);
+            if (stack.getItem() instanceof com.example.content.GearItem) {
+                Model model = modelFor(stack);
+                if (model != null) {
+                    reach = Math.max(reach, model.reach());
+                }
+            }
+        }
+        return reach;
+    }
+
+    private static final net.minecraft.entity.EquipmentSlot[] REACH_SLOTS = {
+        net.minecraft.entity.EquipmentSlot.HEAD, net.minecraft.entity.EquipmentSlot.CHEST,
+        net.minecraft.entity.EquipmentSlot.MAINHAND, net.minecraft.entity.EquipmentSlot.OFFHAND };
 
     public record Unbaked() implements SpecialModelRenderer.Unbaked {
         public static final MapCodec<Unbaked> CODEC = MapCodec.unit(new Unbaked());
@@ -94,16 +117,18 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         return model;
     }
 
-    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null);
+    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null, 0);
 
     private static Model decode(BuildPlan plan, boolean worn) {
         List<Sprite> sprites = new ArrayList<>();
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
         float tilt = worn ? 0 : TILT;
         float c = (float) Math.cos(tilt), s = (float) Math.sin(tilt);
+        float reach = 0;
         for (BuildPlan.Part p : plan.parts) {
             sprites.add(spriteOf(p.block));
             double r = Math.sqrt(p.sx * p.sx + p.sy * p.sy + p.sz * p.sz) / 2;
+            reach = (float) Math.max(reach, Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z) + r);
             for (int i = 0; i < 4; i++) {
                 float x = (float) (p.x + ((i & 1) == 0 ? -r : r));
                 float y = (float) (p.y + ((i & 2) == 0 ? -r : r));
@@ -118,7 +143,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
                 anims.computeIfAbsent(a.group, k -> new ArrayList<>()).add(a);
             }
         }
-        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims, plan.aura);
+        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims, plan.aura, reach);
     }
 
     private static Sprite spriteOf(String block) {

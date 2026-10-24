@@ -42,8 +42,16 @@ public class MinecraftAI {
     private static BuildPlan recorder;
 
     public static void startRecording(BuildPlan plan) {
+        startRecording(plan, false);
+    }
+
+    /**
+     * fine: equipment, whose smooth shapes may use a 1/32-block grid (twice the detail of
+     * objects; equipment is drawn by the client, not as display entities).
+     */
+    public static void startRecording(BuildPlan plan, boolean fine) {
         recorder = plan;
-        canvas = new ShapeCanvas();
+        canvas = new ShapeCanvas(fine);
         mirrorX = null;
         group = 0;
         groupIds = new java.util.LinkedHashMap<>();
@@ -136,6 +144,13 @@ public class MinecraftAI {
             if (flip && t.equals("spin")) {
                 recorder.anims.get(recorder.anims.size() - 1).speed = -s;
             }
+        }
+    }
+
+    /** Equipment: the order asked for it to be big, so it may go past the slot's usual size. */
+    public static void oversize() {
+        if (recorder != null) {
+            recorder.oversize = true;
         }
     }
 

@@ -21,6 +21,8 @@ public final class ShapeCanvas {
 
     /** Grid sizes tried, finest first (cells per block). */
     private static final int[] RESOLUTIONS = { 16, 12, 10, 8, 6, 5, 4, 3, 2 };
+    /** Equipment: drawn by the client, so a finer grid (1/32 block) is tried first. */
+    private static final int[] FINE_RESOLUTIONS = { 32, 24, 16, 12, 10, 8, 6, 5, 4, 3, 2 };
     /** Most voxels one painting may test, so huge objects cannot stall the server. */
     private static final long MAX_CELLS = 3_000_000L;
 
@@ -53,6 +55,15 @@ public final class ShapeCanvas {
     }
 
     private final List<Painted> shapes = new ArrayList<>();
+    private final int[] resolutions;
+
+    public ShapeCanvas() {
+        this(false);
+    }
+
+    public ShapeCanvas(boolean fine) {
+        resolutions = fine ? FINE_RESOLUTIONS : RESOLUTIONS;
+    }
 
     public boolean isEmpty() {
         return shapes.isEmpty();
@@ -94,7 +105,7 @@ public final class ShapeCanvas {
             }
         }
         List<BuildPlan.Part> best = null;
-        for (int res : RESOLUTIONS) {
+        for (int res : resolutions) {
             double cells = (all[3] - all[0]) * res * (all[4] - all[1]) * res * (all[5] - all[2]) * res;
             if (cells > MAX_CELLS) {
                 continue;
@@ -105,7 +116,7 @@ public final class ShapeCanvas {
                 return parts;
             }
         }
-        return best == null ? paint(RESOLUTIONS[RESOLUTIONS.length - 1]) : best;
+        return best == null ? paint(resolutions[resolutions.length - 1]) : best;
     }
 
     /**

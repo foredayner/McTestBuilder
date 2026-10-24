@@ -34,8 +34,29 @@ public final class Demo {
             + "ai.addPart('brown_concrete', cx - 0.03, 0.62, cz - 0.03, 0.06, 0.15, 0.06)\n"
             + "ai.addPart('lime_concrete', cx, 0.7, cz - 0.04, 0.16, 0.02, 0.08, 30)\n";
 
+    /** A 4-block balloon on a string, floating above the head: worn on the back, asked to be big. */
+    public static final String BALLOON =
+        "ai.oversize()\n"
+            + "ai.addRoundBox('brown_terracotta', -0.27, -0.45, -0.15, 0.54, 0.06, 0.3, 0.02)\n"
+            + "ai.addTube('white_wool', [[0.1, -0.42, 0.15], [0.25, 0.6, 0.35], [0.2, 1.75, 0.25]], 0.015)\n"
+            + "ai.addCone('red_terracotta', 0.2, 1.68, 0.25, 0.1, 0.16)\n"
+            + "ai.addEllipsoid('red_concrete', 0.2, 3.8, 0.25, 1.6, 2.0, 1.6)\n"
+            + "ai.addEllipsoid('pink_concrete', -0.35, 4.5, -0.95, 0.3, 0.45, 0.25)\n";
+
     private Demo() {
     }
+
+    /** gear: equipment, on the finer equipment grid (as the mod does for 장비 orders). */
+    public static BuildPlan plan(ServerWorld world, BlockPos origin, ServerPlayerEntity player, String script, boolean gear) {
+        fine = gear;
+        try {
+            return plan(world, origin, player, script);
+        } finally {
+            fine = false;
+        }
+    }
+
+    private static boolean fine = false;
 
     /** Review + dry run. Throws with the reason if the script would be rejected. */
     public static BuildPlan plan(ServerWorld world, BlockPos origin, ServerPlayerEntity player, String script) {
@@ -46,7 +67,7 @@ public final class Demo {
         MinecraftAI.init(world, origin, player.getYaw(), player.getPitch(), player);
         BuildPlan plan = new BuildPlan();
         plan.facing = BuildPlan.normalizeFacing(MinecraftAI.getFacing());
-        MinecraftAI.startRecording(plan);
+        MinecraftAI.startRecording(plan, fine);
         ScriptExecutor.ExecutionResult result;
         try {
             result = ScriptExecutor.executeScript(script);

@@ -163,6 +163,8 @@ public final class BuildPlan {
     public Fx idle;
     /** Equipment: glow around the model while held or worn (null = none). */
     public Aura aura;
+    /** Equipment the order asked to be big (ai.oversize()): it may go past the slot's usual size. */
+    public boolean oversize;
 
     public boolean isEmpty() {
         return (ops == null || ops.isEmpty()) && (parts == null || parts.isEmpty());

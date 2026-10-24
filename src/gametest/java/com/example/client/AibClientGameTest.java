@@ -111,11 +111,11 @@ public class AibClientGameTest implements FabricClientGameTest {
                 var world = player.getServerWorld();
                 var origin = player.getBlockPos();
                 BuildRecord sword = BuildRecord.create("에메랄드가 박힌 기사의 장검", "TEST", "script",
-                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_SWORD));
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_SWORD, true));
                 sword.kind = "gear";
                 sword.gear = "sword";
                 BuildRecord axe = BuildRecord.create("바이킹 전투 도끼", "TEST", "script",
-                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_AXE));
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_AXE, true));
                 axe.kind = "gear";
                 axe.gear = "axe";
                 player.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(sword));
@@ -161,12 +161,12 @@ public class AibClientGameTest implements FabricClientGameTest {
                 ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
                 var world = player.getServerWorld();
                 var origin = player.getBlockPos();
-                BuildRecord helmet = BuildRecord.create("기사 투구", "TEST", "script",
-                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HELMET));
+                BuildRecord helmet = BuildRecord.create("곰 탈", "TEST", "script",
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HELMET, true));
                 helmet.kind = "gear";
                 helmet.gear = "helmet";
                 BuildRecord wings = BuildRecord.create("천사 날개", "TEST", "script",
-                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_WINGS));
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_WINGS, true));
                 wings.kind = "gear";
                 wings.gear = "back";
                 player.equipStack(net.minecraft.entity.EquipmentSlot.HEAD, com.example.ai.build.GearItems.stackFor(helmet));
@@ -178,6 +178,31 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
             context.waitTicks(5);
             context.takeScreenshot("22_worn_back");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
+            // A beanie and a big balloon (asked to be big: it goes past the usual size) above the head.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                var world = player.getServerWorld();
+                var origin = player.getBlockPos();
+                BuildRecord hat = BuildRecord.create("털모자", "TEST", "script",
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HAT, true));
+                hat.kind = "gear";
+                hat.gear = "hat";
+                BuildRecord balloon = BuildRecord.create("4블럭 풍선", "TEST", "script", Demo.plan(world, origin, player, Demo.BALLOON, true));
+                balloon.kind = "gear";
+                balloon.gear = "back";
+                player.equipStack(net.minecraft.entity.EquipmentSlot.HEAD, com.example.ai.build.GearItems.stackFor(hat));
+                player.equipStack(net.minecraft.entity.EquipmentSlot.CHEST, com.example.ai.build.GearItems.stackFor(balloon));
+            });
+            game.getServer().runCommand("execute as @a at @s run tp @s ~ ~ ~ ~ -10");
+            context.waitTicks(10);
+            context.takeScreenshot("23_hat_and_big_balloon");
+            // Looking up from behind: the wearer is off screen but the balloon must still be drawn.
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
+            game.getServer().runCommand("execute as @a at @s run tp @s ~ ~ ~ ~ -75");
+            context.waitTicks(10);
+            context.takeScreenshot("24_balloon_looking_up");
+            game.getServer().runCommand("execute as @a at @s run tp @s ~ ~ ~ ~ 18");
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
             game.getServer().runOnServer(server -> {
                 ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);

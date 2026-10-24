@@ -225,6 +225,10 @@ public final class AiScriptFacade {
         MinecraftAI.aura(color, strength);
     }
 
+    public void oversize() {
+        MinecraftAI.oversize();
+    }
+
     public void idleEffect(String particle, String color, Number count) {
         MinecraftAI.idleEffect(particle, color, count);
     }
