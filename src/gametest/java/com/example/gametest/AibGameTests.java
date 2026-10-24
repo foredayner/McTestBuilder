@@ -231,7 +231,11 @@ public class AibGameTests implements FabricGameTest {
             ai.glow('gem')
             ai.hitEffect('flame', '#ff6600', 6)
             ai.idleEffect('dust', '#33ccff', 2)
+            ai.aura('#ffdd66', 0.6)
+            ai.hitEffect('end_rod', '#ffffff', 4, 'converge', 2)
             """);
+        check(fx.aura != null && fx.aura.color == 0xffdd66, "aura recorded");
+        check(fx.moreHits.size() == 1 && "converge".equals(fx.moreHits.get(0).pattern), "a second hit effect plays together");
         check(fx.parts.stream().anyMatch(q -> q.group > 0), "group parts are marked");
         check(fx.anims.size() == 4, "spin + glow for the gem and its mirrored twin, got " + fx.anims.size());
         check(fx.hit != null && "flame".equals(fx.hit.particle) && fx.idle != null && fx.idle.color == 0x33ccff, "effects recorded");
@@ -241,8 +245,11 @@ public class AibGameTests implements FabricGameTest {
         net.minecraft.item.ItemStack fxStack = com.example.ai.build.GearItems.stackFor(fxRecord);
         check(com.example.ai.build.GearEffects.read(fxStack, com.example.ai.build.GearEffects.HIT) != null, "hit effect on the item");
         check(com.example.ai.build.GearItems.modelOf(fxStack).anims.size() == 4, "movements ride in the model");
+        check(com.example.ai.build.GearItems.modelOf(fxStack).aura != null, "the aura rides in the model");
+        check(com.example.ai.build.GearEffects.read(fxStack, com.example.ai.build.GearEffects.HIT + 2) != null, "second hit effect on the item");
         com.example.ai.AiController.applyEffectRequest(fx, com.example.content.GearKind.STAFF, "", "");
-        check(fx.hit == null && fx.idle == null && fx.anims.isEmpty(), "empty effect fields = no effects at all");
+        check(fx.hit == null && fx.moreHits.isEmpty() && fx.idle == null && fx.anims.isEmpty() && fx.aura == null,
+            "empty effect fields = no effects at all");
         try {
             Demo.plan(world, origin, player, "ai.addSphere('stone', 0, 0.5, 0, 0.2)\nai.hitEffect('nuke', '#ffffff', 3)");
             throw new GameTestException("an unknown particle should be refused");

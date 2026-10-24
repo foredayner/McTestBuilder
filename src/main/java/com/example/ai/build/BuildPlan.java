@@ -133,6 +133,20 @@ public final class BuildPlan {
         }
     }
 
+    /** A glow around equipment (drawn by the mod): colour and strength (0.2-1). */
+    public static final class Aura {
+        public int color;
+        public double strength;
+
+        public Aura() {
+        }
+
+        public Aura(int color, double strength) {
+            this.color = color;
+            this.strength = strength;
+        }
+    }
+
     public static final int MAX_PARTS = 400;
     public static final double MAX_PART_SIZE = 16;
     public static final double MAX_PART_OFFSET = 64;
@@ -147,6 +161,8 @@ public final class BuildPlan {
     /** More hit effects played together with {@code hit} (e.g. lightning + shockwave), at most 2. */
     public List<Fx> moreHits = new ArrayList<>();
     public Fx idle;
+    /** Equipment: glow around the model while held or worn (null = none). */
+    public Aura aura;
 
     public boolean isEmpty() {
         return (ops == null || ops.isEmpty()) && (parts == null || parts.isEmpty());

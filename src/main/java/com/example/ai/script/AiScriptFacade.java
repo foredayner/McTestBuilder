@@ -221,6 +221,10 @@ public final class AiScriptFacade {
         MinecraftAI.hitEffect(particle, color, count, pattern, size);
     }
 
+    public void aura(String color, Number strength) {
+        MinecraftAI.aura(color, strength);
+    }
+
     public void idleEffect(String particle, String color, Number count) {
         MinecraftAI.idleEffect(particle, color, count);
     }

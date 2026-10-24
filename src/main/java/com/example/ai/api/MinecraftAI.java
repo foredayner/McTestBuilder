@@ -184,7 +184,7 @@ public class MinecraftAI {
 
     /** Shapes a hit effect can take. */
     public static final java.util.List<String> PATTERNS = java.util.List.of(
-        "burst", "shockwave", "cone", "slash", "spiral", "pillar", "magic_circle", "lightning");
+        "burst", "shockwave", "cone", "slash", "spiral", "pillar", "magic_circle", "lightning", "expand", "converge");
 
     /** A hit effect with a shape (see PATTERNS) and a size in blocks (0.5-4). */
     public static void hitEffect(String particle, String color, Number count, String pattern, Number size) {
@@ -204,6 +204,23 @@ public class MinecraftAI {
         } else if (recorder.moreHits.size() < 2) {
             recorder.moreHits.add(fx);
         }
+    }
+
+    /**
+     * A soft glow around the equipment while it is held or worn (drawn by the mod: a see-through,
+     * shining shell around every piece), in a colour; strength 0.2-1.
+     */
+    public static void aura(String color, Number strength) {
+        if (recorder == null) {
+            return;
+        }
+        int rgb;
+        try {
+            rgb = Integer.parseInt((color == null ? "ffffff" : color).trim().replace("#", ""), 16) & 0xFFFFFF;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("colour must look like '#ffdd66', got '" + color + "'");
+        }
+        recorder.aura = new BuildPlan.Aura(rgb, Math.max(0.2, Math.min(1, Math.abs(toDouble(strength)))));
     }
 
     /** Particles around the item while it is held or worn. */

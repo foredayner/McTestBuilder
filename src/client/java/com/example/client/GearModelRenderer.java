@@ -41,7 +41,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
 
     /** A decoded model: parts with their textures, and its outline after the sword tilt. */
     public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn,
-                        Map<Integer, List<BuildPlan.Anim>> anims) {
+                        Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura) {
     }
 
     public record Unbaked() implements SpecialModelRenderer.Unbaked {
@@ -94,7 +94,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         return model;
     }
 
-    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of());
+    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null);
 
     private static Model decode(BuildPlan plan, boolean worn) {
         List<Sprite> sprites = new ArrayList<>();
@@ -118,7 +118,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
                 anims.computeIfAbsent(a.group, k -> new ArrayList<>()).add(a);
             }
         }
-        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims);
+        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims, plan.aura);
     }
 
     private static Sprite spriteOf(String block) {
@@ -164,6 +164,63 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         }
         matrices.multiply(new Quaternionf().rotateZ(TILT));
         draw(matrices, vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout()), model, light, overlay);
+        if (mode != ModelTransformationMode.GUI && mode != ModelTransformationMode.FIXED) {
+            drawAura(matrices, vertexConsumers, model, overlay);
+        }
+        matrices.pop();
+    }
+
+    private static final Identifier WHITE = Identifier.of(AiBuildAssistantMod.MOD_ID, "textures/misc/white.png");
+
+    /**
+     * The aura: two see-through, shining shells around every piece (a small and a wider one),
+     * slowly breathing, in the aura's colour. Moving parts carry their shell with them.
+     */
+    static void drawAura(MatrixStack matrices, VertexConsumerProvider vertexConsumers, Model model, int overlay) {
+        BuildPlan.Aura aura = model.aura();
+        if (aura == null || model.parts().isEmpty()) {
+            return;
+        }
+        VertexConsumer buffer = vertexConsumers.getBuffer(net.minecraft.client.render.RenderLayer.getEntityTranslucentEmissive(WHITE));
+        double seconds = seconds();
+        double breathe = 0.8 + 0.2 * Math.sin(2 * Math.PI * 0.6 * seconds);
+        double[][] shells = { { 0.025, 0.30 }, { 0.07, 0.13 } };
+        for (double[] shell : shells) {
+            int alpha = (int) Math.round(255 * Math.min(0.6, shell[1] * aura.strength * breathe));
+            int argb = (alpha << 24) | (aura.color & 0xFFFFFF);
+            for (BuildPlan.Part part : model.parts()) {
+                List<BuildPlan.Anim> anims = part.group == 0 ? null : model.anims().get(part.group);
+                matrices.push();
+                if (anims != null) {
+                    for (BuildPlan.Anim a : anims) {
+                        animate(matrices, a, seconds, 0);
+                    }
+                }
+                shellBox(matrices, buffer, part, (float) shell[0], argb, overlay);
+                matrices.pop();
+            }
+        }
+    }
+
+    private static void shellBox(MatrixStack matrices, VertexConsumer buffer, BuildPlan.Part p, float margin, int argb, int overlay) {
+        matrices.push();
+        matrices.translate((float) p.x, (float) p.y, (float) p.z);
+        matrices.multiply(new Quaternionf()
+            .rotateY((float) Math.toRadians(p.yaw))
+            .rotateX((float) Math.toRadians(p.pitch))
+            .rotateZ((float) Math.toRadians(p.roll)));
+        MatrixStack.Entry e = matrices.peek();
+        float hx = (float) p.sx / 2 + margin, hy = (float) p.sy / 2 + margin, hz = (float) p.sz / 2 + margin;
+        Vector3f[] corner = new Vector3f[8];
+        for (int i = 0; i < 8; i++) {
+            corner[i] = new Vector3f((i & 1) == 0 ? -hx : hx, (i & 2) == 0 ? -hy : hy, (i & 4) == 0 ? -hz : hz);
+        }
+        for (int[] f : FACES) {
+            for (int k = 0; k < 4; k++) {
+                buffer.vertex(e, corner[f[k]]).color(argb).texture(0.5F, 0.5F).overlay(overlay).light(0xF000F0)
+                    .normal(e, f[4], f[5], f[6]);
+            }
+        }
         matrices.pop();
     }
 

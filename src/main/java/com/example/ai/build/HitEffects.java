@@ -115,6 +115,8 @@ public final class HitEffects {
             case "pillar" -> 12;
             case "magic_circle" -> 36;
             case "lightning" -> 4;
+            case "expand" -> 10;
+            case "converge" -> 14;
             default -> 1;
         };
         Vec3d from = attacker.getEyePos().add(0, -0.4, 0).add(look.multiply(0.6));
@@ -217,6 +219,20 @@ public final class HitEffects {
                 }
                 if (e.age % 3 == 0) {
                     turnCircle(e);
+                }
+            }
+            case "expand", "converge" -> {
+                // A shell of particles around the hit point (chest height) growing out or shrinking in.
+                double grow = "expand".equals(e.fx.pattern) ? t : 1 - t;
+                double r = 0.15 + size * grow;
+                Vec3d mid = c.add(0, 1.0, 0);
+                int n = Math.min(40, 14 + e.fx.count * 3);
+                for (int i = 0; i < n; i++) {
+                    // Random points spread evenly over the sphere.
+                    double z = e.world.random.nextDouble() * 2 - 1;
+                    double a = e.world.random.nextDouble() * 2 * Math.PI;
+                    double ring = Math.sqrt(1 - z * z);
+                    dot(e, mid.x + Math.cos(a) * ring * r, mid.y + z * r, mid.z + Math.sin(a) * ring * r);
                 }
             }
             case "lightning" -> {

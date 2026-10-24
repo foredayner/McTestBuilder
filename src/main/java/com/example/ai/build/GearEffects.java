@@ -14,15 +14,12 @@ import net.minecraft.particle.ParticleType;
 import net.minecraft.particle.SimpleParticleType;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 
 /**
- * Particle effects of AI equipment, sent by the server so every player sees them: a burst
+ * Particle effects of AI equipment (no sounds), sent by the server so every player sees them: a burst
  * where a weapon hits, and a light, steady stream while it is held or worn. Only what the
  * order's effect fields asked for is stored on the item.
  */
@@ -78,20 +75,6 @@ public final class GearEffects {
         return type instanceof SimpleParticleType simple ? simple : null;
     }
 
-    /** A matching, quiet sound for a hit burst (or null). */
-    static SoundEvent hitSound(String particle) {
-        return switch (particle) {
-            case "flame", "soul_fire_flame", "small_flame", "lava" -> SoundEvents.ENTITY_BLAZE_SHOOT;
-            case "snowflake" -> SoundEvents.BLOCK_POWDER_SNOW_BREAK;
-            case "electric_spark" -> SoundEvents.ENTITY_FIREWORK_ROCKET_BLAST;
-            case "enchant", "end_rod", "glow", "portal", "witch", "dragon_breath", "dust", "totem_of_undying", "sculk_soul" ->
-                SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME;
-            case "smoke", "large_smoke", "cloud" -> SoundEvents.BLOCK_FIRE_EXTINGUISH;
-            case "heart", "cherry_leaves" -> SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP;
-            default -> null;
-        };
-    }
-
     /** A weapon hit {@code target}. */
     public static void onHit(ItemStack stack, LivingEntity target, LivingEntity attacker) {
         if (!(target.getWorld() instanceof ServerWorld world)) {
@@ -108,10 +91,6 @@ public final class GearEffects {
                 // Shaped effects: one set per attacker at a time (fast hits only get the plain burst).
                 if (!busy) {
                     HitEffects.start(world, attacker, target, fx, effect, true);
-                    SoundEvent sound = hitSound(fx.particle);
-                    if (sound != null) {
-                        world.playSound(null, target.getBlockPos(), sound, SoundCategory.PLAYERS, 0.5F, 1.0F);
-                    }
                     continue;
                 }
                 fx = new BuildPlan.Fx(fx.particle, fx.color, fx.count);
@@ -124,10 +103,6 @@ public final class GearEffects {
         Vec3d at = target.getPos().add(0, target.getHeight() * 0.6, 0);
         world.spawnParticles(effect, at.x, at.y, at.z, fx.count * 3, target.getWidth() * 0.4, target.getHeight() * 0.3,
             target.getWidth() * 0.4, 0.08);
-        SoundEvent sound = hitSound(fx.particle);
-        if (sound != null) {
-            world.playSound(null, target.getBlockPos(), sound, SoundCategory.PLAYERS, 0.4F, 1.2F);
-        }
     }
 
     /** Every tick for an equipment stack in someone's inventory: puffs while held (or worn). */

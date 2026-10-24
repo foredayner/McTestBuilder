@@ -556,6 +556,7 @@ public class AiController {
         if (fxIdle == null || fxIdle.isBlank()) {
             plan.idle = null;
             plan.anims.clear();
+            plan.aura = null;
         }
     }
 
@@ -567,7 +568,8 @@ public class AiController {
                 'burst' (ball of particles), 'shockwave' (ring spreading over the ground), 'cone' (a wide spray in front of
                 the swing: breath of fire, frost, spores), 'slash' (crescent arc of the swing), 'spiral' (winding up around
                 the target), 'pillar' (column rising from the target), 'magic_circle' (glowing circle with a star on the
-                ground, turning, coloured by '#rrggbb'), 'lightning' (bolt striking the target)
+                ground, turning, coloured by '#rrggbb'), 'lightning' (bolt striking the target), 'expand' (a sphere of
+                particles growing out from the hit point), 'converge' (a big sphere shrinking into the target: gathering power)
                 Call hitEffect up to 3 times to combine effects (e.g. lightning + shockwave); they play together.
               ai.idleEffect(particle, '#rrggbb', count)     // steady puffs while held or worn (count 1-6 looks best)
                 particle: flame, soul_fire_flame, small_flame, lava, snowflake, electric_spark, enchant, end_rod, glow,
@@ -581,7 +583,9 @@ public class AiController {
                 type 'pulse' : grows and shrinks, amount = fraction (0.05-0.2), speed = cycles/s
                 axis: 'x', 'y' or 'z'. A group made with mirrorOn() gets a mirrored twin that moves as its mirror image.
               ai.glow('name')                               // the group glows in the dark (gems, flames, runes)
-            Movement and glow are part of the while-held/worn effect: make them only if that line is not "none".
+              ai.aura('#rrggbb', strength)                  // a soft, shining halo of light around the whole item while held
+                                                            // or worn (strength 0.2-1): holy, cursed, magical, legendary items
+            Movement, glow and aura are part of the while-held/worn effect: make them only if that line is not "none".
             Example (a staff whose crystal spins and glows, with sparkles):
               ai.groupStart('crystal')
               ai.addEllipsoid('amethyst_block', 0, 1.6, 0, 0.1, 0.16, 0.1)

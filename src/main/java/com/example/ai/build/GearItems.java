@@ -39,6 +39,7 @@ public final class GearItems {
         model.plan.facing = plan.facing;
         model.plan.parts = new java.util.ArrayList<>(plan.parts);
         model.plan.anims = plan.anims == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(plan.anims);
+        model.plan.aura = plan.aura;
         return model.toGzip();
     }
 

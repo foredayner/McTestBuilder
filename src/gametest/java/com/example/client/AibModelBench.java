@@ -62,10 +62,9 @@ public class AibModelBench implements FabricClientGameTest {
     }
 
     private static final List<Case> CASES = List.of(
-        new Case("h1_fire", "불꽃이 타오르는 용사의 대검", "gear:sword", "화염이 앞으로 넓게 퍼짐", ""),
-        new Case("h2_circle", "보라색 마도서 지팡이", "gear:staff", "적 발밑에 보라색 마법진이 생김", "끝의 보석이 빛남"),
-        new Case("h3_thunder", "천둥의 망치", "gear:hammer", "번개가 내리꽂히고 충격파가 퍼짐", ""),
-        new Case("h4_frost", "서리 도끼", "gear:axe", "눈송이 회오리가 감아 올라감", "")
+        new Case("a1_holy", "성스러운 빛의 장검", "gear:sword", "빛 입자가 한 점에서 구형으로 퍼져나감", "금빛 후광이 검 전체를 감쌈"),
+        new Case("a2_void", "공허의 낫 모양 지팡이", "gear:staff", "보라색 입자가 큰 구에서 한 점으로 빨려 들어감", "검보라색 오라가 일렁임"),
+        new Case("a3_crown", "태양 왕관", "gear:hat", "", "황금빛 후광이 왕관을 감싸고 빛남")
     );
 
     /** One AI call. */
