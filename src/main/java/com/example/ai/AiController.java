@@ -27,7 +27,7 @@ public class AiController {
 
     /** One build request, kept across automatic retries. */
     private record BuildRequest(String userPrompt, AiPrompt basePrompt, boolean webSearch, long startTime, String mode,
-                                String fxHit, String fxIdle) {
+                                String fxHit, String fxIdle, String motion) {
     }
 
     /** Request modes: "build", "object", or "gear:<kind>" (sword, axe, ...). */
@@ -62,6 +62,12 @@ public class AiController {
      */
     public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch, String mode,
                                     String fxHit, String fxIdle) {
+        requestBuild(player, prompt, useWebSearch, mode, fxHit, fxIdle, "");
+    }
+
+    /** motion: the sword's attack motion picked in the order (see GearMotions), or empty for the normal swing. */
+    public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch, String mode,
+                                    String fxHit, String fxIdle, String motion) {
         String hitText = fxHit == null ? "" : fxHit.trim();
         String idleText = fxIdle == null ? "" : fxIdle.trim();
         boolean objectMode = !"build".equals(mode);
@@ -97,14 +103,15 @@ public class AiController {
             debug("[DEBUG] World info:\n" + worldInfo);
 
             debug("[DEBUG] Building prompt...");
-            AiPrompt promptText = gearOf(mode) != null
+            AiPrompt promptText = withWebNote(gearOf(mode) != null
                 ? gearPrompt(prompt, gearOf(mode), hitText, idleText)
-                : objectMode ? objectPrompt(prompt) : buildingPrompt(prompt, worldInfo, webSearch);
+                : objectMode ? objectPrompt(prompt) : buildingPrompt(prompt, worldInfo, webSearch), webSearch);
 
             debug("[DEBUG] Sending to AI provider...");
             AiNetworking.sendDebugLog(player, "[AI] Requesting from AI model (" + config.provider.getDisplayName() + ")...");
 
-            sendToAi(player, new BuildRequest(prompt, promptText, webSearch, startTime, mode, hitText, idleText), promptText, 0);
+            sendToAi(player, new BuildRequest(prompt, promptText, webSearch, startTime, mode, hitText, idleText,
+                com.example.content.GearMotions.normalize(motion)), promptText, 0);
 
         } catch (Exception exception) {
             debug("[ERROR] Fatal error: " + exception.getMessage());
@@ -174,7 +181,7 @@ public class AiController {
     private static void planAndApprove(ServerPlayerEntity player, BuildRequest req, String aiCode, int attempt) {
         BlockPos origin = player.getBlockPos();
         GearKind gear = gearOf(req.mode());
-        Evaluation eval = evaluate(player, aiCode, gear != null);
+        Evaluation eval = evaluate(player, aiCode, gear != null || "object".equals(req.mode()));
         BuildPlan plan = eval.plan();
         ScriptExecutor.ExecutionResult result = eval.result();
         String failure = eval.failure();
@@ -203,6 +210,7 @@ public class AiController {
                 record.kind = "gear";
                 record.gear = gear.id();
                 applyEffectRequest(plan, gear, req.fxHit(), req.fxIdle());
+                plan.motion = gear == GearKind.SWORD ? req.motion() : "";
             }
             BuildApproval.requestApproval(player, record, description, origin);
             debug("[TIMER] ===== PENDING USER APPROVAL =====");
@@ -494,6 +502,7 @@ public class AiController {
     /** What every equipment prompt says about style: make what was asked, in its own style. */
     static final String GEAR_STYLE = """
             STYLE (this decides the quality):
+            - PLAN FIRST: before the code, write short // comments listing its real parts and sizes, then build them.
             - Make exactly what the request describes, in the style it implies (everyday, realistic, cute, toy, sci-fi,
               fantasy, a joke...). Do not add armour, gems or fantasy decoration it did not ask for.
             - Get the subject right first: its recognisable silhouette, proportions and colours. If it names a known
@@ -509,6 +518,29 @@ public class AiController {
             - Keep parts at least 0.03 thick. Prefer a few smooth shapes over many tiny boxes. At most 400 pieces after merging.
             """;
 
+    /** Added to the request when web search is on: look the thing up and build what was found. */
+    static final String WEB_NOTE = """
+            Web search is ON for this request. Use it to find out what the requested thing really looks like:
+            - Search for its appearance: shape, colours, parts, proportions, markings, how it is worn or placed. For an
+              item that belongs to a character, series or brand, search for that exact version.
+            - If the request could mean several designs (e.g. a series where each character has their own), use the one
+              the request names, otherwise the most iconic one, and say which in a comment.
+            - Search results are text, so turn every described feature into shapes and colours. Before the code, write
+              // comments listing the features you found (3-8 lines), then build every one of them. What you found decides
+              the shape and colours: never fall back to a generic version of the thing.
+            """;
+
+    /** The request's prompt with the web search note (when web search is on for it). */
+    public static AiPrompt withWebNote(AiPrompt prompt, boolean webSearch) {
+        if (!webSearch) {
+            return prompt;
+        }
+        String user = prompt.user();
+        int at = user.lastIndexOf("\nWrite the Groovy script");
+        user = at < 0 ? user + "\n" + WEB_NOTE : user.substring(0, at) + "\n" + WEB_NOTE + user.substring(at);
+        return new AiPrompt(prompt.system(), user);
+    }
+
     /** Instructions for equipment (fixed part); the kind and the request come in the user message. */
     static final String GEAR_SYSTEM = """
             You are an expert 3D modeller of hand-held items for Minecraft. Write ONLY executable Groovy using the `ai` API.
@@ -519,7 +551,7 @@ public class AiController {
             FRAME:
             - Units are blocks (a vanilla sword is about 1.2 long). +X = right, +Y = up, +Z = away from the viewer.
             - The hand holds it at (0, 0, 0). The handle (or the part you hold) passes through that point and the item
-              goes UP (+Y); the end below the hand may go to about y = -0.2.
+              goes UP (+Y); the end below the hand may go to about y = -0.2. (A bow is held at its middle: see its kind.)
             - The front (the side with the most detail) faces -Z, the viewer.
 
             SIZE:
@@ -624,6 +656,10 @@ public class AiController {
         if (fxHit == null || fxHit.isBlank() || kind.worn()) {
             plan.hit = null;
             plan.moreHits.clear();
+            plan.trail = null;
+        }
+        if (kind != GearKind.BOW) {
+            plan.trail = null;
         }
         if (fxIdle == null || fxIdle.isBlank()) {
             plan.idle = null;
@@ -638,8 +674,11 @@ public class AiController {
      */
     public static String effectProblem(BuildPlan plan, GearKind kind, String fxHit, String fxIdle) {
         List<String> problems = new java.util.ArrayList<>();
-        if (!kind.worn() && fxHit != null && !fxHit.isBlank() && plan.hit == null) {
-            problems.add("the order asks for an effect on hit (\"" + fxHit.trim() + "\") but the script makes none: "
+        if (kind == GearKind.BOW && fxHit != null && !fxHit.isBlank() && plan.hit == null && plan.trail == null) {
+            problems.add("the order asks for an arrow effect (\"" + fxHit.trim() + "\") but the script makes none: "
+                + "call ai.arrowTrail(...) for the flight and/or ai.hitEffect(...) for where it lands.");
+        } else if (kind != GearKind.BOW && !kind.worn() && fxHit != null && !fxHit.isBlank() && plan.hit == null) {
+            problems.add("the order asks for an effect on attack (\"" + fxHit.trim() + "\") but the script makes none: "
                 + "call ai.hitEffect(...) with a fitting particle and pattern.");
         }
         if (fxIdle != null && !fxIdle.isBlank() && plan.idle == null && plan.anims.isEmpty() && plan.aura == null) {
@@ -652,7 +691,8 @@ public class AiController {
     /** API and rules for effects, added to the equipment prompts. */
     static final String EFFECT_API = """
             EFFECTS AND MOVEMENT (use ONLY what the request's effect lines ask for; if a line says "none", make nothing for it):
-              ai.hitEffect(particle, '#rrggbb', count)      // weapons: burst where a hit lands (count 1-12)
+              ai.hitEffect(particle, '#rrggbb', count)      // weapons: burst when it is swung, in front of the wielder where
+                                                            // the blow lands (count 1-12); bows: where the arrow lands
               ai.hitEffect(particle, '#rrggbb', count, pattern, size)   // a shaped hit effect, size in blocks (0.5-4):
                 'burst' (ball of particles), 'shockwave' (ring spreading over the ground), 'cone' (a wide spray in front of
                 the swing: breath of fire, frost, spores), 'slash' (crescent arc of the swing), 'spiral' (winding up around
@@ -660,6 +700,7 @@ public class AiController {
                 ground, turning, coloured by '#rrggbb'), 'lightning' (bolt striking the target), 'expand' (a sphere of
                 particles growing out from the hit point), 'converge' (a big sphere shrinking into the target: gathering power)
                 Call hitEffect up to 3 times to combine effects (e.g. lightning + shockwave); they play together.
+              ai.arrowTrail(particle, '#rrggbb', count)     // bows only: particles following the arrow in flight (count 1-4)
               ai.idleEffect(particle, '#rrggbb', count)     // steady puffs while held or worn (count 1-6 looks best)
                 particle: flame, soul_fire_flame, small_flame, lava, snowflake, electric_spark, enchant, end_rod, glow,
                 portal, witch, dragon_breath, smoke, large_smoke, cloud, heart, crit, enchanted_hit, cherry_leaves,
@@ -695,7 +736,8 @@ public class AiController {
     public static AiPrompt gearPrompt(String userPrompt, GearKind kind, String fxHit, String fxIdle) {
         AiPrompt base = gearPromptBase(userPrompt, kind);
         String hit = kind.worn() ? "none (worn equipment has no hit effect)" : blankToNone(fxHit);
-        String effects = "\nEffect on hit: " + hit + "\nEffect while " + (kind.worn() ? "worn" : "held")
+        String hitLine = kind == GearKind.BOW ? "\nArrow effect (trail in flight and/or where it lands): " : "\nEffect on attack (swing): ";
+        String effects = hitLine + hit + "\nEffect while " + (kind.worn() ? "worn" : "held")
             + " (particles, movement, glow): " + blankToNone(fxIdle);
         return new AiPrompt(base.system() + "\n" + EFFECT_API, base.user().replace("\nWrite the Groovy script", effects + "\nWrite the Groovy script"));
     }
@@ -726,7 +768,8 @@ public class AiController {
             You are an expert modeller of cute, detailed Minecraft props and characters. Write ONLY executable Groovy using the `ai` API.
 
             Build ONE object out of display-entity pieces (not whole blocks). Smooth shapes are drawn on a fine
-            1/16-block grid (one texture pixel), and touching pieces of the same block are merged automatically.
+            1/32-block grid (1/16 or coarser for big or busy objects), and touching pieces of the same block are merged
+            automatically.
 
             FRAME (always this, whichever way the player really looks):
             - Units are blocks; decimals are fine. +X = the player's right, +Y = up, +Z = away from the player.
@@ -760,14 +803,20 @@ public class AiController {
             BLOCKS: ai.searchBlocks(keyword)
 
             STYLE (this decides the quality):
+            - PLAN FIRST: before the code, write short // comments listing the thing's real parts with their real sizes
+              (1 block = 1 metre), from the main body to the small details; then build them in that order.
             - Silhouette first: 2-4 big shapes with the right proportions, then medium parts, then small details.
+            - Real things (devices, furniture, vehicles, tools, food, appliances): build their real 3D structure, never a
+              flat picture of them. Every side has thickness; fronts have frames, bezels or rims, with recessed or raised
+              parts in them (a screen sits inside its bezel, buttons and knobs stand out, drawers have handles); backs and
+              undersides are closed and have their own simpler detail (back housing, vents, cables, legs, a stand and base).
             - Characters and animals: cute, stylised proportions. A big head (40-60%% of the body), big readable eyes
               (dark pupil + small white shine), a simple nose/mouth/beak, short sturdy limbs, a recognisable feature
               (horn, hat, mane, ears, tail).
             - Faces (eyes, mouth) only on characters and animals, or when the request asks for one. Food, plants,
               furniture, tools and decorations stay realistic: get their shape and colours right instead.
             - Round things (fruit, pots, heads, bodies) are spheres, ellipsoids, cylinders and cones, not boxes.
-            - Keep parts at least 0.06 thick (one grid pixel); thinner ones are drawn one pixel thick.
+            - Keep parts at least 0.03 thick (one grid pixel); thinner ones are drawn one pixel thick.
             - 3-5 main colours. Use a darker shade for undersides and creases and a lighter one for highlights
               (e.g. yellow_concrete body + yellow_terracotta underside; white_concrete + light_gray_concrete).
             - Overlap shapes slightly so nothing floats or leaves gaps; set details just outside the surface they sit on.
@@ -786,7 +835,37 @@ public class AiController {
             %s
             %s
             %s
-            """.formatted(EXAMPLE_DUCK.strip(), EXAMPLE_LAMP.strip(), EXAMPLE_CHAIR.strip());
+            %s
+            """.formatted(EXAMPLE_DUCK.strip(), EXAMPLE_LAMP.strip(), EXAMPLE_CHAIR.strip(), EXAMPLE_RADIO.strip());
+
+    /** A real device with depth on every side (front frame, recessed and raised parts, a closed back). */
+    public static final String EXAMPLE_RADIO = """
+        // old table radio at real size. Parts: wooden cabinet 0.7 x 0.42 x 0.28; raised front panel; speaker cloth with
+        // grille bars; dial scale with a needle; two knobs; carrying handle; antenna; feet; back cover with vents
+        def z = 2.0
+        def w = 0.7
+        def h = 0.42
+        def d = 0.28
+        ai.addRoundBox('dark_oak_planks', -w / 2, 0.04, z, w, h, d, 0.05)                         // cabinet (real depth)
+        ai.addRoundBox('spruce_planks', -w / 2 + 0.03, 0.07, z - 0.01, w - 0.06, h - 0.06, 0.03, 0.02)  // raised front panel
+        ai.addRoundBox('black_wool', -0.31, 0.11, z - 0.015, 0.34, 0.3, 0.03, 0.01)               // speaker cloth
+        for (int i = 0; i < 5; i++) {
+            ai.addPart('dark_oak_planks', -0.31, 0.13 + i * 0.06, z - 0.03, 0.34, 0.015, 0.02)    // grille bars in front of it
+        }
+        ai.addRoundBox('yellow_terracotta', 0.07, 0.3, z - 0.02, 0.22, 0.08, 0.02, 0.01)          // dial scale
+        ai.addPart('red_concrete', 0.16, 0.305, z - 0.03, 0.008, 0.07, 0.01)                      // needle
+        ai.addCapsule('black_concrete', 0.11, 0.17, z - 0.06, 0.11, 0.17, z, 0.035)               // tuning knob
+        ai.addCapsule('black_concrete', 0.25, 0.17, z - 0.06, 0.25, 0.17, z, 0.035)               // volume knob
+        ai.addTube('black_concrete', [[-0.2, h + 0.03, z + 0.14], [-0.17, h + 0.13, z + 0.14], [0.17, h + 0.13, z + 0.14], [0.2, h + 0.03, z + 0.14]], 0.015)
+        ai.addCapsule('iron_block', 0.27, h + 0.04, z + 0.22, 0.4, h + 0.42, z + 0.25, 0.01)       // telescopic antenna
+        ai.addRoundBox('brown_terracotta', -w / 2 + 0.05, 0.09, z + d - 0.005, w - 0.1, h - 0.1, 0.015, 0)  // back cover
+        for (int i = 0; i < 4; i++) {
+            ai.addPart('black_concrete', -0.2, 0.15 + i * 0.06, z + d + 0.008, 0.4, 0.015, 0.008)  // vents
+        }
+        ai.mirrorOn()
+        ai.addRoundBox('black_concrete', 0.25, 0, z + 0.03, 0.07, 0.05, 0.22, 0.01)              // feet
+        ai.mirrorOff()
+        """;
 
     public static AiPrompt objectPrompt(String userPrompt) {
         return new AiPrompt(OBJECT_SYSTEM, "Object request: " + userPrompt + "\nWrite the Groovy script for it now.");

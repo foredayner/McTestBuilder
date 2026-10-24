@@ -173,6 +173,18 @@ public final class AiClientState {
         return gearKind;
     }
 
+    /** Swords: the attack motion picked in the order ("" = normal swing). */
+    private static String motion = "";
+
+    public static String getMotion() {
+        return motion;
+    }
+
+    public static void cycleMotion() {
+        motion = com.example.content.GearMotions.next(motion);
+        refreshOpenScreen(true);
+    }
+
     public static void cycleGearKind() {
         com.example.content.GearKind[] all = com.example.content.GearKind.values();
         gearKind = all[(gearKind.ordinal() + 1) % all.length];
@@ -278,6 +290,9 @@ public final class AiClientState {
         }
 
         String flag = mode == 1 ? "--object " : mode == 2 ? "--gear=" + gearKind.id() + " " : "";
+        if (mode == 2 && gearKind == com.example.content.GearKind.SWORD && !motion.isEmpty()) {
+            flag += "--motion=" + motion + " ";
+        }
         String effects = "";
         if (mode == 2) {
             String hit = clean(fxHit);

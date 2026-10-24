@@ -36,6 +36,13 @@ public enum GearKind {
         "a long held thing (a staff, wand, walking stick, umbrella, flag, microphone stand...): a shaft (1.2-2.0) going "
             + "up with whatever sits on top."),
 
+    BOW("활", Items.BOW, Items.BOW,
+        "a bow held at the middle of its grip at (0, 0, 0): the limbs go up and down along Y (tips at about y = +-0.55 to "
+            + "+-0.7) and bend toward +X at the tips (x about 0.2-0.35); the string runs between the tips on the +X side; "
+            + "arrows fly toward -X. Keep it thin in Z (0.04-0.1). You may also design the arrow it shoots between "
+            + "ai.arrowStart() and ai.arrowEnd(): the arrow points UP (+Y), fletching at y = 0 to 0.2, shaft up to the head "
+            + "at y = 0.6-0.9, centred on x = z = 0, about 0.03-0.08 thick (without it, arrows look normal)."),
+
     // Worn equipment: drawn on the wearer's head or torso and following its movement.
     HELMET("투구", Items.IRON_HELMET, Items.IRON_HELMET, EquipmentSlot.HEAD,
         "anything that covers the whole head: a helmet, a mask, a mascot, animal or character head, a diving helmet, "

@@ -23,6 +23,8 @@ public class AiBuildAssistantClient implements ClientModInitializer {
         // Solid object hitboxes are invisible; object items draw their own picture.
         net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
             com.example.content.AibContent.HITBOX, net.minecraft.client.render.entity.EmptyEntityRenderer::new);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
+            com.example.content.AibContent.ARROW, AibArrowRenderer::new);
         net.minecraft.client.render.item.model.special.SpecialModelTypes.ID_MAPPER.put(
             ObjectIconRenderer.TYPE_ID, ObjectIconRenderer.Unbaked.CODEC);
         net.minecraft.client.render.item.model.special.SpecialModelTypes.ID_MAPPER.put(

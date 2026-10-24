@@ -303,6 +303,67 @@ public class AibGameTests implements FabricGameTest {
         });
     }
 
+    /** A sword's attack effect plays when it is swung (in front of the player), even at nothing. */
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 100)
+    public void swingingASwordPlaysItsAttackEffect(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(4, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f); // facing south (+Z)
+        BuildPlan plan = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_SWORD
+            + "\nai.hitEffect('enchant', '#9933ff', 4, 'magic_circle', 1.5)\n", true);
+        plan.motion = "thrust";
+        BuildRecord record = BuildRecord.create("swing test", "TEST", "script", plan);
+        record.kind = "gear";
+        record.gear = "sword";
+        net.minecraft.item.ItemStack sword = com.example.ai.build.GearItems.stackFor(record);
+        check("thrust".equals(com.example.content.GearMotions.of(sword)), "the sword keeps its attack motion");
+        player.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, sword);
+        com.example.ai.build.GearEffects.onSwing(player);
+        com.example.ai.build.GearEffects.onSwing(player); // too soon: ignored
+        Box ahead = new Box(origin.add(0, 0, 2)).expand(3);
+        context.waitAndRun(6, () -> {
+            int pieces = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, ahead, e -> e.getCommandTags().contains("aib_fx")).size();
+            check(pieces == 25, "a magic circle in front of the player, got " + pieces + " pieces");
+            context.complete();
+        });
+    }
+
+    /** An AI bow shoots arrows that carry the bow (for their shape) and land like normal arrows. */
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 200)
+    public void bowShootsItsOwnArrows(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        BuildPlan plan = Demo.plan(world, origin, player, Demo.BOW, true);
+        check(com.example.ai.AiController.gearProblem(plan, com.example.content.GearKind.BOW) == null,
+            "the bow fits: " + com.example.ai.AiController.gearProblem(plan, com.example.content.GearKind.BOW));
+        check(plan.trail != null && plan.hit != null, "trail and landing effect recorded");
+        check(plan.parts.stream().anyMatch(p -> p.group == BuildPlan.ARROW_GROUP), "arrow pieces recorded");
+        com.example.ai.AiController.applyEffectRequest(plan, com.example.content.GearKind.BOW, "불꽃 화살", "");
+        check(plan.trail != null, "the arrow effect field keeps the trail");
+        BuildRecord record = BuildRecord.create("bow test", "TEST", "script", plan);
+        record.kind = "gear";
+        record.gear = "bow";
+        net.minecraft.item.ItemStack bow = com.example.ai.build.GearItems.stackFor(record);
+        check(bow.getItem() instanceof net.minecraft.item.BowItem, "it is a bow");
+        check(bow.isIn(net.minecraft.registry.tag.ItemTags.BOW_ENCHANTABLE), "takes bow enchantments");
+        var arrow = ((com.example.content.GearBowItem) bow.getItem()).createArrowEntity(world, player, bow,
+            new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), false);
+        check(arrow instanceof com.example.content.AibArrowEntity, "plain arrows become AI arrows");
+        com.example.content.AibArrowEntity aib = (com.example.content.AibArrowEntity) arrow;
+        check(com.example.ai.build.GearItems.modelOf(aib.bow()) != null, "the arrow carries the bow's model");
+        var tipped = ((com.example.content.GearBowItem) bow.getItem()).createArrowEntity(world, player, bow,
+            new net.minecraft.item.ItemStack(net.minecraft.item.Items.SPECTRAL_ARROW), false);
+        check(!(tipped instanceof com.example.content.AibArrowEntity), "other arrows stay vanilla");
+        aib.refreshPositionAndAngles(origin.getX() + 0.5, origin.getY() + 2, origin.getZ() + 0.5, 0, 0);
+        aib.setVelocity(0, -1, 0.3);
+        world.spawnEntity(aib);
+        context.waitAndRun(40, () -> {
+            check(aib.hasLanded(), "the arrow landed (and played its landing effect)");
+            context.complete();
+        });
+    }
+
     @GameTest(templateName = EMPTY_STRUCTURE)
     public void reviewRejectsBadScriptsBeforeRunning(TestContext context) {
         ServerWorld world = context.getWorld();

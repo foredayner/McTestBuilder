@@ -43,7 +43,10 @@ public final class AiScriptApi {
         "hitEffect",
         "idleEffect",
         "aura",
-        "oversize"
+        "oversize",
+        "arrowStart",
+        "arrowEnd",
+        "arrowTrail"
     );
 
     private AiScriptApi() {

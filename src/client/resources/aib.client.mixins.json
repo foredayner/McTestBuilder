@@ -4,7 +4,12 @@
   "package": "com.example.mixin.client",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "EntityRendererMixin"
+    "BipedEntityModelMixin",
+    "BipedEntityRenderStateMixin",
+    "EntityRendererMixin",
+    "HeldItemRendererMixin",
+    "LivingEntityRendererMixin",
+    "MinecraftClientMixin"
   ],
   "injectors": {
     "defaultRequire": 1

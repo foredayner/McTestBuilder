@@ -148,6 +148,8 @@ public final class BuildPlan {
     }
 
     public static final int MAX_PARTS = 400;
+    /** Bows: the group of the pieces that make the arrow's shape. */
+    public static final int ARROW_GROUP = 999;
     public static final double MAX_PART_SIZE = 16;
     public static final double MAX_PART_OFFSET = 64;
 
@@ -165,6 +167,10 @@ public final class BuildPlan {
     public Aura aura;
     /** Equipment the order asked to be big (ai.oversize()): it may go past the slot's usual size. */
     public boolean oversize;
+    /** Sword: attack motion chosen in the order ("" = the normal swing). */
+    public String motion = "";
+    /** Bow: particles that follow its arrows in flight (null = none). */
+    public Fx trail;
 
     public boolean isEmpty() {
         return (ops == null || ops.isEmpty()) && (parts == null || parts.isEmpty());

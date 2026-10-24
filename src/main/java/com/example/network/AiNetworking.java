@@ -37,6 +37,7 @@ public final class AiNetworking {
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.BuildCompleteS2CPayload.ID, AiNetworkPayloads.BuildCompleteS2CPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RebuildPartC2SPayload.ID, AiNetworkPayloads.RebuildPartC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.UndoC2SPayload.ID, AiNetworkPayloads.UndoC2SPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.AttackSwingC2SPayload.ID, AiNetworkPayloads.AttackSwingC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.BreakObjectC2SPayload.ID, AiNetworkPayloads.BreakObjectC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RemoveObjectC2SPayload.ID, AiNetworkPayloads.RemoveObjectC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.NearbyRequestC2SPayload.ID, AiNetworkPayloads.NearbyRequestC2SPayload.CODEC);
@@ -92,6 +93,9 @@ public final class AiNetworking {
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.BreakObjectC2SPayload.ID, (payload, context) ->
             context.server().execute(() -> com.example.ai.build.ObjectItems.breakObject(context.player(), payload.entityId())));
+        // Using what was made is open to everyone: swinging an AI weapon plays its effect.
+        ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.AttackSwingC2SPayload.ID, (payload, context) ->
+            context.server().execute(() -> com.example.ai.build.GearEffects.onSwing(context.player())));
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.UndoC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> {
                 if (allowed(context.player())) {

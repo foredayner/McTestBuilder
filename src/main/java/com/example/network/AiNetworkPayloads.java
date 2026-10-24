@@ -183,6 +183,17 @@ public final class AiNetworkPayloads {
         }
     }
 
+    /** Client -> server: the player swung an AI weapon (attack key, charged): play its attack effect. */
+    public record AttackSwingC2SPayload() implements CustomPayload {
+        public static final CustomPayload.Id<AttackSwingC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "attack_swing"));
+        public static final PacketCodec<RegistryByteBuf, AttackSwingC2SPayload> CODEC = PacketCodec.unit(new AttackSwingC2SPayload());
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     /** Client -> server: remove a placed object (by its hitbox entity id, or by tag from the list). */
     public record RemoveObjectC2SPayload(int entityId, String tag) implements CustomPayload {
         public static final CustomPayload.Id<RemoveObjectC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "remove_object"));

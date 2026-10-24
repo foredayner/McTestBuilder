@@ -79,8 +79,8 @@ public class MinecraftAI {
 
     /** The group mirrored pieces of the current group go into. */
     private static int mirrorGroup() {
-        if (group == 0) {
-            return 0;
+        if (group == 0 || group == BuildPlan.ARROW_GROUP) {
+            return group;
         }
         for (Map.Entry<String, Integer> e : groupIds.entrySet()) {
             if (e.getValue() == group) {
@@ -100,6 +100,24 @@ public class MinecraftAI {
 
     public static void groupEnd() {
         group = 0;
+    }
+
+    /** Bows: pieces made until arrowEnd() are the shape of the arrows it shoots (not drawn on the bow). */
+    public static void arrowStart() {
+        group = BuildPlan.ARROW_GROUP;
+    }
+
+    public static void arrowEnd() {
+        group = 0;
+    }
+
+    /** Bows: particles that follow its arrows in flight. */
+    public static void arrowTrail(String particle, String color, Number count) {
+        if (recorder != null) {
+            BuildPlan.Fx fx = fx(particle, color, count);
+            fx.count = Math.max(1, Math.min(4, fx.count));
+            recorder.trail = fx;
+        }
     }
 
     private static final java.util.Set<String> ANIMS = java.util.Set.of("spin", "swing", "bob", "pulse");

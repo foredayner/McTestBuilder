@@ -38,6 +38,7 @@ public class AiBuildCommand {
         String prompt = rawPrompt.trim();
         boolean useWebSearch = webFlag;
         String mode = "build";
+        String motion = "";
         while (true) {
             if (prompt.startsWith("--web ")) {
                 useWebSearch = true;
@@ -45,6 +46,9 @@ public class AiBuildCommand {
             } else if (prompt.startsWith("--object ")) {
                 mode = "object";
                 prompt = prompt.substring(9).trim();
+            } else if (prompt.startsWith("--motion=") && prompt.indexOf(' ') > 0) {
+                motion = prompt.substring(9, prompt.indexOf(' '));
+                prompt = prompt.substring(prompt.indexOf(' ') + 1).trim();
             } else if (prompt.startsWith("--gear=") && prompt.indexOf(' ') > 0) {
                 mode = "gear:" + com.example.content.GearKind.of(prompt.substring(7, prompt.indexOf(' '))).id();
                 prompt = prompt.substring(prompt.indexOf(' ') + 1).trim();
@@ -70,11 +74,12 @@ public class AiBuildCommand {
         final String finalPrompt = prompt;
         final String finalMode = mode;
         final boolean web = useWebSearch;
+        final String finalMotion = motion;
         source.sendFeedback(
             () -> Text.literal("AI " + finalMode + " request" + (web ? " (web search)" : "") + ": " + finalPrompt),
             false
         );
-        AiController.requestBuild(source.getPlayer(), finalPrompt, web, finalMode, finalHit, finalIdle);
+        AiController.requestBuild(source.getPlayer(), finalPrompt, web, finalMode, finalHit, finalIdle, finalMotion);
         return 1;
     }
 }

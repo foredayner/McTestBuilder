@@ -17,6 +17,9 @@ public final class AibContent {
     public static final Identifier OBJECT_ID = Identifier.of(AiBuildAssistantMod.MOD_ID, "object");
 
     public static EntityType<SolidHitboxEntity> HITBOX;
+    public static final Identifier ARROW_ID = Identifier.of(AiBuildAssistantMod.MOD_ID, "arrow");
+    /** Arrows shot from AI bows. */
+    public static EntityType<AibArrowEntity> ARROW;
     public static Item OBJECT_ITEM;
     /** One item per equipment kind (so tags like #minecraft:swords and enchantments work). */
     public static final java.util.Map<GearKind, Item> GEAR = new java.util.EnumMap<>(GearKind.class);
@@ -39,6 +42,15 @@ public final class AibContent {
                 .maxTrackingRange(10)
                 .build(entityKey));
 
+        RegistryKey<EntityType<?>> arrowKey = RegistryKey.of(RegistryKeys.ENTITY_TYPE, ARROW_ID);
+        ARROW = Registry.register(Registries.ENTITY_TYPE, arrowKey,
+            EntityType.Builder.<AibArrowEntity>create(AibArrowEntity::new, SpawnGroup.MISC)
+                .dimensions(0.5F, 0.5F)
+                .eyeHeight(0.13F)
+                .maxTrackingRange(4)
+                .trackingTickInterval(20)
+                .build(arrowKey));
+
         RegistryKey<Item> itemKey = RegistryKey.of(RegistryKeys.ITEM, OBJECT_ID);
         OBJECT_ITEM = Registry.register(Registries.ITEM, itemKey, new ObjectItem(new Item.Settings().registryKey(itemKey)));
 
@@ -52,7 +64,8 @@ public final class AibContent {
             copy(settings, kind.base, net.minecraft.component.DataComponentTypes.ENCHANTABLE);
             copy(settings, kind.base, net.minecraft.component.DataComponentTypes.REPAIRABLE);
             copy(settings, kind.base, net.minecraft.component.DataComponentTypes.EQUIPPABLE); // worn kinds only
-            GEAR.put(kind, Registry.register(Registries.ITEM, key, new GearItem(kind, settings)));
+            Item item = kind == GearKind.BOW ? new GearBowItem(settings) : new GearToolItem(kind, settings);
+            GEAR.put(kind, Registry.register(Registries.ITEM, key, item));
         }
     }
 }

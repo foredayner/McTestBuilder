@@ -156,6 +156,48 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.waitTicks(5);
             context.takeScreenshot("20_sword_third_person");
 
+            // A sword ordered with an attack motion (가로베기), frozen in the middle of the swing.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                BuildRecord r = BuildRecord.fromJson(gear.get(0));
+                r.plan.motion = "slash";
+                p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(r));
+            });
+            context.waitTicks(40);
+            context.runOnClient(client -> com.example.client.GearMotionClient.forceProgress = 0.45F);
+            context.waitTicks(2);
+            context.takeScreenshot("25_sword_slash_third_person");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
+            context.waitTicks(2);
+            context.takeScreenshot("26_sword_slash_first_person");
+            context.runOnClient(client -> com.example.client.GearMotionClient.forceProgress = -1);
+
+            // A bow with its own arrow shape: in the hand, and one of its arrows hanging in the air.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                BuildRecord bow = BuildRecord.create("불꽃 활", "TEST", "script",
+                    Demo.plan(p.getServerWorld(), p.getBlockPos(), p, Demo.BOW, true));
+                bow.kind = "gear";
+                bow.gear = "bow";
+                net.minecraft.item.ItemStack stack = com.example.ai.build.GearItems.stackFor(bow);
+                p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, stack);
+                var arrow = new com.example.content.AibArrowEntity(p.getServerWorld(), p,
+                    new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), stack);
+                var look = p.getRotationVec(1.0F);
+                var flat = new net.minecraft.util.math.Vec3d(look.x, 0, look.z).normalize();
+                var at = p.getEyePos().add(flat.multiply(2.2)).add(0, -0.3, 0);
+                arrow.refreshPositionAndAngles(at.x, at.y, at.z, 0, 0);
+                arrow.setNoGravity(true);
+                // Flying across the view (to the right), very slowly.
+                arrow.setVelocity(-flat.z, 0.0, flat.x, 0.01F, 0.0F);
+                p.getServerWorld().spawnEntity(arrow);
+            });
+            context.waitTicks(40);
+            context.takeScreenshot("27_bow_first_person");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
+            context.waitTicks(3);
+            context.takeScreenshot("28_bow_third_person");
+
             // Worn equipment: the example helmet and wings on the player, from the front and the back.
             game.getServer().runOnServer(server -> {
                 ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);

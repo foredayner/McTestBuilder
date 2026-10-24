@@ -59,6 +59,11 @@ public final class GearItems {
             }
         }
         GearEffects.write(nbt, GearEffects.IDLE, record.plan.idle);
+        GearEffects.write(nbt, GearEffects.TRAIL, record.plan.trail);
+        String motion = com.example.content.GearMotions.normalize(record.plan.motion);
+        if (!motion.isEmpty()) {
+            nbt.putString(com.example.content.GearMotions.KEY, motion);
+        }
         stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbt));
         stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(RebuildService.title(record))
             .setStyle(Style.EMPTY.withItalic(false).withColor(Formatting.AQUA)));

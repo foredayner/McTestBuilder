@@ -70,6 +70,22 @@ server and the client of the player who builds. That player needs operator level
     something big does the AI call `ai.oversize()`: then up to 5 blocks (e.g. a 4-block balloon on a string
     above the head). Big equipment widens the wearer's on-screen check (a client mixin on
     `EntityRenderer.getBoundingBox`) so it does not vanish when the wearer is off screen.
+    Attack effects play when the weapon is swung (the client tells the server when the attack key is pressed
+    with a charged attack, not at a block; the server limits how often), in front of the player or on what
+    they aim at; mobs holding AI weapons still play them on hit.
+    Swords have a 공격 모션 button (기본 / 가로베기 / 내려찍기 / 찌르기 / 회전베기): the swing is drawn with that
+    motion in first person (HeldItemRenderer mixin) and third person (BipedEntityModel.animateArms mixin);
+    damage, reach and speed stay vanilla.
+    Bows (활): a BowItem (drawing, power, enchantments) drawn as the AI model with its grip where the vanilla
+    bow sprite's grip is. The AI may design the arrow (ai.arrowStart/arrowEnd) and a trail (ai.arrowTrail);
+    the bow's effect field is the arrow effect: trail in flight and ai.hitEffect where it lands. Plain arrows
+    shot from it are AibArrowEntity (they carry the bow, so clients draw its arrow shape); tipped and spectral
+    arrows stay vanilla.
+  - Objects: the prompt asks the AI to list the real parts and sizes first and to build real things with
+    depth on every side (frames, recessed and raised parts, closed backs); a table radio example; objects
+    use the 1/32 grid when 400 pieces allow.
+  - Web search: the request gets a note to look up the thing's real look (the exact version for a
+    character or series), list the features found as comments, and build every one of them.
   - **Claude (Anthropic)** provider: Messages API with the fixed instructions as a cached system prompt,
     optional web search (`web_search` tool, at most 3 searches per build).
   - Objects are **solid**: their parts are merged into a few boxes that follow the shape (an

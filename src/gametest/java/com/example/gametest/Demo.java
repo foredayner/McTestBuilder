@@ -43,6 +43,21 @@ public final class Demo {
             + "ai.addEllipsoid('red_concrete', 0.2, 3.8, 0.25, 1.6, 2.0, 1.6)\n"
             + "ai.addEllipsoid('pink_concrete', -0.35, 4.5, -0.95, 0.3, 0.45, 0.25)\n";
 
+    /** A wooden bow with its own red-fletched arrow, a flame trail and a shockwave where arrows land. */
+    public static final String BOW =
+        "ai.addTube('dark_oak_planks', [[0.3, -0.65, 0], [0.08, -0.35, 0], [0, 0, 0], [0.08, 0.35, 0], [0.3, 0.65, 0]], 0.035)\n"
+            + "ai.addCapsule('brown_wool', 0, -0.1, 0, 0, 0.1, 0, 0.05)\n"
+            + "ai.addCapsule('white_wool', 0.3, -0.65, 0, 0.3, 0.65, 0, 0.01)\n"
+            + "ai.arrowStart()\n"
+            + "ai.addCapsule('oak_planks', 0, 0, 0, 0, 0.7, 0, 0.018)\n"
+            + "ai.addCone('iron_block', 0, 0.66, 0, 0.045, 0.14)\n"
+            + "ai.mirrorOn()\n"
+            + "ai.addPart('red_wool', 0.012, 0.02, -0.006, 0.06, 0.16, 0.012)\n"
+            + "ai.mirrorOff()\n"
+            + "ai.arrowEnd()\n"
+            + "ai.hitEffect('flame', '#ff6600', 6, 'shockwave', 1.5)\n"
+            + "ai.arrowTrail('flame', '#ff6600', 2)\n";
+
     private Demo() {
     }
 

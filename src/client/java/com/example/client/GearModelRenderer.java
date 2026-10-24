@@ -41,7 +41,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
 
     /** A decoded model: parts with their textures, and its outline after the sword tilt. */
     public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn,
-                        Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura, float reach) {
+                        Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura, float reach, boolean bow, Model arrow) {
     }
 
     /**
@@ -85,6 +85,9 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     private static final float GRIP_Y = 0.2F;
     private static final float TILT = (float) Math.toRadians(-45);
     private static final float HAND_SCALE = 0.8F;
+    /** The grip of the vanilla bow sprite (its limbs run along the same diagonal as a sword's blade). */
+    private static final float BOW_GRIP_X = 0.31F;
+    private static final float BOW_GRIP_Y = 0.69F;
 
     /** Decoded models by item data, so the gzip and JSON are read once per stack, not every frame. */
     private static final Map<Integer, Map.Entry<WeakReference<NbtComponent>, Model>> CACHE = new LinkedHashMap<>(64, 0.75f, true) {
@@ -112,14 +115,35 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         }
         BuildPlan plan = GearItems.modelOf(stack);
         boolean worn = stack.getItem() instanceof com.example.content.GearItem gear && gear.kind().worn();
-        Model model = plan == null || plan.parts.isEmpty() ? null : decode(plan, worn);
+        boolean bow = stack.getItem() instanceof com.example.content.GearItem gear2 && gear2.kind() == com.example.content.GearKind.BOW;
+        Model model = plan == null || plan.parts.isEmpty() ? null : decode(plan, worn, bow);
         CACHE.put(key, Map.entry(new WeakReference<>(data), model == null ? EMPTY : model));
         return model;
     }
 
-    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null, 0);
+    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null, 0, false, null);
 
-    private static Model decode(BuildPlan plan, boolean worn) {
+    private static Model decode(BuildPlan plan, boolean worn, boolean bow) {
+        // A bow's arrow pieces are not part of the bow: they are the shape of the arrows it shoots.
+        List<BuildPlan.Part> arrowParts = new ArrayList<>();
+        List<BuildPlan.Part> own = new ArrayList<>();
+        for (BuildPlan.Part p : plan.parts) {
+            (p.group == BuildPlan.ARROW_GROUP ? arrowParts : own).add(p);
+        }
+        Model arrow = null;
+        if (bow && !arrowParts.isEmpty()) {
+            List<Sprite> arrowSprites = new ArrayList<>();
+            float reach = 0;
+            for (BuildPlan.Part p : arrowParts) {
+                arrowSprites.add(spriteOf(p.block));
+                reach = (float) Math.max(reach, p.y + p.sy / 2);
+            }
+            arrow = new Model(arrowParts, arrowSprites, new float[4], false, Map.of(), null, reach, false, null);
+        }
+        if (own.isEmpty()) {
+            own = arrowParts; // only an arrow: show it
+        }
+        plan = copyWithParts(plan, own);
         List<Sprite> sprites = new ArrayList<>();
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
         float tilt = worn ? 0 : TILT;
@@ -143,7 +167,15 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
                 anims.computeIfAbsent(a.group, k -> new ArrayList<>()).add(a);
             }
         }
-        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims, plan.aura, reach);
+        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims, plan.aura, reach, bow, arrow);
+    }
+
+    private static BuildPlan copyWithParts(BuildPlan plan, List<BuildPlan.Part> parts) {
+        BuildPlan copy = new BuildPlan();
+        copy.parts = parts;
+        copy.anims = plan.anims;
+        copy.aura = plan.aura;
+        return copy;
     }
 
     private static Sprite spriteOf(String block) {
@@ -182,6 +214,9 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             matrices.translate(0.5F, 0.5F, 0.5F);
             matrices.scale(scale, scale, scale);
             matrices.translate(-(t[0] + t[2]) / 2, -(t[1] + t[3]) / 2, 0);
+        } else if (model.bow()) {
+            // A bow: its grip where the vanilla bow sprite's grip is, so the bow poses (drawing too) fit it.
+            matrices.translate(BOW_GRIP_X, BOW_GRIP_Y, 0.5F);
         } else {
             // In the hand: a 1.45-block AI sword shows about as big as a vanilla sword.
             matrices.translate(GRIP_X, GRIP_Y, 0.5F);

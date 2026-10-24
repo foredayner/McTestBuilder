@@ -229,6 +229,18 @@ public final class AiScriptFacade {
         MinecraftAI.oversize();
     }
 
+    public void arrowStart() {
+        MinecraftAI.arrowStart();
+    }
+
+    public void arrowEnd() {
+        MinecraftAI.arrowEnd();
+    }
+
+    public void arrowTrail(String particle, String color, Number count) {
+        MinecraftAI.arrowTrail(particle, color, count);
+    }
+
     public void idleEffect(String particle, String color, Number count) {
         MinecraftAI.idleEffect(particle, color, count);
     }

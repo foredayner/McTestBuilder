@@ -208,6 +208,11 @@ public class AiPromptScreen extends Screen {
             com.example.content.GearKind kind = AiClientState.getGearKind();
             button("   종류: " + kind.korean, right() - 84 - 92, top(), 88, b -> AiClientState.cycleGearKind());
             this.icons.add(new IconAt(new ItemStack(kind.icon), right() - 84 - 89, top() + 1));
+            if (kind == com.example.content.GearKind.SWORD) {
+                // Swords only: how the attack swing looks.
+                button("모션: " + com.example.content.GearMotions.korean(AiClientState.getMotion()), right() - 84 - 92 - 96, top(), 92,
+                    b -> AiClientState.cycleMotion());
+            }
         }
 
         int y = bottom() - 42;
@@ -221,7 +226,9 @@ public class AiPromptScreen extends Screen {
                 this.idleField = effectField(left(), y, span, "착용 시 이펙트·애니메이션 (비우면 없음)", AiClientState.getFxIdle());
             } else {
                 int half = (span - 4) / 2;
-                this.hitField = effectField(left(), y, half, "공격 시 이펙트 (비우면 없음)", AiClientState.getFxHit());
+                boolean bow = AiClientState.getGearKind() == com.example.content.GearKind.BOW;
+                this.hitField = effectField(left(), y, half, bow ? "화살 이펙트·모양 (비우면 없음)" : "공격 시 이펙트 (비우면 없음)",
+                    AiClientState.getFxHit());
                 this.idleField = effectField(left() + half + 4, y, span - half - 4, "대기 시 이펙트·애니메이션 (비우면 없음)",
                     AiClientState.getFxIdle());
             }
@@ -269,7 +276,10 @@ public class AiPromptScreen extends Screen {
             String hit = AiClientState.getGearKind().worn() ? "" : AiClientState.getFxHit().trim();
             String idle = AiClientState.getFxIdle().trim();
             if (!hit.isEmpty()) {
-                AiClientState.addLog("[Request] 공격 시: " + hit);
+                AiClientState.addLog("[Request] " + (AiClientState.getGearKind() == com.example.content.GearKind.BOW ? "화살: " : "공격 시: ") + hit);
+            }
+            if (AiClientState.getGearKind() == com.example.content.GearKind.SWORD && !AiClientState.getMotion().isEmpty()) {
+                AiClientState.addLog("[Request] 공격 모션: " + com.example.content.GearMotions.korean(AiClientState.getMotion()));
             }
             if (!idle.isEmpty()) {
                 AiClientState.addLog("[Request] " + (AiClientState.getGearKind().worn() ? "착용 시: " : "대기 시: ") + idle);

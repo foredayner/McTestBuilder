@@ -72,6 +72,12 @@ public final class AiClientNetworking {
         ClientPlayNetworking.send(new AiNetworkPayloads.BreakObjectC2SPayload(entityId));
     }
 
+    public static void sendAttackSwing() {
+        if (ClientPlayNetworking.canSend(AiNetworkPayloads.AttackSwingC2SPayload.ID)) {
+            ClientPlayNetworking.send(new AiNetworkPayloads.AttackSwingC2SPayload());
+        }
+    }
+
     public static void sendUndo() {
         ClientPlayNetworking.send(new AiNetworkPayloads.UndoC2SPayload());
     }

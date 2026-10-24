@@ -83,8 +83,12 @@ public final class HitEffects {
 
     /** True while this attacker's last shaped effect is still playing. */
     public static boolean busy(LivingEntity attacker) {
+        return busy(attacker.getUuid());
+    }
+
+    public static boolean busy(UUID who) {
         for (Effect e : ACTIVE) {
-            if (e.attacker.equals(attacker.getUuid()) && e.age < e.duration) {
+            if (e.attacker.equals(who) && e.age < e.duration) {
                 return true;
             }
         }
@@ -98,13 +102,23 @@ public final class HitEffects {
     /** together: part of a set started by the same hit (does not wait for the attacker's last effect). */
     public static boolean start(ServerWorld world, LivingEntity attacker, LivingEntity target, BuildPlan.Fx fx, ParticleEffect particle,
                                 boolean together) {
-        if (!together && busy(attacker)) {
+        Vec3d look = attacker.getRotationVec(1.0F);
+        Vec3d from = attacker.getEyePos().add(0, -0.4, 0).add(look.multiply(0.6));
+        return startAt(world, attacker.getUuid(), target.getPos(), from, look, fx, particle, together);
+    }
+
+    /**
+     * Play a shaped effect centred on {@code center} (feet level of where it lands); {@code from}
+     * is where a cone or slash starts and {@code look} the direction it goes.
+     */
+    public static boolean startAt(ServerWorld world, UUID who, Vec3d center, Vec3d from, Vec3d look, BuildPlan.Fx fx,
+                                  ParticleEffect particle, boolean together) {
+        if (!together && busy(who)) {
             return false;
         }
         if (ACTIVE.size() >= MAX_ACTIVE) {
             return false;
         }
-        Vec3d look = attacker.getRotationVec(1.0F);
         Vec3d flat = new Vec3d(look.x, 0, look.z);
         flat = flat.lengthSquared() < 1e-6 ? new Vec3d(0, 0, 1) : flat.normalize();
         int duration = switch (fx.pattern) {
@@ -119,13 +133,12 @@ public final class HitEffects {
             case "converge" -> 14;
             default -> 1;
         };
-        Vec3d from = attacker.getEyePos().add(0, -0.4, 0).add(look.multiply(0.6));
-        Effect e = new Effect(world, attacker.getUuid(), particle, fx, target.getPos(), from, flat, duration);
+        Effect e = new Effect(world, who, particle, fx, center, from, flat, duration);
         if ("magic_circle".equals(fx.pattern)) {
             spawnCircle(e);
         }
         ACTIVE.add(e);
-        BY_ATTACKER.put(attacker.getUuid(), e);
+        BY_ATTACKER.put(who, e);
         return true;
     }
 

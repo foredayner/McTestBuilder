@@ -27,6 +27,8 @@ public final class GearEffects {
 
     public static final String HIT = "aib_fx_hit";
     public static final String IDLE = "aib_fx_idle";
+    /** Bows: particles following the arrow in flight. */
+    public static final String TRAIL = "aib_fx_trail";
     /** Ticks between two puffs of the held / worn effect. */
     private static final int IDLE_INTERVAL = 5;
 
@@ -97,6 +99,79 @@ public final class GearEffects {
             }
             burst(world, target, fx, effect);
         }
+    }
+
+    /** Last swing effect per player (server ticks), so a modified client cannot flood effects. */
+    private static final java.util.Map<java.util.UUID, Integer> LAST_SWING = new java.util.HashMap<>();
+
+    /**
+     * A player swung an equipment weapon (told by their client when the attack key is pressed and
+     * the attack is charged): play its attack effect in front of them, on whatever they aim at
+     * within reach, or about two blocks ahead.
+     */
+    public static void onSwing(net.minecraft.server.network.ServerPlayerEntity player) {
+        ItemStack stack = player.getMainHandStack();
+        if (!(stack.getItem() instanceof com.example.content.GearItem gear) || gear.kind().worn()
+            || gear.kind() == GearKind.BOW || !(player.getWorld() instanceof ServerWorld world)) {
+            return;
+        }
+        int now = player.getServer() == null ? player.age : player.getServer().getTicks();
+        int interval = Math.max(4, Math.round(player.getAttackCooldownProgressPerTick() * 0.8F));
+        Integer last = LAST_SWING.get(player.getUuid());
+        if (last != null && now - last >= 0 && now - last < interval) {
+            return;
+        }
+        LAST_SWING.put(player.getUuid(), now);
+        Vec3d eye = player.getEyePos();
+        Vec3d look = player.getRotationVec(1.0F);
+        double reach = player.getEntityInteractionRange();
+        Vec3d center;
+        net.minecraft.util.hit.EntityHitResult aimed = net.minecraft.entity.projectile.ProjectileUtil.raycast(player, eye,
+            eye.add(look.multiply(reach)), player.getBoundingBox().stretch(look.multiply(reach)).expand(1.0),
+            e -> e instanceof LivingEntity && !e.isSpectator() && e.canHit(), reach * reach);
+        if (aimed != null) {
+            center = aimed.getEntity().getPos();
+        } else {
+            Vec3d flat = new Vec3d(look.x, 0, look.z);
+            flat = flat.lengthSquared() < 1e-6 ? new Vec3d(0, 0, 1) : flat.normalize();
+            center = player.getPos().add(flat.multiply(2.0));
+        }
+        Vec3d from = eye.add(0, -0.4, 0).add(look.multiply(0.6));
+        play(world, player.getUuid(), stack, center, from, look);
+    }
+
+    /** All hit effects of {@code stack}: plain bursts, and shaped ones (one set per wielder at a time). */
+    private static void play(ServerWorld world, java.util.UUID who, ItemStack stack, Vec3d center, Vec3d from, Vec3d look) {
+        boolean busy = HitEffects.busy(who);
+        for (String key : new String[] { HIT, HIT + 2, HIT + 3 }) {
+            BuildPlan.Fx fx = read(stack, key);
+            ParticleEffect effect = fx == null ? null : particle(fx);
+            if (effect == null) {
+                continue;
+            }
+            if (!"burst".equals(fx.pattern)) {
+                if (!busy) {
+                    HitEffects.startAt(world, who, center, from, look, fx, effect, true);
+                    continue;
+                }
+                fx = new BuildPlan.Fx(fx.particle, fx.color, fx.count);
+            }
+            world.spawnParticles(effect, center.x, center.y + 1.0, center.z, fx.count * 3, 0.35, 0.4, 0.35, 0.08);
+        }
+    }
+
+    /** One tick of a flying arrow's trail. */
+    public static void arrowTrail(ServerWorld world, com.example.content.AibArrowEntity arrow, BuildPlan.Fx fx) {
+        ParticleEffect effect = particle(fx);
+        if (effect != null) {
+            world.spawnParticles(effect, arrow.getX(), arrow.getY(), arrow.getZ(), fx.count, 0.04, 0.04, 0.04, 0.0);
+        }
+    }
+
+    /** An arrow from an AI bow landed at {@code at}: the bow's hit effects play there. */
+    public static void arrowImpact(ServerWorld world, com.example.content.AibArrowEntity arrow, Vec3d at) {
+        Vec3d dir = arrow.getVelocity().lengthSquared() < 1e-6 ? arrow.getRotationVec(1.0F) : arrow.getVelocity().normalize();
+        play(world, arrow.getUuid(), arrow.bow(), at, at.add(0, 0.6, 0).subtract(dir.multiply(1.2)), dir);
     }
 
     private static void burst(ServerWorld world, LivingEntity target, BuildPlan.Fx fx, ParticleEffect effect) {
