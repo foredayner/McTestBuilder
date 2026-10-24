@@ -233,9 +233,9 @@ public class AiPromptScreen extends Screen {
     private void renderCreate(DrawContext ctx) {
         boolean object = AiClientState.isObjectMode();
         boolean gear = AiClientState.isGearMode();
-        String hint = gear ? "종류를 고르고 원하는 장비를 이야기해 주세요"
+        String header = gear ? "종류를 고르고 원하는 장비를 이야기해 주세요"
             : object ? "원하는 소품을 이야기해 주세요" : "원하는 건물을 이야기해 주세요";
-        ctx.drawText(this.textRenderer, ellipsize(hint, right() - left() - (gear ? 190 : 96)), left() + 2, top() + 5, INK_SOFT, false);
+        ctx.drawText(this.textRenderer, ellipsize(header, right() - left() - (gear ? 190 : 96)), left() + 2, top() + 5, INK_SOFT, false);
 
         int l = left(), r = right(), t = chatTop(), b = chatBottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);
