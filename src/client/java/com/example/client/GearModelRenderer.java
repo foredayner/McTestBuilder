@@ -60,6 +60,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     private static final float GRIP_X = 0.2F;
     private static final float GRIP_Y = 0.2F;
     private static final float TILT = (float) Math.toRadians(-45);
+    private static final float HAND_SCALE = 0.8F;
 
     /** Decoded models by item data, so the gzip and JSON are read once per stack, not every frame. */
     private static final Map<Integer, Map.Entry<WeakReference<NbtComponent>, Model>> CACHE = new LinkedHashMap<>(64, 0.75f, true) {
@@ -130,7 +131,9 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             matrices.scale(scale, scale, scale);
             matrices.translate(-(t[0] + t[2]) / 2, -(t[1] + t[3]) / 2, 0);
         } else {
+            // In the hand: a 1.45-block AI sword shows about as big as a vanilla sword.
             matrices.translate(GRIP_X, GRIP_Y, 0.5F);
+            matrices.scale(HAND_SCALE, HAND_SCALE, HAND_SCALE);
         }
         matrices.multiply(new Quaternionf().rotateZ(TILT));
         VertexConsumer buffer = vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout());
