@@ -21,7 +21,9 @@ public final class AiClientState {
     private static final LinkedList<String> LOGS = new LinkedList<>();
     private static final LinkedList<Entry> ENTRIES = new LinkedList<>();
     private static final int MAX_ENTRIES = 120;
-    private static boolean objectMode = false;
+    /** What the AI 공방 makes: 0 building, 1 object, 2 equipment. */
+    private static int mode = 0;
+    private static com.example.content.GearKind gearKind = com.example.content.GearKind.SWORD;
     private static final int MAX_LOGS = 300;
     private static final int MAX_LINES_PER_MESSAGE = 8;
 
@@ -145,11 +147,35 @@ public final class AiClientState {
     }
 
     public static boolean isObjectMode() {
-        return objectMode;
+        return mode == 1;
     }
 
-    public static void toggleObjectMode() {
-        objectMode = !objectMode;
+    public static boolean isGearMode() {
+        return mode == 2;
+    }
+
+    public static int getMode() {
+        return mode;
+    }
+
+    /** 건물 -> 소품 -> 장비 -> 건물. */
+    public static void cycleMode() {
+        mode = (mode + 1) % 3;
+        refreshOpenScreen(true);
+    }
+
+    public static void setMode(int newMode) {
+        mode = Math.floorMod(newMode, 3);
+        refreshOpenScreen(true);
+    }
+
+    public static com.example.content.GearKind getGearKind() {
+        return gearKind;
+    }
+
+    public static void cycleGearKind() {
+        com.example.content.GearKind[] all = com.example.content.GearKind.values();
+        gearKind = all[(gearKind.ordinal() + 1) % all.length];
         refreshOpenScreen(true);
     }
 
@@ -245,12 +271,14 @@ public final class AiClientState {
             return;
         }
 
-        if (willUseWebSearch() && !OpenAiWebSearchSupport.isModelSupported(AiBuilderConfig.get().modelName)) {
+        if (willUseWebSearch() && AiBuilderConfig.get().provider == AiProvider.OPENAI
+            && !OpenAiWebSearchSupport.isModelSupported(AiBuilderConfig.get().modelName)) {
             addLog("[AI] Error: " + OpenAiWebSearchSupport.unsupportedModelMessage(AiBuilderConfig.get().modelName));
             return;
         }
 
-        ClientAiBuildNetworking.sendAiBuildRequest(trimmed, willUseWebSearch(), objectMode);
+        String flag = mode == 1 ? "--object " : mode == 2 ? "--gear=" + gearKind.id() + " " : "";
+        ClientAiBuildNetworking.sendAiBuildRequest(trimmed, willUseWebSearch(), flag);
     }
 
     public static void approve() {

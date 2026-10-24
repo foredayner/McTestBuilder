@@ -18,8 +18,17 @@ public final class AibContent {
 
     public static EntityType<SolidHitboxEntity> HITBOX;
     public static Item OBJECT_ITEM;
+    /** One item per equipment kind (so tags like #minecraft:swords and enchantments work). */
+    public static final java.util.Map<GearKind, Item> GEAR = new java.util.EnumMap<>(GearKind.class);
 
     private AibContent() {
+    }
+
+    private static <T> void copy(Item.Settings settings, Item from, net.minecraft.component.ComponentType<T> type) {
+        T value = from.getComponents().get(type);
+        if (value != null) {
+            settings.component(type, value);
+        }
     }
 
     public static void register() {
@@ -32,5 +41,17 @@ public final class AibContent {
 
         RegistryKey<Item> itemKey = RegistryKey.of(RegistryKeys.ITEM, OBJECT_ID);
         OBJECT_ITEM = Registry.register(Registries.ITEM, itemKey, new ObjectItem(new Item.Settings().registryKey(itemKey)));
+
+        for (GearKind kind : GearKind.values()) {
+            RegistryKey<Item> key = RegistryKey.of(RegistryKeys.ITEM, Identifier.of(AiBuildAssistantMod.MOD_ID, "gear_" + kind.id()));
+            Item.Settings settings = new Item.Settings().registryKey(key).maxCount(1);
+            copy(settings, kind.base, net.minecraft.component.DataComponentTypes.ATTRIBUTE_MODIFIERS);
+            copy(settings, kind.base, net.minecraft.component.DataComponentTypes.TOOL);
+            copy(settings, kind.base, net.minecraft.component.DataComponentTypes.MAX_DAMAGE);
+            copy(settings, kind.base, net.minecraft.component.DataComponentTypes.DAMAGE);
+            copy(settings, kind.base, net.minecraft.component.DataComponentTypes.ENCHANTABLE);
+            copy(settings, kind.base, net.minecraft.component.DataComponentTypes.REPAIRABLE);
+            GEAR.put(kind, Registry.register(Registries.ITEM, key, new GearItem(kind, settings)));
+        }
     }
 }

@@ -47,18 +47,23 @@ public class AibModelBench implements FabricClientGameTest {
     private static final Path OUT = Path.of("bench");
     private static final int RETRIES = 2;
 
-    private record Case(String id, String prompt, boolean object) {
+    private record Case(String id, String prompt, String mode) {
+        boolean object() {
+            return !"build".equals(mode);
+        }
+
+        boolean gear() {
+            return mode.startsWith("gear:");
+        }
     }
 
     private static final List<Case> CASES = List.of(
-        new Case("b1_cabin", "참나무와 조약돌로 만든 작은 오두막, 굴뚝과 현관 계단", false),
-        new Case("b2_house", "거실, 부엌, 침실 두 개가 있는 2층 집", false),
-        new Case("o1_apple", "빨간 사과", true),
-        new Case("o2_duck", "모자를 쓴 노란 오리", true),
-        new Case("o3_unicorn", "흰 유니콘", true),
-        new Case("o4_golem", "이끼 낀 돌 골렘", true),
-        new Case("o5_chair", "나무 의자", true),
-        new Case("o6_lamp", "책상 스탠드 램프", true)
+        new Case("g1_sword", "불꽃이 타오르는 용사의 대검", "gear:sword"),
+        new Case("g2_axe", "바이킹 전투 도끼", "gear:axe"),
+        new Case("g3_pickaxe", "다이아몬드가 박힌 광부의 곡괭이", "gear:pickaxe"),
+        new Case("g4_staff", "얼음 결정이 달린 마법사의 지팡이", "gear:staff"),
+        new Case("g5_hammer", "천둥의 망치", "gear:hammer"),
+        new Case("o2_duck", "모자를 쓴 노란 오리", "object")
     );
 
     /** One AI call. */
@@ -168,7 +173,7 @@ public class AibModelBench implements FabricClientGameTest {
         r.prompt = c.prompt();
         r.object = c.object();
         com.example.ai.AiPrompt base = game.getServer().computeOnServer(server ->
-            AiController.promptFor(server.getPlayerManager().getPlayerList().get(0), c.prompt(), c.object()));
+            AiController.promptFor(server.getPlayerManager().getPlayerList().get(0), c.prompt(), c.mode()));
         com.example.ai.AiPrompt prompt = base;
         long start = System.currentTimeMillis();
         for (int attempt = 0; attempt <= RETRIES; attempt++) {
@@ -187,16 +192,22 @@ public class AibModelBench implements FabricClientGameTest {
             save(model, c.id() + "_try" + attempt + ".groovy", code);
             AiController.Evaluation eval = game.getServer().computeOnServer(server ->
                 AiController.evaluate(server.getPlayerManager().getPlayerList().get(0), code));
-            if (eval.ok()) {
+            String gearProblem = eval.ok() && c.gear() ? AiController.gearProblem(eval.plan()) : null;
+            if (eval.ok() && gearProblem == null) {
                 r.success = true;
                 r.summary = eval.plan().summary();
                 BuildRecord record = BuildRecord.create(c.prompt(), "BENCH", model, eval.plan());
+                if (c.gear()) {
+                    record.kind = "gear";
+                    record.gear = c.mode().substring(5);
+                }
                 save(model, c.id() + ".record.json", record.toJson());
                 break;
             }
-            call.failure = eval.failure();
-            r.finalFailure = eval.failure();
-            prompt = AiController.fixPrompt(base, code, eval.failure());
+            String failure = gearProblem != null ? gearProblem : eval.failure();
+            call.failure = failure;
+            r.finalFailure = failure;
+            prompt = AiController.fixPrompt(base, code, failure);
         }
         r.totalMs = System.currentTimeMillis() - start;
         return r;
@@ -233,6 +244,30 @@ public class AibModelBench implements FabricClientGameTest {
     /** Place the accepted design in front of the player, take a picture, save the front view, then undo. */
     private void photograph(ClientGameTestContext context, TestSingleplayerContext game, String model, Case c, Result r, double[] home) {
         BuildRecord record = BuildRecord.fromJson(read(model, c.id() + ".record.json"));
+        if (c.gear()) {
+            // Equipment: hold it and take a picture in first person and from the front.
+            game.getServer().runOnServer(server -> server.getPlayerManager().getPlayerList().get(0)
+                .setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(record)));
+            context.runOnClient(client -> client.options.hudHidden = false);
+            context.waitTicks(10);
+            context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_hand");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
+            context.waitTicks(5);
+            context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_front");
+            context.runOnClient(client -> {
+                client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON);
+                client.options.hudHidden = true;
+            });
+            game.getServer().runOnServer(server -> server.getPlayerManager().getPlayerList().get(0)
+                .setStackInHand(net.minecraft.util.Hand.MAIN_HAND, net.minecraft.item.ItemStack.EMPTY));
+            try {
+                Path dir = OUT.resolve(safe(model));
+                BuildPreview.compute(record.plan).writePngs(dir.resolve(c.id() + "_top.png"), dir.resolve(c.id() + "_front.png"));
+            } catch (Exception e) {
+                r.summary += " (preview failed: " + e.getMessage() + ")";
+            }
+            return;
+        }
         String camera = game.getServer().computeOnServer(server -> {
             ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
             var origin = player.getBlockPos();

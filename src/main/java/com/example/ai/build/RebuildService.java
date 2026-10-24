@@ -124,7 +124,7 @@ public final class RebuildService {
      * overwrite the original one. Null (with a message) if that size is not possible.
      */
     public static BuildRecord withScale(ServerPlayerEntity player, BuildRecord record, int percent) {
-        if (percent <= 0 || percent == 100) {
+        if (percent <= 0 || percent == 100 || "gear".equals(record.kind)) {
             return record;
         }
         double s = percent / 100.0;

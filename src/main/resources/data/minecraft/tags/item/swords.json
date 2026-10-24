@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft-ai-build-assistant:gear_sword",
+    "minecraft-ai-build-assistant:gear_spear",
+    "minecraft-ai-build-assistant:gear_staff"
+  ]
+}

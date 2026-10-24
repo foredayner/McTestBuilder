@@ -15,8 +15,10 @@ public final class BuildRecord {
     private static final Gson GSON = new Gson();
 
     public int version = 1;
-    /** "build" (blocks) or "object" (display-entity parts). */
+    /** "build" (blocks), "object" (display-entity parts) or "gear" (a hand-held item model). */
     public String kind = "build";
+    /** Gear only: which kind (GearKind id: sword, axe, ...). */
+    public String gear;
     public String id = "";
     public long createdAt;
     public String prompt = "";

@@ -173,6 +173,41 @@ public class AibGameTests implements FabricGameTest {
     }
 
     @GameTest(templateName = EMPTY_STRUCTURE)
+    public void gearIsAnItemWithItsModelAndIronStats(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        for (String example : new String[] { com.example.ai.AiController.EXAMPLE_SWORD, com.example.ai.AiController.EXAMPLE_AXE }) {
+            BuildPlan plan = Demo.plan(world, origin, player, example);
+            String problem = com.example.ai.AiController.gearProblem(plan);
+            check(problem == null, "example fits the hand: " + problem);
+        }
+        BuildPlan sword = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_SWORD);
+        BuildRecord record = BuildRecord.create("long sword", "TEST", "script", sword);
+        record.kind = "gear";
+        record.gear = "sword";
+        com.example.ai.build.BlueprintStore.give(player, record);
+        net.minecraft.item.ItemStack stack = net.minecraft.item.ItemStack.EMPTY;
+        for (int i = 0; i < player.getInventory().size(); i++) {
+            if (player.getInventory().getStack(i).getItem() instanceof com.example.content.GearItem) {
+                stack = player.getInventory().getStack(i);
+            }
+        }
+        check(!stack.isEmpty(), "the player got the equipment item");
+        check(((com.example.content.GearItem) stack.getItem()).kind() == com.example.content.GearKind.SWORD, "a sword");
+        BuildPlan model = com.example.ai.build.GearItems.modelOf(stack);
+        check(model != null && model.parts.size() == sword.parts.size(), "the item carries the whole model");
+        check(stack.getMaxDamage() == new net.minecraft.item.ItemStack(net.minecraft.item.Items.IRON_SWORD).getMaxDamage(), "iron sword durability");
+        check(stack.contains(net.minecraft.component.DataComponentTypes.ATTRIBUTE_MODIFIERS), "it has attack damage");
+        check(stack.isIn(net.minecraft.registry.tag.ItemTags.SWORDS), "it counts as a sword (enchantments)");
+        check(stack.getMaxCount() == 1, "does not stack");
+        // Too long for the hand: refused with a reason the AI can fix.
+        BuildPlan pole = Demo.plan(world, origin, player, "ai.addCapsule('oak_planks', 0, 0, 0, 0, 4, 0, 0.05)");
+        check(com.example.ai.AiController.gearProblem(pole) != null, "a 4-block pole is too long");
+        context.complete();
+    }
+
+    @GameTest(templateName = EMPTY_STRUCTURE)
     public void reviewRejectsBadScriptsBeforeRunning(TestContext context) {
         ServerWorld world = context.getWorld();
         BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));

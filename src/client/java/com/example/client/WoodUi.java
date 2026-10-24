@@ -92,6 +92,13 @@ public final class WoodUi {
     /** Button drawn as a small wooden board with brown lettering. */
     public static class WoodButton extends ButtonWidget {
         private final boolean danger;
+        private boolean selected;
+
+        /** A tab-like button that is currently chosen: drawn pressed in, in leaf green. */
+        public WoodButton selected(boolean value) {
+            this.selected = value;
+            return this;
+        }
 
         public WoodButton(int x, int y, int width, int height, Text message, PressAction onPress, boolean danger) {
             super(x, y, width, height, message, onPress, DEFAULT_NARRATION_SUPPLIER);
@@ -104,7 +111,11 @@ public final class WoodUi {
             int fill;
             int light;
             int dark;
-            if (this.danger) {
+            if (this.selected) {
+                fill = hover ? 0xFF86A653 : LEAF;
+                light = 0xFFA8C878;
+                dark = 0xFF4B6128;
+            } else if (this.danger) {
                 fill = hover ? 0xFFE0573E : 0xFFC9402C;
                 light = 0xFFF28B6E;
                 dark = 0xFF7D2214;
@@ -120,7 +131,7 @@ public final class WoodUi {
             int l = this.getX(), t = this.getY(), r = l + this.width, b = t + this.height;
             bevel(ctx, l, t, r, b, fill, light, dark, 2);
             TextRenderer font = MinecraftClient.getInstance().textRenderer;
-            int color = this.danger ? 0xFFFFF4DC : this.active ? INK : 0xFF9A7A55;
+            int color = this.danger || this.selected ? 0xFFFFF4DC : this.active ? INK : 0xFF9A7A55;
             String label = this.getMessage().getString();
             ctx.drawText(font, label, l + (this.width - font.getWidth(label)) / 2 + 1, t + (this.height - 8) / 2 + 1, color, false);
         }

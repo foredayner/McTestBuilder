@@ -86,6 +86,12 @@ public final class BlueprintStore {
             AiNetworking.sendLog(player, "[History] 설계도를 저장하지 못했어요: " + exception.getMessage());
             return;
         }
+        if ("gear".equals(record.kind) && record.plan.isObject()) {
+            player.getInventory().offerOrDrop(GearItems.stackFor(record));
+            AiNetworking.sendLog(player, "[History] " + GearItems.kindOf(record).korean
+                + " 장비를 받았어요. 철 " + GearItems.kindOf(record).korean + "과 같은 성능이에요.");
+            return;
+        }
         if (record.plan.isObject() && record.plan.ops.isEmpty()) {
             player.getInventory().offerOrDrop(ObjectItems.stackFor(record));
             AiNetworking.sendLog(player, "[History] 소품 아이템을 받았어요. 블록 윗면을 우클릭하면 그 위에 놓이고, 돌처럼 캐면 다시 아이템이 돼요.");

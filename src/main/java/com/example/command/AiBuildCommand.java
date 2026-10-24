@@ -33,31 +33,32 @@ public class AiBuildCommand {
     }
 
     private static int executeBuild(ServerCommandSource source, String rawPrompt, boolean webFlag) {
-        // Flags may come in any order before the prompt: --web, --object.
+        // Flags may come in any order before the prompt: --web, --object, --gear=<kind>.
         String prompt = rawPrompt.trim();
         boolean useWebSearch = webFlag;
-        boolean objectMode = false;
+        String mode = "build";
         while (true) {
             if (prompt.startsWith("--web ")) {
                 useWebSearch = true;
                 prompt = prompt.substring(6).trim();
             } else if (prompt.startsWith("--object ")) {
-                objectMode = true;
+                mode = "object";
                 prompt = prompt.substring(9).trim();
+            } else if (prompt.startsWith("--gear=") && prompt.indexOf(' ') > 0) {
+                mode = "gear:" + com.example.content.GearKind.of(prompt.substring(7, prompt.indexOf(' '))).id();
+                prompt = prompt.substring(prompt.indexOf(' ') + 1).trim();
             } else {
                 break;
             }
         }
-        return executeBuild(source, prompt, useWebSearch, objectMode);
-    }
-
-    private static int executeBuild(ServerCommandSource source, String prompt, boolean useWebSearch, boolean objectMode) {
+        final String finalPrompt = prompt;
+        final String finalMode = mode;
+        final boolean web = useWebSearch;
         source.sendFeedback(
-            () -> Text.literal("AI " + (objectMode ? "object" : "build") + " request" + (useWebSearch ? " (web search)" : "") + ": " + prompt),
+            () -> Text.literal("AI " + finalMode + " request" + (web ? " (web search)" : "") + ": " + finalPrompt),
             false
         );
-
-        AiController.requestBuild(source.getPlayer(), prompt, useWebSearch, objectMode);
+        AiController.requestBuild(source.getPlayer(), finalPrompt, web, finalMode);
         return 1;
     }
 }

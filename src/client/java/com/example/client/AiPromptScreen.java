@@ -44,8 +44,11 @@ public class AiPromptScreen extends Screen {
     /** Size for placing a saved object: index into SCALES, kept while the game runs. */
     private static final int[] SCALES = { 50, 100, 200, 300, 500 };
     private static int scaleIndex = 1;
-    private static int filter = 0;        // 0 all, 1 builds, 2 objects, 3 objects placed nearby
-    private static final int NEARBY = 3;
+    private static final int BUILDS = 1;
+    private static final int OBJECTS = 2;
+    private static final int NEARBY = 3;  // objects placed around me
+    private static final int GEAR = 4;
+    private static int filter = BUILDS;
     private static int chatScroll = 0;    // pixels up from the bottom
     private static int listScroll = 0;    // rows
     private static int detailScroll = 0;  // pixels
@@ -88,6 +91,12 @@ public class AiPromptScreen extends Screen {
         listScroll = 0;
         detailScroll = 0;
         return new AiPromptScreen();
+    }
+
+    /** Open 보관함 on the 장비 tab (optionally with one open). */
+    public static AiPromptScreen openGear(String recordId) {
+        filter = GEAR;
+        return open("HISTORY", recordId);
     }
 
     /** Open 보관함 on the "주변 배치" view (asks the server for the list). */
@@ -168,7 +177,14 @@ public class AiPromptScreen extends Screen {
 
     private void buildCreate() {
         boolean object = AiClientState.isObjectMode();
-        button(object ? "모드: 소품" : "모드: 건물", right() - 84, top(), 84, b -> AiClientState.toggleObjectMode());
+        boolean gear = AiClientState.isGearMode();
+        button(gear ? "모드: 장비" : object ? "모드: 소품" : "모드: 건물", right() - 84, top(), 84, b -> AiClientState.cycleMode());
+        if (gear) {
+            // Choose the kind of equipment first, then describe it.
+            com.example.content.GearKind kind = AiClientState.getGearKind();
+            button("   종류: " + kind.korean, right() - 84 - 92, top(), 88, b -> AiClientState.cycleGearKind());
+            this.icons.add(new IconAt(new ItemStack(kind.icon), right() - 84 - 89, top() + 1));
+        }
 
         int y = bottom() - 42;
         if (AiClientState.isWebSearchAvailable()) {
@@ -183,7 +199,8 @@ public class AiPromptScreen extends Screen {
         this.promptField.setDrawsBackground(false);
         this.promptField.setEditableColor(PAPER);
         this.promptField.setMaxLength(220); // the chat command that carries it is limited to 256 characters
-        this.promptField.setPlaceholder(Text.literal(object ? "만들 소품을 적어 주세요…" : "지을 건물을 적어 주세요…"));
+        this.promptField.setPlaceholder(Text.literal(gear ? "어떤 " + AiClientState.getGearKind().korean + "인지 적어 주세요…"
+            : object ? "만들 소품을 적어 주세요…" : "지을 건물을 적어 주세요…"));
         this.promptField.setText(this.draftPrompt);
         this.promptField.setFocused(true);
         this.addSelectableChild(this.promptField);
@@ -205,7 +222,9 @@ public class AiPromptScreen extends Screen {
         if (AiClientState.willUseWebSearch()) {
             AiClientState.addLog("[Web] Search enabled for this request");
         }
-        AiClientState.addLog("[Waiting...] " + (AiClientState.isObjectMode() ? "소품" : "건물") + " 설계 중입니다. 잠시 기다려 주세요.");
+        String what = AiClientState.isGearMode() ? AiClientState.getGearKind().korean
+            : AiClientState.isObjectMode() ? "소품" : "건물";
+        AiClientState.addLog("[Waiting...] " + what + " 설계 중입니다. 잠시 기다려 주세요.");
         AiClientState.sendPromptText(prompt);
         this.promptField.setText("");
         this.draftPrompt = "";
@@ -213,8 +232,10 @@ public class AiPromptScreen extends Screen {
 
     private void renderCreate(DrawContext ctx) {
         boolean object = AiClientState.isObjectMode();
-        ctx.drawText(this.textRenderer, object ? "원하는 소품을 이야기해 주세요" : "원하는 건물을 이야기해 주세요",
-            left() + 2, top() + 5, INK_SOFT, false);
+        boolean gear = AiClientState.isGearMode();
+        String hint = gear ? "종류를 고르고 원하는 장비를 이야기해 주세요"
+            : object ? "원하는 소품을 이야기해 주세요" : "원하는 건물을 이야기해 주세요";
+        ctx.drawText(this.textRenderer, ellipsize(hint, right() - left() - (gear ? 190 : 96)), left() + 2, top() + 5, INK_SOFT, false);
 
         int l = left(), r = right(), t = chatTop(), b = chatBottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);
@@ -223,7 +244,7 @@ public class AiPromptScreen extends Screen {
         List<AiClientState.Entry> entries = new ArrayList<>(AiClientState.getEntries());
         if (entries.isEmpty()) {
             entries.add(new AiClientState.Entry(AiClientState.Speaker.SYSTEM,
-                "아래에 " + (object ? "소품" : "건물") + "을 적고 보내기를 누르세요.\n오른쪽 위 버튼으로 건물 / 소품 모드를 바꿀 수 있어요."));
+                "아래에 " + (gear ? "장비를" : object ? "소품을" : "건물을") + " 적고 보내기를 누르세요.\n오른쪽 위 버튼으로 건물 / 소품 / 장비 모드를 바꿀 수 있어요."));
         }
         int maxBubble = (int) ((r - l - 12) * 0.82);
         List<List<OrderedText>> wrapped = new ArrayList<>();
@@ -312,7 +333,8 @@ public class AiPromptScreen extends Screen {
         List<BuildRecord> out = new ArrayList<>();
         for (BuildRecord r : BuildHistory.list()) {
             boolean object = "object".equals(r.kind);
-            if (filter == 0 || (filter == 1 && !object) || (filter == 2 && object)) {
+            boolean gear = "gear".equals(r.kind);
+            if ((filter == BUILDS && !object && !gear) || (filter == OBJECTS && object) || (filter == GEAR && gear)) {
                 out.add(r);
             }
         }
@@ -337,15 +359,29 @@ public class AiPromptScreen extends Screen {
     private void buildHistory() {
         BuildRecord record = selected();
         if (record == null) {
-            String[] names = { "보기: 전체", "보기: 건물", "보기: 소품", "보기: 주변 배치" };
-            button(names[filter], right() - 84, top(), 84, b -> {
-                filter = (filter + 1) % 4;
-                listScroll = 0;
-                if (filter == NEARBY) {
-                    AiClientNetworking.requestNearby();
-                }
-                rebuild();
-            });
+            // Tabs: 건축 / 소품 / 장비; in 소품, "주변" lists the objects placed around me.
+            int tx = right() - 3 * 44 - 8;
+            String[] names = { "건축", "소품", "장비" };
+            int[] filters = { BUILDS, OBJECTS, GEAR };
+            for (int i = 0; i < 3; i++) {
+                int target = filters[i];
+                boolean on = filter == target || (target == OBJECTS && filter == NEARBY);
+                button(names[i], tx + i * 48, top(), 44, b -> {
+                    filter = target;
+                    listScroll = 0;
+                    rebuild();
+                }).selected(on);
+            }
+            if (filter == OBJECTS || filter == NEARBY) {
+                button("주변", tx - 48, top(), 44, b -> {
+                    filter = filter == NEARBY ? OBJECTS : NEARBY;
+                    listScroll = 0;
+                    if (filter == NEARBY) {
+                        AiClientNetworking.requestNearby();
+                    }
+                    rebuild();
+                }).selected(filter == NEARBY);
+            }
             if (filter == NEARBY) {
                 // One "지우기" per visible row of placed objects.
                 List<com.example.ai.build.ObjectService.Nearby> list = AiClientState.getNearby();
@@ -379,12 +415,14 @@ public class AiPromptScreen extends Screen {
             });
             x += quarter + 4;
         }
+        boolean gear = "gear".equals(record.kind);
         button("   손에 받기", x, y, quarter, b -> {
             AiClientNetworking.sendRebuild(withIcon(record), com.example.ai.build.RebuildService.MODE_GIVE, scale);
             AiClientState.addLog("[History] \"" + shortTitle(record.prompt) + "\"" + size
-                + (object ? " 소품 아이템을 요청했어요." : " 설계도를 요청했어요."));
+                + (gear ? " 장비를 요청했어요." : object ? " 소품 아이템을 요청했어요." : " 설계도를 요청했어요."));
         });
-        this.icons.add(new IconAt(new ItemStack(object ? Items.ARMOR_STAND : Items.PAPER), x + 3, y + 1));
+        this.icons.add(new IconAt(new ItemStack(gear ? com.example.content.GearKind.of(record.gear).icon
+            : object ? Items.ARMOR_STAND : Items.PAPER), x + 3, y + 1));
         x += quarter + 4;
         this.addDrawableChild(new WoodButton(x, y, right() - x, 18,
             Text.literal(this.confirmDelete ? "정말 삭제?" : "삭제"), b -> {
@@ -410,12 +448,12 @@ public class AiPromptScreen extends Screen {
             renderNearby(ctx);
             return;
         }
-        ctx.drawText(this.textRenderer, ellipsize("만든 건물과 소품을 다시 꺼내 놓을 수 있어요", right() - left() - 170), left() + 2, top() + 5, INK_SOFT, false);
+        ctx.drawText(this.textRenderer, ellipsize("만든 것을 꺼내 쓸 수 있어요", right() - left() - 200), left() + 2, top() + 5, INK_SOFT, false);
         int l = left(), r = right(), t = listTop(), b = bottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);
         List<BuildRecord> records = filtered();
         if (records.isEmpty()) {
-            String empty = "아직 비어 있어요. 설계를 배치하면 여기에 보관됩니다.";
+            String empty = "아직 비어 있어요. AI 공방에서 만들면 여기에 보관됩니다.";
             ctx.drawText(this.textRenderer, empty, (l + r - this.textRenderer.getWidth(empty)) / 2, t + 20, INK_SOFT, false);
             return;
         }
@@ -436,12 +474,19 @@ public class AiPromptScreen extends Screen {
             BuildPreview p = BuildPreview.of(rec);
             BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, l + 8, y + 5, ROW - 10, ROW - 14);
             boolean object = "object".equals(rec.kind);
-            String tag = object ? "소품" : "건물";
+            boolean gear = "gear".equals(rec.kind);
+            // No request text here (it is in the detail view): the picture, the kind and the size.
+            String tag = gear ? "장비 · " + com.example.content.GearKind.of(rec.gear).korean : object ? "소품" : "건물";
             int tagW = this.textRenderer.getWidth(tag) + 6;
-            ctx.fill(textX, y + 5, textX + tagW, y + 16, object ? LEAF : TAG);
+            ctx.fill(textX, y + 5, textX + tagW, y + 16, gear ? 0xFF4F7FA8 : object ? LEAF : TAG);
             ctx.drawText(this.textRenderer, tag, textX + 3, y + 7, PAPER, false);
-            ctx.drawText(this.textRenderer, ellipsize(rec.prompt.replace('\n', ' '), textW - tagW - 4), textX + tagW + 4, y + 7, INK, false);
-            String info = DATE.format(new Date(rec.createdAt)) + " · " + p.sizeX + "×" + p.sizeY + "×" + p.sizeZ + " · " + rec.model;
+            if (gear) {
+                // Which kind of equipment, at a glance: the vanilla item in the picture's corner.
+                ctx.drawItem(new ItemStack(com.example.content.GearKind.of(rec.gear).icon), l + ROW - 15, y + ROW - 23);
+            }
+            String sizeText = p.sizeX + " × " + p.sizeY + " × " + p.sizeZ + (object || gear ? " · 조각 " + p.blocks : "");
+            ctx.drawText(this.textRenderer, ellipsize(sizeText, textW - tagW - 4), textX + tagW + 4, y + 7, INK, false);
+            String info = DATE.format(new Date(rec.createdAt)) + " · " + rec.model;
             ctx.drawText(this.textRenderer, ellipsize(info, textW), textX, y + 21, INK_SOFT, false);
         }
         if (records.size() > visible) {
@@ -521,8 +566,10 @@ public class AiPromptScreen extends Screen {
         ctx.enableScissor(l + 1, t + 1, rr - 1, b - 1);
         int x = l + 7;
         int y = t + 6 - detailScroll;
-        boolean object = "object".equals(r.kind);
-        ctx.drawText(this.textRenderer, object ? "소품 주문서" : "건물 주문서", x, y, TAG, false);
+        boolean gear = "gear".equals(r.kind);
+        boolean object = "object".equals(r.kind) || gear;
+        ctx.drawText(this.textRenderer, gear ? "장비 주문서 · " + com.example.content.GearKind.of(r.gear).korean
+            : object ? "소품 주문서" : "건물 주문서", x, y, TAG, false);
         y += LINE + 3;
         for (OrderedText line : this.textRenderer.wrapLines(Text.literal(r.prompt), width)) {
             ctx.drawText(this.textRenderer, line, x, y, INK, false);

@@ -12,6 +12,7 @@ import com.example.ai.api.MinecraftAI;
 import com.example.ai.approval.BuildApproval;
 import com.example.ai.build.BuildPlan;
 import com.example.ai.build.BuildRecord;
+import com.example.content.GearKind;
 import com.example.ai.script.ScriptExecutor;
 import com.example.ai.script.ScriptLinter;
 import java.util.List;
@@ -25,7 +26,16 @@ import java.util.regex.Pattern;
 public class AiController {
 
     /** One build request, kept across automatic retries. */
-    private record BuildRequest(String userPrompt, AiPrompt basePrompt, boolean webSearch, long startTime) {
+    private record BuildRequest(String userPrompt, AiPrompt basePrompt, boolean webSearch, long startTime, String mode) {
+    }
+
+    /** Request modes: "build", "object", or "gear:<kind>" (sword, axe, ...). */
+    public static String modeOf(boolean objectMode) {
+        return objectMode ? "object" : "build";
+    }
+
+    private static GearKind gearOf(String mode) {
+        return mode != null && mode.startsWith("gear:") ? GearKind.of(mode.substring(5)) : null;
     }
 
     public static void requestBuild(ServerPlayerEntity player, String prompt) {
@@ -38,6 +48,11 @@ public class AiController {
 
     /** objectMode: a small decorative object from scaled block pieces instead of a block build. */
     public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch, boolean objectMode) {
+        requestBuild(player, prompt, useWebSearch, modeOf(objectMode));
+    }
+
+    public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch, String mode) {
+        boolean objectMode = !"build".equals(mode);
         long startTime = System.currentTimeMillis();
         AiBuilderConfig config = AiBuilderConfig.get();
         boolean webSearch = config.provider.supportsWebSearch()
@@ -70,14 +85,14 @@ public class AiController {
             debug("[DEBUG] World info:\n" + worldInfo);
 
             debug("[DEBUG] Building prompt...");
-            AiPrompt promptText = objectMode
-                ? objectPrompt(prompt)
-                : buildingPrompt(prompt, worldInfo, webSearch);
+            AiPrompt promptText = gearOf(mode) != null
+                ? gearPrompt(prompt, gearOf(mode))
+                : objectMode ? objectPrompt(prompt) : buildingPrompt(prompt, worldInfo, webSearch);
 
             debug("[DEBUG] Sending to AI provider...");
             AiNetworking.sendDebugLog(player, "[AI] Requesting from AI model (" + config.provider.getDisplayName() + ")...");
 
-            sendToAi(player, new BuildRequest(prompt, promptText, webSearch, startTime), promptText, 0);
+            sendToAi(player, new BuildRequest(prompt, promptText, webSearch, startTime, mode), promptText, 0);
 
         } catch (Exception exception) {
             debug("[ERROR] Fatal error: " + exception.getMessage());
@@ -150,6 +165,13 @@ public class AiController {
         BuildPlan plan = eval.plan();
         ScriptExecutor.ExecutionResult result = eval.result();
         String failure = eval.failure();
+        GearKind gear = gearOf(req.mode());
+        if (failure == null && gear != null) {
+            failure = gearProblem(plan);
+            if (failure != null) {
+                AiNetworking.sendLog(player, "[Review] " + failure);
+            }
+        }
         if (!eval.review().isEmpty()) {
             AiNetworking.sendLog(player, "[Review] " + eval.review().size() + " problem(s) found before running:\n- " + String.join("\n- ", eval.review()));
         } else {
@@ -162,6 +184,10 @@ public class AiController {
             AiBuilderConfig config = AiBuilderConfig.get();
             String description = generateDescription(aiCode, origin) + "\n" + plan.summary();
             BuildRecord record = BuildRecord.create(req.userPrompt(), config.provider.name(), config.modelName, plan);
+            if (gear != null) {
+                record.kind = "gear";
+                record.gear = gear.id();
+            }
             BuildApproval.requestApproval(player, record, description, origin);
             debug("[TIMER] ===== PENDING USER APPROVAL =====");
             return;
@@ -231,6 +257,14 @@ public class AiController {
 
     /** The prompt the game sends for a request, made where the player stands now. */
     public static AiPrompt promptFor(ServerPlayerEntity player, String userPrompt, boolean objectMode) {
+        return promptFor(player, userPrompt, modeOf(objectMode));
+    }
+
+    public static AiPrompt promptFor(ServerPlayerEntity player, String userPrompt, String mode) {
+        if (gearOf(mode) != null) {
+            return gearPrompt(userPrompt, gearOf(mode));
+        }
+        boolean objectMode = "object".equals(mode);
         MinecraftAI.init(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player.getPitch());
         return objectMode
             ? objectPrompt(userPrompt)
@@ -338,6 +372,90 @@ public class AiController {
             ai.addRoundBox('oak_planks', -w / 2 + 0.06, 0.72 + i * 0.16, z + d - 0.09, w - 0.12, 0.08, 0.05, 0.01)  // back slats
         }
         """;
+
+    /** Hand-held equipment must fit in the hand: about the size of vanilla tools, at most 2.6 long. */
+    public static String gearProblem(BuildPlan plan) {
+        if (!plan.ops.isEmpty()) {
+            return PLAN_PROBLEMS + "\n- equipment must be made only of pieces (addPart / smooth shapes), no blocks.";
+        }
+        double[] b = plan.partBounds();
+        List<String> problems = new java.util.ArrayList<>();
+        if (b[4] - b[1] > 2.6) {
+            problems.add(String.format(java.util.Locale.ROOT, "it is %.2f blocks long; keep it at most 2.6.", b[4] - b[1]));
+        }
+        if (b[3] - b[0] > 1.3 || b[5] - b[2] > 1.3) {
+            problems.add(String.format(java.util.Locale.ROOT, "it is %.2f wide (X) and %.2f deep (Z); keep both at most 1.3.",
+                b[3] - b[0], b[5] - b[2]));
+        }
+        if (b[1] > 0.05 || b[4] < 0.2 || b[0] > 0.05 || b[3] < -0.05) {
+            problems.add("the hand holds it at (0, 0, 0): the handle must pass through that point, with the item going up (+Y).");
+        }
+        return problems.isEmpty() ? null : PLAN_PROBLEMS + "\n- " + String.join("\n- ", problems);
+    }
+
+    public static final String EXAMPLE_SWORD = """
+        // longsword, about 1.45 long; the hand holds it at (0, 0, 0), blade up (+Y), flat side facing -Z
+        ai.addCapsule('dark_oak_planks', 0, -0.12, 0, 0, 0.22, 0, 0.045)            // grip
+        ai.addSphere('gold_block', 0, -0.15, 0, 0.06)                               // pommel
+        ai.addRoundBox('gold_block', -0.2, 0.22, -0.05, 0.4, 0.07, 0.1, 0.02)      // cross guard
+        ai.addSphere('emerald_block', 0, 0.255, -0.05, 0.035)                       // gem in the guard
+        ai.addRoundBox('iron_block', -0.075, 0.29, -0.025, 0.15, 0.95, 0.05, 0.01) // blade
+        ai.addRoundBox('light_gray_concrete', -0.02, 0.32, -0.03, 0.04, 0.85, 0.06, 0)  // fuller (groove)
+        ai.addCone('iron_block', 0, 1.24, 0, 0.075, 0.16)                           // tip
+        """;
+
+    public static final String EXAMPLE_AXE = """
+        // battle axe, about 1.2 long; hand at (0, 0, 0), handle up (+Y), blade out to +X
+        ai.addCapsule('spruce_planks', 0, -0.1, 0, 0, 1.15, 0, 0.04)                // handle
+        ai.addRoundBox('dark_oak_planks', -0.05, 0.05, -0.05, 0.1, 0.2, 0.1, 0.02)  // leather wrap
+        ai.addRoundBox('iron_block', -0.08, 0.85, -0.06, 0.18, 0.24, 0.12, 0.02)   // head socket
+        ai.addEllipsoid('iron_block', 0.26, 0.97, 0, 0.17, 0.2, 0.025)              // blade
+        ai.addEllipsoid('quartz_block', 0.37, 0.97, 0, 0.07, 0.18, 0.027)           // bright cutting edge
+        ai.addCone('iron_block', 0, 1.09, 0, 0.05, 0.12)                            // top spike
+        """;
+
+    /** Instructions for equipment (fixed part); the kind and the request come in the user message. */
+    static final String GEAR_SYSTEM = """
+            You are an expert designer of fantasy weapons and tools for Minecraft. Write ONLY executable Groovy using the `ai` API.
+
+            Model ONE hand-held item (weapon or tool) out of pieces. It is drawn as the item itself, held in the hand,
+            in first and third person. Smooth shapes are drawn on a fine 1/16-block grid.
+
+            FRAME:
+            - Units are blocks (a vanilla sword is about 1.2 long). +X = right, +Y = up, +Z = away from the viewer.
+            - The hand holds it at (0, 0, 0). The handle passes through that point and the item goes UP (+Y);
+              the end of the handle/pommel may go a little below (to about y = -0.2).
+            - The wide, decorated side faces -Z (the viewer). Keep it thin in Z unless the design needs depth.
+            - Size limits: at most 2.6 long (Y) and 1.3 wide (X and Z). Use the kind's guide below.
+
+            %s
+            STYLE (this decides the quality):
+            - A clear silhouette that reads at a glance: handle, guard or socket, head or blade, a few accents.
+            - Materials: iron_block / light_gray_concrete / quartz_block (steel and bright edges), gold_block (trim),
+              diamond_block, emerald_block, amethyst_block, redstone_block, lapis_block (gems), oak/spruce/dark_oak_planks
+              and brown or black terracotta (wood and leather), glowstone / sea_lantern / magma_block (glow, fire, magic),
+              obsidian / crying_obsidian / blackstone (dark), packed_ice / blue_ice (ice).
+            - Use one lighter shade for edges and highlights and one darker shade for grooves and wraps.
+            - Overlap pieces slightly so nothing floats. Keep parts at least 0.04 thick.
+            - Prefer a few smooth shapes over many tiny boxes. At most 400 pieces after merging.
+
+            CODE RULES:
+            - Block names are quoted strings: 'iron_block'.
+            - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
+            - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
+
+            EXAMPLES (style reference; make your own design, do not copy):
+            %s
+            %s
+            """;
+
+    public static AiPrompt gearPrompt(String userPrompt, GearKind kind) {
+        String shapes = OBJECT_SYSTEM.substring(OBJECT_SYSTEM.indexOf("SMOOTH SHAPES"), OBJECT_SYSTEM.indexOf("STYLE (this"));
+        String system = GEAR_SYSTEM.formatted(shapes, EXAMPLE_SWORD.strip(), EXAMPLE_AXE.strip());
+        String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "). Shape guide for this kind: " + kind.guide
+            + "\nRequest: " + userPrompt + "\nWrite the Groovy script for it now.";
+        return new AiPrompt(system, user);
+    }
 
     /** Instructions for objects: the same for every request (cached by Claude). */
     static final String OBJECT_SYSTEM = """

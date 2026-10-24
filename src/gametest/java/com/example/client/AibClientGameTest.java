@@ -67,10 +67,10 @@ public class AibClientGameTest implements FabricClientGameTest {
             shot(context, () -> AiPromptScreen.open("CREATE", null), "02_create_pending");
 
             context.runOnClient(client -> {
-                AiClientState.toggleObjectMode();
+                AiClientState.setMode(1);
             });
             shot(context, () -> AiPromptScreen.open("CREATE", null), "03_create_object_mode");
-            context.runOnClient(client -> AiClientState.toggleObjectMode());
+            context.runOnClient(client -> AiClientState.setMode(0));
 
             String houseId = BuildRecord.fromJson(records.get(0)).id;
             String appleId = BuildRecord.fromJson(records.get(1)).id;
@@ -103,6 +103,41 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.waitTicks(3);
             context.takeScreenshot("13_nearby_objects");
             context.setScreen(() -> null);
+
+            // Equipment: the AI 공방 in 장비 mode, the 장비 tab, and a sword held in the hand.
+            List<String> gear = game.getServer().computeOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                var world = player.getServerWorld();
+                var origin = player.getBlockPos();
+                BuildRecord sword = BuildRecord.create("에메랄드가 박힌 기사의 장검", "TEST", "script",
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_SWORD));
+                sword.kind = "gear";
+                sword.gear = "sword";
+                BuildRecord axe = BuildRecord.create("바이킹 전투 도끼", "TEST", "script",
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_AXE));
+                axe.kind = "gear";
+                axe.gear = "axe";
+                player.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(sword));
+                return List.of(sword.toJson(), axe.toJson());
+            });
+            context.runOnClient(client -> {
+                for (String json : gear) {
+                    BuildHistory.save(BuildRecord.fromJson(json));
+                }
+                AiClientState.setMode(2);
+            });
+            shot(context, () -> AiPromptScreen.open("CREATE", null), "16_create_gear_mode");
+            context.runOnClient(client -> AiClientState.setMode(0));
+            shot(context, () -> AiPromptScreen.openGear(null), "17_history_gear");
+            String swordId = BuildRecord.fromJson(gear.get(0)).id;
+            shot(context, () -> AiPromptScreen.openGear(swordId), "18_history_sword");
+            context.setScreen(() -> null);
+            context.waitTicks(5);
+            context.takeScreenshot("19_sword_in_hand");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
+            context.waitTicks(5);
+            context.takeScreenshot("20_sword_third_person");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
 
             // The same apple placed at x1, x3 and x5, side by side somewhere empty.
             game.getServer().runCommand("execute as @a at @s run tp @s ~40 ~ ~ 0 18");

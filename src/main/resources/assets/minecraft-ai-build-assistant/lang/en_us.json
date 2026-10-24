@@ -3,5 +3,13 @@
   "key.categories.minecraft-ai-build-assistant": "Minecraft AI Build Assistant",
   "key.minecraft-ai-build-assistant.remove_object": "Remove AI object (look at it, press twice)",
   "item.minecraft-ai-build-assistant.object": "AI Object",
-  "entity.minecraft-ai-build-assistant.hitbox": "AI Object Hitbox"
+  "entity.minecraft-ai-build-assistant.hitbox": "AI Object Hitbox",
+  "item.minecraft-ai-build-assistant.gear_sword": "AI Sword",
+  "item.minecraft-ai-build-assistant.gear_axe": "AI Axe",
+  "item.minecraft-ai-build-assistant.gear_pickaxe": "AI Pickaxe",
+  "item.minecraft-ai-build-assistant.gear_shovel": "AI Shovel",
+  "item.minecraft-ai-build-assistant.gear_hoe": "AI Hoe",
+  "item.minecraft-ai-build-assistant.gear_spear": "AI Spear",
+  "item.minecraft-ai-build-assistant.gear_hammer": "AI Hammer",
+  "item.minecraft-ai-build-assistant.gear_staff": "AI Staff"
 }
