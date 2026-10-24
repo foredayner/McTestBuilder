@@ -46,7 +46,14 @@ jobs:
           msg=$(sed -e 's/%/%25/g' errors.txt | awk '{printf "%s%%0A", $0}')
           echo "::error title=game test errors::${msg}"
 
+      - name: Client game test (screenshots)
+        id: clienttest
+        continue-on-error: true
+        uses: modmuss50/xvfb-action@v1
+        with:
+          run: bash -c "./gradlew runClientGametest --stacktrace > clienttest-gradle.log 2>&1; s=$?; tail -c 60000 clienttest-gradle.log; exit $s"
       - name: Keep only the mod jar
+        if: steps.clienttest.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -55,7 +62,7 @@ jobs:
             gh release delete-asset mc1.21.4-latest "$a" -y
           done
       - name: Publish to the "latest" release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && steps.clienttest.outcome == 'success'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: mc1.21.4-latest
@@ -64,16 +71,9 @@ jobs:
           make_latest: true
           body: |
             Minecraft 1.21.4 / Fabric port of Minecraft-AI-Build-Assistant (original: Fyzugx-Lab, CC0).
-            Built automatically from `${{ github.sha }}` after unit tests and in-game server tests passed.
+            Built automatically from `${{ github.sha }}` after unit tests, in-game server tests and the client test passed.
             See PORT-1.21.4.md for what changed and how to install.
           files: build/libs/*.jar
-
-      - name: Client game test (screenshots)
-        id: clienttest
-        continue-on-error: true
-        uses: modmuss50/xvfb-action@v1
-        with:
-          run: ./gradlew runClientGametest --stacktrace
       - name: Publish screenshots and logs to the ci-screenshots branch
         if: always()
         run: |
@@ -81,6 +81,8 @@ jobs:
           cp -r build/clientgametest/screenshots "$out/" 2>/dev/null || true
           mkdir -p "$out/logs"
           cp build/clientgametest/logs/latest.log "$out/logs/client.log" 2>/dev/null || true
+          cp -r build/clientgametest/crash-reports "$out/logs/" 2>/dev/null || true
+          tail -c 200000 clienttest-gradle.log > "$out/logs/client-gradle.log" 2>/dev/null || true
           cp build/gametest/logs/latest.log "$out/logs/server-gametest.log" 2>/dev/null || true
           cp build/gametest/junit.xml "$out/logs/server-gametest-junit.xml" 2>/dev/null || true
           echo "${GITHUB_SHA} client-test=${{ steps.clienttest.outcome }}" > "$out/RUN.txt"
