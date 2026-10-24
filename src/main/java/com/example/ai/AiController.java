@@ -594,7 +594,10 @@ public class AiController {
               ai.idleEffect(particle, '#rrggbb', count)     // steady puffs while held or worn (count 1-6 looks best)
                 particle: flame, soul_fire_flame, small_flame, lava, snowflake, electric_spark, enchant, end_rod, glow,
                 portal, witch, dragon_breath, smoke, large_smoke, cloud, heart, crit, enchanted_hit, cherry_leaves,
-                totem_of_undying, sculk_soul, dust (dust uses the colour; others ignore it)
+                totem_of_undying, sculk_soul, dust (dust uses the colour; others ignore it and keep their own:
+                glow = teal sparkles, end_rod = white light, enchant = runes, witch / portal / dragon_breath = purple,
+                totem_of_undying = green-gold, flame = orange, soul_fire_flame = blue. For a specific colour (gold light,
+                red mist...) use dust)
               ai.groupStart('name') ... ai.groupEnd()       // pieces made in between move together
               ai.animate('name', type, pivotX, pivotY, pivotZ, axis, speed, amount)
                 type 'spin'  : turns around the axis through the pivot, speed = turns per second (amount unused)
