@@ -1,4 +1,4 @@
-package com.example.mixin.client;
+package com.example.client;
 
 /** Added to biped render states: the attack motion of the main-hand AI sword ("" = none). */
 public interface AibMotionState {

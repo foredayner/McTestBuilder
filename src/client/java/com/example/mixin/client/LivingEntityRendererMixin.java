@@ -1,5 +1,6 @@
 package com.example.mixin.client;
 
+import com.example.client.AibMotionState;
 import com.example.client.GearMotionClient;
 import net.minecraft.client.render.entity.LivingEntityRenderer;
 import net.minecraft.client.render.entity.state.LivingEntityRenderState;

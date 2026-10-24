@@ -1,5 +1,6 @@
 package com.example.mixin.client;
 
+import com.example.client.AibMotionState;
 import net.minecraft.client.render.entity.state.BipedEntityRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;

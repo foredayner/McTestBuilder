@@ -1,5 +1,6 @@
 package com.example.mixin.client;
 
+import com.example.client.AibMotionState;
 import com.example.client.GearMotionClient;
 import net.minecraft.client.model.ModelPart;
 import net.minecraft.client.render.entity.model.BipedEntityModel;
