@@ -391,7 +391,8 @@ public class AiController {
             String[] axis = { "x", "y", "z" };
             List<String> problems = new java.util.ArrayList<>();
             for (int i = 0; i < 3; i++) {
-                if (b[i] < lim[i] - 1e-6 || b[i + 3] > lim[i + 3] + 1e-6) {
+                // A little slack: smooth shapes may grow by part of a grid pixel.
+                if (b[i] < lim[i] - 0.08 || b[i + 3] > lim[i + 3] + 0.08) {
                     problems.add(String.format(java.util.Locale.ROOT, "it reaches %s = %.2f..%.2f; keep it within %.2f..%.2f "
                         + "(it must stay on the %s).", axis[i], b[i], b[i + 3], lim[i], lim[i + 3], head ? "head" : "torso"));
                 }

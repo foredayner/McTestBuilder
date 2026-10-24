@@ -51,6 +51,9 @@ server and the client of the player who builds. That player needs operator level
     gives an item with iron stats of that kind (damage, mining, durability, enchanting via item tags, axe
     stripping / shovel paths / hoe tilling) that is drawn as the 3D model in the hand and in slots; the stack
     carries the model, so it works anywhere. 보관함 has 건축 / 소품 / 장비 tabs.
+    Worn kinds (투구, 모자, 갑옷, 등 장식) are equipped on the head or chest, give iron (투구, 갑옷) or leather
+    (모자, 등 장식) armour, and are drawn on the head or torso bone (Fabric ArmorRenderer), so they move with the
+    wearer.
   - **Claude (Anthropic)** provider: Messages API with the fixed instructions as a cached system prompt,
     optional web search (`web_search` tool, at most 3 searches per build).
   - Objects are **solid**: their parts are merged into a few boxes that follow the shape (an
