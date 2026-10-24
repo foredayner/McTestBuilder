@@ -248,8 +248,12 @@ public class AibModelBench implements FabricClientGameTest {
             // Equipment: hold it and take a picture in first person and from the front.
             game.getServer().runOnServer(server -> server.getPlayerManager().getPlayerList().get(0)
                 .setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(record)));
-            context.runOnClient(client -> client.options.hudHidden = false);
-            context.waitTicks(10);
+            context.runOnClient(client -> {
+                client.options.hudHidden = false;
+                client.inGameHud.getChatHud().clear(false);
+            });
+            // A newly held weapon is raised only after its attack cooldown (an axe: about 1 s).
+            context.waitTicks(40);
             context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_hand");
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
             context.waitTicks(5);
