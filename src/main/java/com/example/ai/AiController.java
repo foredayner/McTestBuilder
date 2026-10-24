@@ -424,9 +424,10 @@ public class AiController {
             List<String> problems = new java.util.ArrayList<>();
             String[] axis = { "x", "y", "z" };
             for (int i = 0; i < 3; i++) {
-                if (b[i + 3] - b[i] > OVERSIZE_MAX + 0.1) {
-                    problems.add(String.format(java.util.Locale.ROOT, "it is %.2f blocks along %s; even a big item is at most %.1f.",
-                        b[i + 3] - b[i], axis[i], OVERSIZE_MAX));
+                // The big thing itself is up to OVERSIZE_MAX; a string or pole holding it may add a little more.
+                if (b[i + 3] - b[i] > OVERSIZE_MAX + 1.5) {
+                    problems.add(String.format(java.util.Locale.ROOT, "it is %.2f blocks along %s; even a big item is at most %.1f "
+                        + "(plus a short string or pole holding it).", b[i + 3] - b[i], axis[i], OVERSIZE_MAX));
                 }
             }
             double reach = 0;
