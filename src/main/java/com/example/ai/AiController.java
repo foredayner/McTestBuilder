@@ -763,6 +763,35 @@ public class AiController {
         return new AiPrompt(system, user);
     }
 
+    /** A real device with depth on every side (front frame, recessed and raised parts, a closed back). */
+    public static final String EXAMPLE_RADIO = """
+        // old table radio at real size. Parts: wooden cabinet 0.7 x 0.42 x 0.28; raised front panel; speaker cloth with
+        // grille bars; dial scale with a needle; two knobs; carrying handle; antenna; feet; back cover with vents
+        def z = 2.0
+        def w = 0.7
+        def h = 0.42
+        def d = 0.28
+        ai.addRoundBox('dark_oak_planks', -w / 2, 0.04, z, w, h, d, 0.05)                         // cabinet (real depth)
+        ai.addRoundBox('spruce_planks', -w / 2 + 0.03, 0.07, z - 0.01, w - 0.06, h - 0.06, 0.03, 0.02)  // raised front panel
+        ai.addRoundBox('black_wool', -0.31, 0.11, z - 0.015, 0.34, 0.3, 0.03, 0.01)               // speaker cloth
+        for (int i = 0; i < 5; i++) {
+            ai.addPart('dark_oak_planks', -0.31, 0.13 + i * 0.06, z - 0.03, 0.34, 0.015, 0.02)    // grille bars in front of it
+        }
+        ai.addRoundBox('yellow_terracotta', 0.07, 0.3, z - 0.02, 0.22, 0.08, 0.02, 0.01)          // dial scale
+        ai.addPart('red_concrete', 0.16, 0.305, z - 0.03, 0.008, 0.07, 0.01)                      // needle
+        ai.addCapsule('black_concrete', 0.11, 0.17, z - 0.06, 0.11, 0.17, z, 0.035)               // tuning knob
+        ai.addCapsule('black_concrete', 0.25, 0.17, z - 0.06, 0.25, 0.17, z, 0.035)               // volume knob
+        ai.addTube('black_concrete', [[-0.2, h + 0.03, z + 0.14], [-0.17, h + 0.13, z + 0.14], [0.17, h + 0.13, z + 0.14], [0.2, h + 0.03, z + 0.14]], 0.015)
+        ai.addCapsule('iron_block', 0.27, h + 0.04, z + 0.22, 0.4, h + 0.42, z + 0.25, 0.01)       // telescopic antenna
+        ai.addRoundBox('brown_terracotta', -w / 2 + 0.05, 0.09, z + d - 0.005, w - 0.1, h - 0.1, 0.015, 0)  // back cover
+        for (int i = 0; i < 4; i++) {
+            ai.addPart('black_concrete', -0.2, 0.15 + i * 0.06, z + d + 0.008, 0.4, 0.015, 0.008)  // vents
+        }
+        ai.mirrorOn()
+        ai.addRoundBox('black_concrete', 0.25, 0, z + 0.03, 0.07, 0.05, 0.22, 0.01)              // feet
+        ai.mirrorOff()
+        """;
+
     /** Instructions for objects: the same for every request (cached by Claude). */
     static final String OBJECT_SYSTEM = """
             You are an expert modeller of cute, detailed Minecraft props and characters. Write ONLY executable Groovy using the `ai` API.
@@ -838,34 +867,6 @@ public class AiController {
             %s
             """.formatted(EXAMPLE_DUCK.strip(), EXAMPLE_LAMP.strip(), EXAMPLE_CHAIR.strip(), EXAMPLE_RADIO.strip());
 
-    /** A real device with depth on every side (front frame, recessed and raised parts, a closed back). */
-    public static final String EXAMPLE_RADIO = """
-        // old table radio at real size. Parts: wooden cabinet 0.7 x 0.42 x 0.28; raised front panel; speaker cloth with
-        // grille bars; dial scale with a needle; two knobs; carrying handle; antenna; feet; back cover with vents
-        def z = 2.0
-        def w = 0.7
-        def h = 0.42
-        def d = 0.28
-        ai.addRoundBox('dark_oak_planks', -w / 2, 0.04, z, w, h, d, 0.05)                         // cabinet (real depth)
-        ai.addRoundBox('spruce_planks', -w / 2 + 0.03, 0.07, z - 0.01, w - 0.06, h - 0.06, 0.03, 0.02)  // raised front panel
-        ai.addRoundBox('black_wool', -0.31, 0.11, z - 0.015, 0.34, 0.3, 0.03, 0.01)               // speaker cloth
-        for (int i = 0; i < 5; i++) {
-            ai.addPart('dark_oak_planks', -0.31, 0.13 + i * 0.06, z - 0.03, 0.34, 0.015, 0.02)    // grille bars in front of it
-        }
-        ai.addRoundBox('yellow_terracotta', 0.07, 0.3, z - 0.02, 0.22, 0.08, 0.02, 0.01)          // dial scale
-        ai.addPart('red_concrete', 0.16, 0.305, z - 0.03, 0.008, 0.07, 0.01)                      // needle
-        ai.addCapsule('black_concrete', 0.11, 0.17, z - 0.06, 0.11, 0.17, z, 0.035)               // tuning knob
-        ai.addCapsule('black_concrete', 0.25, 0.17, z - 0.06, 0.25, 0.17, z, 0.035)               // volume knob
-        ai.addTube('black_concrete', [[-0.2, h + 0.03, z + 0.14], [-0.17, h + 0.13, z + 0.14], [0.17, h + 0.13, z + 0.14], [0.2, h + 0.03, z + 0.14]], 0.015)
-        ai.addCapsule('iron_block', 0.27, h + 0.04, z + 0.22, 0.4, h + 0.42, z + 0.25, 0.01)       // telescopic antenna
-        ai.addRoundBox('brown_terracotta', -w / 2 + 0.05, 0.09, z + d - 0.005, w - 0.1, h - 0.1, 0.015, 0)  // back cover
-        for (int i = 0; i < 4; i++) {
-            ai.addPart('black_concrete', -0.2, 0.15 + i * 0.06, z + d + 0.008, 0.4, 0.015, 0.008)  // vents
-        }
-        ai.mirrorOn()
-        ai.addRoundBox('black_concrete', 0.25, 0, z + 0.03, 0.07, 0.05, 0.22, 0.01)              // feet
-        ai.mirrorOff()
-        """;
 
     public static AiPrompt objectPrompt(String userPrompt) {
         return new AiPrompt(OBJECT_SYSTEM, "Object request: " + userPrompt + "\nWrite the Groovy script for it now.");
