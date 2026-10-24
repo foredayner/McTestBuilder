@@ -154,6 +154,35 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
             context.waitTicks(5);
             context.takeScreenshot("20_sword_third_person");
+
+            // Worn equipment: the example helmet and wings on the player, from the front and the back.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                var world = player.getServerWorld();
+                var origin = player.getBlockPos();
+                BuildRecord helmet = BuildRecord.create("기사 투구", "TEST", "script",
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HELMET));
+                helmet.kind = "gear";
+                helmet.gear = "helmet";
+                BuildRecord wings = BuildRecord.create("천사 날개", "TEST", "script",
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_WINGS));
+                wings.kind = "gear";
+                wings.gear = "back";
+                player.equipStack(net.minecraft.entity.EquipmentSlot.HEAD, com.example.ai.build.GearItems.stackFor(helmet));
+                player.equipStack(net.minecraft.entity.EquipmentSlot.CHEST, com.example.ai.build.GearItems.stackFor(wings));
+            });
+            context.waitTicks(10);
+            context.runOnClient(client -> client.inGameHud.getChatHud().clear(false));
+            context.takeScreenshot("21_worn_front");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
+            context.waitTicks(5);
+            context.takeScreenshot("22_worn_back");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                player.equipStack(net.minecraft.entity.EquipmentSlot.HEAD, net.minecraft.item.ItemStack.EMPTY);
+                player.equipStack(net.minecraft.entity.EquipmentSlot.CHEST, net.minecraft.item.ItemStack.EMPTY);
+            });
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
 
             // The same apple placed at x1, x3 and x5, side by side somewhere empty.

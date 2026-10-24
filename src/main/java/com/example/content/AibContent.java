@@ -51,6 +51,7 @@ public final class AibContent {
             copy(settings, kind.base, net.minecraft.component.DataComponentTypes.DAMAGE);
             copy(settings, kind.base, net.minecraft.component.DataComponentTypes.ENCHANTABLE);
             copy(settings, kind.base, net.minecraft.component.DataComponentTypes.REPAIRABLE);
+            copy(settings, kind.base, net.minecraft.component.DataComponentTypes.EQUIPPABLE); // worn kinds only
             GEAR.put(kind, Registry.register(Registries.ITEM, key, new GearItem(kind, settings)));
         }
     }

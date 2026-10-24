@@ -1,5 +1,6 @@
 package com.example.content;
 
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 
@@ -32,7 +33,24 @@ public enum GearKind {
         "a handle 0.9-1.4 long going up; at the top a heavy head across X (0.4-0.7 wide, 0.2-0.35 tall and deep)."),
     STAFF("지팡이", Items.IRON_SWORD, Items.BLAZE_ROD,
         "a shaft (1.2-2.0) going up, with an ornament on top: an orb, crystal, crescent or carved head; "
-            + "rings or wraps along the shaft.");
+            + "rings or wraps along the shaft."),
+
+    // Worn equipment: drawn on the wearer's head or torso and following its movement.
+    HELMET("투구", Items.IRON_HELMET, Items.IRON_HELMET, EquipmentSlot.HEAD,
+        "a helmet that encloses the head box (start 0.02-0.06 outside it): a shell, a darker rim, a visor or eye slit "
+            + "on the front, maybe horns, a crest or a plume on top."),
+    HAT("모자", Items.LEATHER_HELMET, Items.LEATHER_HELMET, EquipmentSlot.HEAD,
+        "a hat, crown, hood or ears sitting on or around the top of the head box (from about y = 0.35 up); "
+            + "brims stick out around the head; keep the face (front, y 0.05-0.4) free."),
+    CHESTPLATE("갑옷", Items.IRON_CHESTPLATE, Items.IRON_CHESTPLATE, EquipmentSlot.CHEST,
+        "armour around the torso box (0.02-0.06 outside it): breastplate on the front, back plate, a belt at the "
+            + "bottom, shoulder pads at the top corners (they may stick out to x = +-0.4), emblems and rivets."),
+    BACK("등 장식", Items.LEATHER_CHESTPLATE, Items.ELYTRA, EquipmentSlot.CHEST,
+        "something worn on the back (z from 0.125 outward): wings (may spread to x = +-1.2), a backpack, a quiver, "
+            + "a sheathed sword, a shell; straps over the front of the torso hold it on.");
+
+    /** Where it is worn (head or chest), or null for hand-held equipment. */
+    public final EquipmentSlot slot;
 
     /** Shown in the UI and the item name. */
     public final String korean;
@@ -44,10 +62,19 @@ public enum GearKind {
     public final String guide;
 
     GearKind(String korean, Item base, Item icon, String guide) {
+        this(korean, base, icon, null, guide);
+    }
+
+    GearKind(String korean, Item base, Item icon, EquipmentSlot slot, String guide) {
         this.korean = korean;
         this.base = base;
         this.icon = icon;
+        this.slot = slot;
         this.guide = guide;
+    }
+
+    public boolean worn() {
+        return slot != null;
     }
 
     public String id() {

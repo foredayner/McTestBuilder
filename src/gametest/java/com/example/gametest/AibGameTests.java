@@ -201,6 +201,24 @@ public class AibGameTests implements FabricGameTest {
         check(stack.contains(net.minecraft.component.DataComponentTypes.ATTRIBUTE_MODIFIERS), "it has attack damage");
         check(stack.isIn(net.minecraft.registry.tag.ItemTags.SWORDS), "it counts as a sword (enchantments)");
         check(stack.getMaxCount() == 1, "does not stack");
+        // Worn equipment: the examples stay on the head / torso; a helmet is a head item with iron armour.
+        BuildPlan helmet = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HELMET);
+        check(com.example.ai.AiController.gearProblem(helmet, com.example.content.GearKind.HELMET) == null,
+            "helmet example fits: " + com.example.ai.AiController.gearProblem(helmet, com.example.content.GearKind.HELMET));
+        BuildPlan wings = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_WINGS);
+        check(com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.BACK) == null,
+            "wings example fits: " + com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.BACK));
+        check(com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.HELMET) != null, "wings are too wide for a head");
+        BuildRecord helm = BuildRecord.create("helm", "TEST", "script", helmet);
+        helm.kind = "gear";
+        helm.gear = "helmet";
+        net.minecraft.item.ItemStack helmStack = com.example.ai.build.GearItems.stackFor(helm);
+        var equippable = helmStack.get(net.minecraft.component.DataComponentTypes.EQUIPPABLE);
+        check(equippable != null && equippable.slot() == net.minecraft.entity.EquipmentSlot.HEAD, "a helmet goes on the head");
+        check(helmStack.isIn(net.minecraft.registry.tag.ItemTags.HEAD_ARMOR), "counts as head armour (enchantments)");
+        check(helmStack.get(net.minecraft.component.DataComponentTypes.ATTRIBUTE_MODIFIERS) != null
+            && !helmStack.get(net.minecraft.component.DataComponentTypes.ATTRIBUTE_MODIFIERS).modifiers().isEmpty(), "it gives armour");
+
         // Too long for the hand: refused with a reason the AI can fix.
         BuildPlan pole = Demo.plan(world, origin, player, "ai.addCapsule('oak_planks', 0, 0, 0, 0, 4, 0, 0.05)");
         check(com.example.ai.AiController.gearProblem(pole) != null, "a 4-block pole is too long");

@@ -40,7 +40,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     public static final Identifier TYPE_ID = Identifier.of(AiBuildAssistantMod.MOD_ID, "gear_model");
 
     /** A decoded model: parts with their textures, and its outline after the sword tilt. */
-    public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted) {
+    public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn) {
     }
 
     public record Unbaked() implements SpecialModelRenderer.Unbaked {
@@ -72,6 +72,11 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
 
     @Override
     public Model getData(ItemStack stack) {
+        return modelFor(stack);
+    }
+
+    /** The decoded model on a gear stack (cached), or null. */
+    public static Model modelFor(ItemStack stack) {
         NbtComponent data = stack.get(DataComponentTypes.CUSTOM_DATA);
         if (data == null) {
             return null;
@@ -82,17 +87,19 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             return hit.getValue();
         }
         BuildPlan plan = GearItems.modelOf(stack);
-        Model model = plan == null || plan.parts.isEmpty() ? null : decode(plan);
+        boolean worn = stack.getItem() instanceof com.example.content.GearItem gear && gear.kind().worn();
+        Model model = plan == null || plan.parts.isEmpty() ? null : decode(plan, worn);
         CACHE.put(key, Map.entry(new WeakReference<>(data), model == null ? EMPTY : model));
         return model;
     }
 
-    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4]);
+    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false);
 
-    private static Model decode(BuildPlan plan) {
+    private static Model decode(BuildPlan plan, boolean worn) {
         List<Sprite> sprites = new ArrayList<>();
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
-        float c = (float) Math.cos(TILT), s = (float) Math.sin(TILT);
+        float tilt = worn ? 0 : TILT;
+        float c = (float) Math.cos(tilt), s = (float) Math.sin(tilt);
         for (BuildPlan.Part p : plan.parts) {
             sprites.add(spriteOf(p.block));
             double r = Math.sqrt(p.sx * p.sx + p.sy * p.sy + p.sz * p.sz) / 2;
@@ -104,7 +111,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
                 minY = Math.min(minY, ty); maxY = Math.max(maxY, ty);
             }
         }
-        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY });
+        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn);
     }
 
     private static Sprite spriteOf(String block) {
@@ -118,10 +125,23 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     @Override
     public void render(Model model, ModelTransformationMode mode, MatrixStack matrices, VertexConsumerProvider vertexConsumers,
                        int light, int overlay, boolean glint) {
-        if (model == null || model.parts().isEmpty()) {
-            return;
+        if (model == null || model.parts().isEmpty() || mode == ModelTransformationMode.HEAD) {
+            return; // worn equipment on the head is drawn by WearRenderer
         }
         matrices.push();
+        if (model.worn()) {
+            // Helmets, armour and back items as an item: upright, fitted (a little smaller in the hand).
+            float[] t = model.tilted();
+            float size = Math.max(t[2] - t[0], t[3] - t[1]);
+            boolean slot = mode == ModelTransformationMode.GUI || mode == ModelTransformationMode.FIXED;
+            float scale = (slot ? 0.95F : 0.6F) / Math.max(0.2F, size);
+            matrices.translate(0.5F, 0.5F, 0.5F);
+            matrices.scale(scale, scale, scale);
+            matrices.translate(-(t[0] + t[2]) / 2, -(t[1] + t[3]) / 2, 0);
+            draw(matrices, vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout()), model, light, overlay);
+            matrices.pop();
+            return;
+        }
         if (mode == ModelTransformationMode.GUI || mode == ModelTransformationMode.FIXED) {
             // Fit the tilted model into the slot, centred.
             float[] t = model.tilted();
@@ -136,11 +156,15 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             matrices.scale(HAND_SCALE, HAND_SCALE, HAND_SCALE);
         }
         matrices.multiply(new Quaternionf().rotateZ(TILT));
-        VertexConsumer buffer = vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout());
+        draw(matrices, vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout()), model, light, overlay);
+        matrices.pop();
+    }
+
+    /** Every part of the model as a textured box, in the current matrix. */
+    static void draw(MatrixStack matrices, VertexConsumer buffer, Model model, int light, int overlay) {
         for (int i = 0; i < model.parts().size(); i++) {
             box(matrices, buffer, model.parts().get(i), model.sprites().get(i), light, overlay);
         }
-        matrices.pop();
     }
 
     private static final int[][] FACES = {

@@ -58,12 +58,12 @@ public class AibModelBench implements FabricClientGameTest {
     }
 
     private static final List<Case> CASES = List.of(
-        new Case("g1_sword", "불꽃이 타오르는 용사의 대검", "gear:sword"),
-        new Case("g2_axe", "바이킹 전투 도끼", "gear:axe"),
-        new Case("g3_pickaxe", "다이아몬드가 박힌 광부의 곡괭이", "gear:pickaxe"),
-        new Case("g4_staff", "얼음 결정이 달린 마법사의 지팡이", "gear:staff"),
-        new Case("g5_hammer", "천둥의 망치", "gear:hammer"),
-        new Case("o2_duck", "모자를 쓴 노란 오리", "object")
+        new Case("w1_helmet", "용의 뿔이 달린 기사 투구", "gear:helmet"),
+        new Case("w2_hat", "별무늬 마법사 모자", "gear:hat"),
+        new Case("w3_chest", "황금 장식의 성기사 갑옷", "gear:chestplate"),
+        new Case("w4_back", "불사조 날개", "gear:back"),
+        new Case("w5_back", "모험가의 가죽 배낭", "gear:back"),
+        new Case("g1_sword", "불꽃이 타오르는 용사의 대검", "gear:sword")
     );
 
     /** One AI call. */
@@ -192,7 +192,8 @@ public class AibModelBench implements FabricClientGameTest {
             save(model, c.id() + "_try" + attempt + ".groovy", code);
             AiController.Evaluation eval = game.getServer().computeOnServer(server ->
                 AiController.evaluate(server.getPlayerManager().getPlayerList().get(0), code));
-            String gearProblem = eval.ok() && c.gear() ? AiController.gearProblem(eval.plan()) : null;
+            String gearProblem = eval.ok() && c.gear()
+                ? AiController.gearProblem(eval.plan(), com.example.content.GearKind.of(c.mode().substring(5))) : null;
             if (eval.ok() && gearProblem == null) {
                 r.success = true;
                 r.summary = eval.plan().summary();
@@ -244,6 +245,31 @@ public class AibModelBench implements FabricClientGameTest {
     /** Place the accepted design in front of the player, take a picture, save the front view, then undo. */
     private void photograph(ClientGameTestContext context, TestSingleplayerContext game, String model, Case c, Result r, double[] home) {
         BuildRecord record = BuildRecord.fromJson(read(model, c.id() + ".record.json"));
+        com.example.content.GearKind kind = c.gear() ? com.example.content.GearKind.of(c.mode().substring(5)) : null;
+        if (kind != null && kind.worn()) {
+            // Worn equipment: put it on and take pictures from the front and the back.
+            game.getServer().runOnServer(server -> server.getPlayerManager().getPlayerList().get(0)
+                .equipStack(kind.slot, com.example.ai.build.GearItems.stackFor(record)));
+            context.runOnClient(client -> {
+                client.options.hudHidden = true;
+                client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT);
+            });
+            context.waitTicks(10);
+            context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_front");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
+            context.waitTicks(5);
+            context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_back");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
+            game.getServer().runOnServer(server -> server.getPlayerManager().getPlayerList().get(0)
+                .equipStack(kind.slot, net.minecraft.item.ItemStack.EMPTY));
+            try {
+                Path dir = OUT.resolve(safe(model));
+                BuildPreview.compute(record.plan).writePngs(dir.resolve(c.id() + "_top.png"), dir.resolve(c.id() + "_front.png"));
+            } catch (Exception e) {
+                r.summary += " (preview failed: " + e.getMessage() + ")";
+            }
+            return;
+        }
         if (c.gear()) {
             // Equipment: hold it and take a picture in first person and from the front.
             game.getServer().runOnServer(server -> server.getPlayerManager().getPlayerList().get(0)

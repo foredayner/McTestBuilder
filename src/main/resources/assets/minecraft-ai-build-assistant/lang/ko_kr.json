@@ -11,5 +11,9 @@
   "item.minecraft-ai-build-assistant.gear_hoe": "AI 괭이",
   "item.minecraft-ai-build-assistant.gear_spear": "AI 창",
   "item.minecraft-ai-build-assistant.gear_hammer": "AI 망치",
-  "item.minecraft-ai-build-assistant.gear_staff": "AI 지팡이"
+  "item.minecraft-ai-build-assistant.gear_staff": "AI 지팡이",
+  "item.minecraft-ai-build-assistant.gear_helmet": "AI 투구",
+  "item.minecraft-ai-build-assistant.gear_hat": "AI 모자",
+  "item.minecraft-ai-build-assistant.gear_chestplate": "AI 갑옷",
+  "item.minecraft-ai-build-assistant.gear_back": "AI 등 장식"
 }

@@ -167,7 +167,7 @@ public class AiController {
         String failure = eval.failure();
         GearKind gear = gearOf(req.mode());
         if (failure == null && gear != null) {
-            failure = gearProblem(plan);
+            failure = gearProblem(plan, gear);
             if (failure != null) {
                 AiNetworking.sendLog(player, "[Review] " + failure);
             }
@@ -373,8 +373,31 @@ public class AiController {
         }
         """;
 
-    /** Hand-held equipment must fit in the hand: about the size of vanilla tools, at most 2.6 long. */
     public static String gearProblem(BuildPlan plan) {
+        return gearProblem(plan, GearKind.SWORD);
+    }
+
+    /**
+     * Hand-held equipment must fit in the hand (about the size of vanilla tools, at most 2.6
+     * long); worn equipment must stay close to the head or torso it is worn on.
+     */
+    public static String gearProblem(BuildPlan plan, GearKind kind) {
+        if (kind.worn() && plan.ops.isEmpty() && plan.isObject()) {
+            double[] b = plan.partBounds();
+            boolean head = kind.slot == net.minecraft.entity.EquipmentSlot.HEAD;
+            double[] lim = head
+                ? new double[] { -0.7, -0.25, -0.7, 0.7, 1.3, 0.7 }
+                : new double[] { -1.3, -1.1, -0.5, 1.3, 0.7, 1.0 };
+            String[] axis = { "x", "y", "z" };
+            List<String> problems = new java.util.ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                if (b[i] < lim[i] - 1e-6 || b[i + 3] > lim[i + 3] + 1e-6) {
+                    problems.add(String.format(java.util.Locale.ROOT, "it reaches %s = %.2f..%.2f; keep it within %.2f..%.2f "
+                        + "(it must stay on the %s).", axis[i], b[i], b[i + 3], lim[i], lim[i + 3], head ? "head" : "torso"));
+                }
+            }
+            return problems.isEmpty() ? null : PLAN_PROBLEMS + "\n- " + String.join("\n- ", problems);
+        }
         if (!plan.ops.isEmpty()) {
             return PLAN_PROBLEMS + "\n- equipment must be made only of pieces (addPart / smooth shapes), no blocks.";
         }
@@ -449,8 +472,69 @@ public class AiController {
             %s
             """;
 
+    public static final String EXAMPLE_HELMET = """
+        // knight helmet; the head is the box x -0.25..0.25, y 0..0.5, z -0.25..0.25, face toward -Z
+        ai.addRoundBox('iron_block', -0.29, 0.0, -0.29, 0.58, 0.58, 0.58, 0.1)          // helm around the head
+        ai.addRoundBox('gray_concrete', -0.3, 0.0, -0.3, 0.6, 0.06, 0.6, 0.02)           // darker lower rim
+        ai.addRoundBox('black_concrete', -0.2, 0.3, -0.32, 0.4, 0.04, 0.05, 0)           // eye slit
+        ai.addRoundBox('gold_block', -0.03, 0.06, -0.32, 0.06, 0.48, 0.05, 0.01)         // nose guard
+        ai.addTube('red_wool', [[0, 0.56, 0.05], [0, 0.78, 0.0], [0, 0.82, 0.25], [0, 0.6, 0.38]], 0.07, 0.03)  // plume
+        """;
+
+    public static final String EXAMPLE_WINGS = """
+        // angel wings; the torso is the box x -0.25..0.25, y -0.75..0, z -0.125..0.125, back toward +Z
+        ai.addRoundBox('brown_terracotta', -0.27, -0.45, -0.15, 0.54, 0.06, 0.32, 0.02)  // harness around the chest
+        ai.mirrorOn()
+        ai.addEllipsoid('white_wool', 0.45, -0.2, 0.22, 0.4, 0.18, 0.05)                 // upper wing
+        ai.addEllipsoid('white_wool', 0.55, -0.42, 0.24, 0.35, 0.14, 0.04)               // lower feathers
+        ai.addEllipsoid('light_gray_wool', 0.75, -0.5, 0.24, 0.2, 0.08, 0.045)           // feather tips (shadow tone)
+        ai.addCapsule('white_concrete', 0.12, -0.15, 0.17, 0.85, 0.0, 0.22, 0.04)        // wing bone
+        ai.mirrorOff()
+        """;
+
+    /** Instructions for worn equipment (fixed part). */
+    static final String WEAR_SYSTEM = """
+            You are an expert designer of fantasy armour and accessories for Minecraft. Write ONLY executable Groovy using the `ai` API.
+
+            Model ONE piece of worn equipment out of pieces. It is drawn on the wearer and moves with their head or torso.
+            Smooth shapes are drawn on a fine 1/16-block grid.
+
+            FRAME (units are blocks; +Y = up, -Z = the wearer's front, +X = the right side as seen by someone facing them):
+            - HEAD items: the head is the box x -0.25..0.25, y 0..0.5, z -0.25..0.25; (0, 0, 0) is the bottom centre of
+              the head (the neck). The face is on the -Z side. Stay within x and z -0.7..0.7 and y -0.25..1.3.
+            - CHEST items: the torso is the box x -0.25..0.25, y -0.75..0, z -0.125..0.125; (0, 0, 0) is the top centre of
+              the torso (between the shoulders). The front is -Z, the back is +Z. Stay within x -1.3..1.3, y -1.1..0.7,
+              z -0.5..1.0. The arms hang beside the torso (x beyond +-0.25), so keep armour off them.
+            - Wrap the body part closely (0.02-0.06 outside it); pieces inside it are hidden, which is fine.
+
+            %s
+            STYLE (this decides the quality):
+            - A clear, bold silhouette; a few big shapes, then trims, rivets, gems, straps.
+            - Materials: iron_block / light_gray_concrete / quartz_block (steel), gold_block (trim), leather in
+              brown_terracotta / brown_concrete, cloth in *_wool, gems (diamond_block, emerald_block, amethyst_block,
+              redstone_block, lapis_block), feathers in white_wool, magic glow in glowstone / sea_lantern.
+            - One darker shade for rims, gaps and the underside, one lighter for highlights. Symmetric with ai.mirrorOn().
+            - Overlap pieces slightly so nothing floats. At most 400 pieces after merging.
+
+            CODE RULES:
+            - Block names are quoted strings: 'iron_block'.
+            - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
+            - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
+
+            EXAMPLES (style reference; make your own design, do not copy):
+            %s
+            %s
+            """;
+
     public static AiPrompt gearPrompt(String userPrompt, GearKind kind) {
         String shapes = OBJECT_SYSTEM.substring(OBJECT_SYSTEM.indexOf("SMOOTH SHAPES"), OBJECT_SYSTEM.indexOf("STYLE (this"));
+        if (kind.worn()) {
+            String system = WEAR_SYSTEM.formatted(shapes, EXAMPLE_HELMET.strip(), EXAMPLE_WINGS.strip());
+            String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "), worn on the "
+                + (kind.slot == net.minecraft.entity.EquipmentSlot.HEAD ? "HEAD" : "CHEST (torso)") + ". What to make: " + kind.guide
+                + "\nRequest: " + userPrompt + "\nWrite the Groovy script for it now.";
+            return new AiPrompt(system, user);
+        }
         String system = GEAR_SYSTEM.formatted(shapes, EXAMPLE_SWORD.strip(), EXAMPLE_AXE.strip());
         String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "). Shape guide for this kind: " + kind.guide
             + "\nRequest: " + userPrompt + "\nWrite the Groovy script for it now.";
