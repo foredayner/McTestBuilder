@@ -57,6 +57,9 @@ server and the client of the player who builds. That player needs operator level
     The order has effect fields (공격 시 / 대기 시, or 착용 시); left empty there is no effect. Effects are
     whitelisted particles sent by the server (hit bursts, steady puffs while held or worn) and looping
     movements of part groups (spin, swing, bob, pulse) plus glow, drawn by the client from game time.
+    Hit effects can be shaped and combined (up to three): burst, shockwave, cone, slash, spiral, pillar,
+    lightning, and a magic circle drawn with particles plus glowing display pieces that open, turn and vanish.
+    One shaped set per attacker plays at a time; faster hits get a plain burst.
   - **Claude (Anthropic)** provider: Messages API with the fixed instructions as a cached system prompt,
     optional web search (`web_search` tool, at most 3 searches per build).
   - Objects are **solid**: their parts are merged into a few boxes that follow the shape (an
