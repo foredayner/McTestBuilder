@@ -64,8 +64,20 @@ public class AibModelBench implements FabricClientGameTest {
     private static final List<Case> CASES = List.of(
         new Case("a1_holy", "성스러운 빛의 장검", "gear:sword", "빛 입자가 한 점에서 구형으로 퍼져나감", "금빛 후광이 검 전체를 감쌈"),
         new Case("a2_void", "공허의 낫 모양 지팡이", "gear:staff", "보라색 입자가 큰 구에서 한 점으로 빨려 들어감", "검보라색 오라가 일렁임"),
-        new Case("a3_crown", "태양 왕관", "gear:hat", "", "황금빛 후광이 왕관을 감싸고 빛남")
+        new Case("a3_crown", "태양 왕관", "gear:hat", "", "황금빛 후광이 왕관을 감싸고 빛남"),
+        new Case("b1_scythe", "게임이나 애니에 나오는 대형 전투낫", "gear:sword"),
+        new Case("b2_reaper", "사신의 거대한 전투낫, 검은 자루에 은빛 초승달 날", "gear:sword", "검붉은 베기 궤적", "")
     );
+
+    /** Cases to run: AIB_BENCH_CASES (comma-separated ids), or all. */
+    private static List<Case> cases() {
+        String wanted = System.getenv("AIB_BENCH_CASES");
+        if (wanted == null || wanted.isBlank()) {
+            return CASES;
+        }
+        List<String> ids = java.util.Arrays.stream(wanted.split(",")).map(String::trim).toList();
+        return CASES.stream().filter(c -> ids.contains(c.id())).toList();
+    }
 
     /** One AI call. */
     static final class Call {
@@ -151,7 +163,7 @@ public class AibModelBench implements FabricClientGameTest {
                     continue;
                 }
                 config.modelName = model;
-                for (Case c : CASES) {
+                for (Case c : cases()) {
                     Result r = runCase(context, game, model, c, key.trim());
                     results.add(r);
                     write(results);
@@ -321,6 +333,9 @@ public class AibModelBench implements FabricClientGameTest {
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
             context.waitTicks(5);
             context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_front");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
+            context.waitTicks(5);
+            context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_back");
             context.runOnClient(client -> {
                 client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON);
                 client.options.hudHidden = true;

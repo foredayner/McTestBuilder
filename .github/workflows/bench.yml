@@ -9,6 +9,9 @@ on:
       models:
         description: Comma-separated model ids
         default: claude-haiku-5-5
+      cases:
+        description: Comma-separated case ids (empty = all)
+        default: ""
   push:
     branches: [bench]
 
@@ -40,7 +43,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
           AIB_BENCH_ONLY: "1"
-          AIB_BENCH_MODELS: ${{ github.event.inputs.models || 'claude-haiku-5-5' }}
+          AIB_BENCH_MODELS: ${{ github.event.inputs.models || 'claude-haiku-5-5,claude-sonnet-5-5' }}
+          AIB_BENCH_CASES: ${{ github.event.inputs.cases || 'b1_scythe,b2_reaper' }}
         with:
           run: |
             chmod +x gradlew
