@@ -11,6 +11,19 @@ public abstract class BipedEntityRenderStateMixin implements AibMotionState {
     @Unique
     private String aib$motion = "";
 
+    @Unique
+    private boolean aib$twoHanded;
+
+    @Override
+    public boolean aib$isTwoHanded() {
+        return aib$twoHanded;
+    }
+
+    @Override
+    public void aib$setTwoHanded(boolean twoHanded) {
+        aib$twoHanded = twoHanded;
+    }
+
     @Override
     public String aib$getMotion() {
         return aib$motion;

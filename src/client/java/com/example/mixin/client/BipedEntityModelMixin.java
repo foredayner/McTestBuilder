@@ -31,14 +31,21 @@ public abstract class BipedEntityModelMixin {
 
     @Inject(method = "animateArms", at = @At("HEAD"), cancellable = true)
     private void aib$motion(BipedEntityRenderState state, float animationProgress, CallbackInfo ci) {
-        if (!(state instanceof AibMotionState m) || m.aib$getMotion().isEmpty()) {
+        if (!(state instanceof AibMotionState m)) {
+            return;
+        }
+        boolean right = state.preferredArm == Arm.RIGHT;
+        if (m.aib$isTwoHanded()) {
+            // A long weapon: both hands on the grip, held ready in front (the swing below moves the main arm).
+            GearMotionClient.twoHandedHold(right ? rightArm : leftArm, right ? leftArm : rightArm, right);
+        }
+        if (m.aib$getMotion().isEmpty()) {
             return;
         }
         float p = GearMotionClient.progress(state.handSwingProgress);
         if (p <= 0) {
             return;
         }
-        boolean right = state.preferredArm == Arm.RIGHT;
         GearMotionClient.thirdPerson(right ? rightArm : leftArm, body, right, m.aib$getMotion(), p);
         ci.cancel();
     }

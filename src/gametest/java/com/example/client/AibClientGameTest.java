@@ -172,6 +172,25 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.takeScreenshot("26_sword_slash_first_person");
             context.runOnClient(client -> com.example.client.GearMotionClient.forceProgress = -1);
 
+            // A greatsword taller than the player: shortened in first person, real size and two-handed in third.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                BuildRecord great = BuildRecord.create("대검", "TEST", "script",
+                    Demo.plan(p.getServerWorld(), p.getBlockPos(), p, Demo.GREATSWORD, true));
+                great.kind = "gear";
+                great.gear = "sword";
+                p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(great));
+            });
+            context.waitTicks(40);
+            context.takeScreenshot("29_greatsword_first_person");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
+            context.waitTicks(3);
+            context.takeScreenshot("30_greatsword_third_person");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
+            context.waitTicks(3);
+            context.takeScreenshot("31_greatsword_back");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
+
             // A bow with its own arrow shape: in the hand, and one of its arrows hanging in the air.
             game.getServer().runOnServer(server -> {
                 ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);

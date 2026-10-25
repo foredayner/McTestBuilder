@@ -410,6 +410,10 @@ public class AiController {
         return gearProblem(plan, GearKind.SWORD);
     }
 
+    /** Hand-held equipment without ai.oversize(): up to a greatsword or scythe taller than the wielder. */
+    public static final double HAND_MAX_LONG = 3.5;
+    public static final double HAND_MAX_WIDE = 1.8;
+
     /** Largest size (blocks) of equipment the order asked to be big (ai.oversize()). */
     public static final double OVERSIZE_MAX = 5.0;
 
@@ -466,13 +470,13 @@ public class AiController {
         }
         double[] b = plan.partBounds();
         List<String> problems = new java.util.ArrayList<>();
-        if (b[4] - b[1] > 2.6) {
-            problems.add(String.format(java.util.Locale.ROOT, "it is %.2f blocks long; keep it at most 2.6 "
-                + "(only if the request asks for it to be big, call ai.oversize()).", b[4] - b[1]));
+        if (b[4] - b[1] > HAND_MAX_LONG) {
+            problems.add(String.format(java.util.Locale.ROOT, "it is %.2f blocks long; keep it at most %.1f "
+                + "(only if the request asks for it to be giant, call ai.oversize()).", b[4] - b[1], HAND_MAX_LONG));
         }
-        if (b[3] - b[0] > 1.3 || b[5] - b[2] > 1.3) {
-            problems.add(String.format(java.util.Locale.ROOT, "it is %.2f wide (X) and %.2f deep (Z); keep both at most 1.3.",
-                b[3] - b[0], b[5] - b[2]));
+        if (b[3] - b[0] > HAND_MAX_WIDE || b[5] - b[2] > HAND_MAX_WIDE) {
+            problems.add(String.format(java.util.Locale.ROOT, "it is %.2f wide (X) and %.2f deep (Z); keep both at most %.1f.",
+                b[3] - b[0], b[5] - b[2], HAND_MAX_WIDE));
         }
         if (b[1] > 0.05 || b[4] < 0.2 || b[0] > 0.05 || b[3] < -0.05) {
             problems.add("the hand holds it at (0, 0, 0): the handle must pass through that point, with the item going up (+Y).");
@@ -555,9 +559,13 @@ public class AiController {
               goes UP (+Y); the end below the hand may go to about y = -0.2. (A bow is held at its middle: see its kind.)
             - The front (the side with the most detail) faces -Z, the viewer.
 
-            SIZE:
-            - Normal: like a vanilla tool. At most 2.6 long (Y) and 1.3 wide (X and Z). Use the kind's typical shape.
-            - Only if the request asks for it to be big (big, huge, giant, 거대한, 큰, or a size in blocks): call
+            SIZE (decide from what it is; the player is 1.8 tall):
+            - Normal weapons and tools (sword, axe, pickaxe, wand...): like vanilla, 1.0-1.6 long.
+            - Large ones by nature (greatsword, zweihander, scythe, war hammer, halberd, giant club, guandao, big
+              anime-style blades): as big as the wielder or bigger, 1.8-3.5 long, with heads or blades up to 1.8 wide.
+              Make them heavy and bold: thick blades, big heads, a long two-handed grip (0.4-0.7) at the bottom.
+            - Limits without asking: 3.5 long (Y), 1.8 wide (X and Z).
+            - Only if the request asks for it to be even bigger (huge, giant, 거대한, or a size in blocks over 3.5): call
               ai.oversize() first; then it may be up to 5 blocks in each direction.
 
             %s

@@ -13,12 +13,16 @@ import java.util.Locale;
  */
 public enum GearKind {
     SWORD("검", Items.IRON_SWORD, Items.IRON_SWORD,
-        "anything swung to hit (a sword, katana, bat, club, stick, toy sword, fish...). For a blade: a grip (0.25-0.35 "
-            + "long) around the hand, a guard above it if it has one, then the blade straight up; total 1.0-1.6 (a long "
-            + "one up to 2.2), the blade 0.12-0.3 wide (X) and 0.04-0.08 thick (Z)."),
+        "anything swung to hit: a sword, katana, greatsword, scythe, sickle, hammer, club, bat, stick, toy sword, "
+            + "fish... (this kind only decides sword stats and the swing; the shape is whatever the request says). "
+            + "Sword: a grip (0.25-0.35, two-handed 0.4-0.7) around the hand, a guard above it if it has one, then the "
+            + "blade straight up, 0.12-0.3 wide (X; a greatsword 0.3-0.6) and 0.04-0.1 thick (Z); 1.0-1.6 long, a "
+            + "greatsword 1.8-3.2. Scythe: a long shaft (1.6-2.8) up from the hand with a big curved blade at the top "
+            + "sweeping out to one side (+X or -X, 0.8-1.6 long) and curving down. Hammer or club: a shaft with a heavy "
+            + "head at the top (a big hammer head 0.6-1.2 wide)."),
     AXE("도끼", Items.IRON_AXE, Items.IRON_AXE,
-        "a handle 0.9-1.3 long going up; near the top a head whose blade sticks out to +X (0.25-0.5 wide), "
-            + "thin in Z (0.04-0.1), with a curved cutting edge."),
+        "a handle 0.9-1.3 long going up (a great axe 1.6-2.8); near the top a head whose blade sticks out to +X "
+            + "(0.25-0.5 wide, a great axe up to 1.2), thin in Z (0.04-0.1), with a curved cutting edge."),
     PICKAXE("곡괭이", Items.IRON_PICKAXE, Items.IRON_PICKAXE,
         "a handle 0.9-1.2 long going up; at the top a head across X in both directions (0.6-0.9 wide), "
             + "its two points curving slightly down."),
@@ -31,7 +35,8 @@ public enum GearKind {
         "a long thin shaft (1.6-2.4) going up, a pointed head (0.25-0.45 long) on top, maybe a binding or tassel "
             + "under the head."),
     HAMMER("망치", Items.IRON_AXE, Items.MACE,
-        "a handle 0.9-1.4 long going up; at the top a heavy head across X (0.4-0.7 wide, 0.2-0.35 tall and deep)."),
+        "a handle 0.9-1.4 long going up (a war hammer 1.6-2.8); at the top a heavy head across X (0.4-0.7 wide, a "
+            + "war hammer 0.8-1.6; 0.2-0.6 tall and deep)."),
     STAFF("지팡이", Items.IRON_SWORD, Items.BLAZE_ROD,
         "a long held thing (a staff, wand, walking stick, umbrella, flag, microphone stand...): a shaft (1.2-2.0) going "
             + "up with whatever sits on top."),

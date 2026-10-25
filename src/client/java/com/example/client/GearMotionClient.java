@@ -72,6 +72,17 @@ public final class GearMotionClient {
         }
     }
 
+    /** Third person: both hands on the grip of a long weapon, held ready in front of the body. */
+    public static void twoHandedHold(ModelPart holding, ModelPart other, boolean right) {
+        float side = right ? 1 : -1;
+        holding.pitch = -0.55F;
+        holding.yaw = side * -0.15F;
+        holding.roll = 0;
+        other.pitch = -0.75F;
+        other.yaw = side * 0.6F;
+        other.roll = 0;
+    }
+
     /** Third person: arm (and body) angles for the swinging arm, in place of the normal swing. */
     public static void thirdPerson(ModelPart arm, ModelPart body, boolean right, String motion, float p) {
         float side = right ? 1 : -1;

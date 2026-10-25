@@ -272,6 +272,12 @@ public class AibGameTests implements FabricGameTest {
             check(expected.getMessage().contains("unknown particle"), expected.getMessage());
         }
 
+        // A greatsword taller than the player is fine without asking.
+        BuildPlan great = Demo.plan(world, origin, player, Demo.GREATSWORD, true);
+        check(com.example.ai.AiController.gearProblem(great, com.example.content.GearKind.SWORD) == null,
+            "a greatsword fits: " + com.example.ai.AiController.gearProblem(great, com.example.content.GearKind.SWORD));
+        check(great.partBounds()[4] - great.partBounds()[1] > 2.5, "it really is long");
+
         // Too long for the hand: refused with a reason the AI can fix.
         BuildPlan pole = Demo.plan(world, origin, player, "ai.addCapsule('oak_planks', 0, 0, 0, 0, 4, 0, 0.05)");
         check(com.example.ai.AiController.gearProblem(pole) != null, "a 4-block pole is too long");

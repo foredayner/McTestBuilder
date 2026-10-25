@@ -137,17 +137,44 @@ public final class GearEffects {
             center = player.getPos().add(flat.multiply(2.0));
         }
         Vec3d from = eye.add(0, -0.4, 0).add(look.multiply(0.6));
-        play(world, player.getUuid(), stack, center, from, look);
+        play(world, player.getUuid(), stack, center, from, look, sizeFor(stack));
+    }
+
+    /** Big weapons get bigger effects: about the weapon's length over a normal sword's (1-2.5x). */
+    private static double sizeFor(ItemStack stack) {
+        BuildPlan model = GearItems.modelOf(stack);
+        if (model == null || model.parts.isEmpty()) {
+            return 1;
+        }
+        double low = Double.MAX_VALUE, high = -Double.MAX_VALUE;
+        for (BuildPlan.Part p : model.parts) {
+            if (p.group != BuildPlan.ARROW_GROUP) {
+                low = Math.min(low, p.y - p.sy / 2);
+                high = Math.max(high, p.y + p.sy / 2);
+            }
+        }
+        return high > low ? Math.max(1, Math.min(2.5, (high - low) / 1.5)) : 1;
     }
 
     /** All hit effects of {@code stack}: plain bursts, and shaped ones (one set per wielder at a time). */
     private static void play(ServerWorld world, java.util.UUID who, ItemStack stack, Vec3d center, Vec3d from, Vec3d look) {
+        play(world, who, stack, center, from, look, 1);
+    }
+
+    private static void play(ServerWorld world, java.util.UUID who, ItemStack stack, Vec3d center, Vec3d from, Vec3d look,
+                             double scale) {
         boolean busy = HitEffects.busy(who);
         for (String key : new String[] { HIT, HIT + 2, HIT + 3 }) {
             BuildPlan.Fx fx = read(stack, key);
             ParticleEffect effect = fx == null ? null : particle(fx);
             if (effect == null) {
                 continue;
+            }
+            if (scale > 1) {
+                BuildPlan.Fx big = new BuildPlan.Fx(fx.particle, fx.color, (int) Math.min(12, Math.round(fx.count * scale)));
+                big.pattern = fx.pattern;
+                big.size = Math.min(4, fx.size * scale);
+                fx = big;
             }
             if (!"burst".equals(fx.pattern)) {
                 if (!busy) {
@@ -156,7 +183,8 @@ public final class GearEffects {
                 }
                 fx = new BuildPlan.Fx(fx.particle, fx.color, fx.count);
             }
-            world.spawnParticles(effect, center.x, center.y + 1.0, center.z, fx.count * 3, 0.35, 0.4, 0.35, 0.08);
+            double spread = 0.35 * scale;
+            world.spawnParticles(effect, center.x, center.y + 1.0, center.z, fx.count * 3, spread, 0.4 * scale, spread, 0.08);
         }
     }
 

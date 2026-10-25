@@ -34,6 +34,15 @@ public final class Demo {
             + "ai.addPart('brown_concrete', cx - 0.03, 0.62, cz - 0.03, 0.06, 0.15, 0.06)\n"
             + "ai.addPart('lime_concrete', cx, 0.7, cz - 0.04, 0.16, 0.02, 0.08, 30)\n";
 
+    /** A greatsword taller than the player, with a long two-handed grip. */
+    public static final String GREATSWORD =
+        "ai.addCapsule('dark_oak_planks', 0, -0.3, 0, 0, 0.35, 0, 0.05)\n"
+            + "ai.addSphere('gold_block', 0, -0.33, 0, 0.08)\n"
+            + "ai.addRoundBox('gold_block', -0.35, 0.35, -0.07, 0.7, 0.1, 0.14, 0.03)\n"
+            + "ai.addRoundBox('iron_block', -0.2, 0.45, -0.04, 0.4, 2.1, 0.08, 0.02)\n"
+            + "ai.addRoundBox('light_gray_concrete', -0.04, 0.5, -0.05, 0.08, 1.9, 0.1, 0)\n"
+            + "ai.addCone('iron_block', 0, 2.54, 0, 0.2, 0.36)\n";
+
     /** A 4-block balloon on a string, floating above the head: worn on the back, asked to be big. */
     public static final String BALLOON =
         "ai.oversize()\n"

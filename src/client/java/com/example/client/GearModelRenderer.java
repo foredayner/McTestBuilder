@@ -41,7 +41,34 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
 
     /** A decoded model: parts with their textures, and its outline after the sword tilt. */
     public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn,
-                        Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura, float reach, boolean bow, Model arrow) {
+                        Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura, float reach, boolean bow, Model arrow,
+                        float length) {
+    }
+
+    /** Hand-held models at least this long (blocks) are held with both hands in third person. */
+    public static final float TWO_HANDED_LENGTH = 2.0F;
+
+    /**
+     * Scale of a hand-held model. Up to vanilla size it is drawn like before (a 1.45 sword about as
+     * big as a vanilla one); longer ones grow toward their real size in third person (a 3-block
+     * greatsword is 3 blocks), and in first person they are kept short enough to fit the view.
+     */
+    static float handScale(float length, boolean firstPerson) {
+        if (firstPerson) {
+            return HAND_SCALE * Math.min(1.0F, 1.8F / Math.max(0.1F, length));
+        }
+        float t = Math.max(0, Math.min(1, (length - 1.6F) / 1.4F));
+        return HAND_SCALE + t * (1.0F / 0.85F - HAND_SCALE);
+    }
+
+    /** True when the main-hand stack is a long AI weapon (held with both hands in third person). */
+    public static boolean twoHanded(ItemStack stack) {
+        if (!(stack.getItem() instanceof com.example.content.GearItem gear) || gear.kind().worn()
+            || gear.kind() == com.example.content.GearKind.BOW) {
+            return false;
+        }
+        Model model = modelFor(stack);
+        return model != null && model.length() >= TWO_HANDED_LENGTH;
     }
 
     /**
@@ -121,7 +148,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         return model;
     }
 
-    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null, 0, false, null);
+    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null, 0, false, null, 0);
 
     private static Model decode(BuildPlan plan, boolean worn, boolean bow) {
         // A bow's arrow pieces are not part of the bow: they are the shape of the arrows it shoots.
@@ -138,7 +165,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
                 arrowSprites.add(spriteOf(p.block));
                 reach = (float) Math.max(reach, p.y + p.sy / 2);
             }
-            arrow = new Model(arrowParts, arrowSprites, new float[4], false, Map.of(), null, reach, false, null);
+            arrow = new Model(arrowParts, arrowSprites, new float[4], false, Map.of(), null, reach, false, null, reach);
         }
         if (own.isEmpty()) {
             own = arrowParts; // only an arrow: show it
@@ -149,7 +176,10 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         float tilt = worn ? 0 : TILT;
         float c = (float) Math.cos(tilt), s = (float) Math.sin(tilt);
         float reach = 0;
+        float lowY = Float.MAX_VALUE, highY = -Float.MAX_VALUE;
         for (BuildPlan.Part p : plan.parts) {
+            lowY = (float) Math.min(lowY, p.y - p.sy / 2);
+            highY = (float) Math.max(highY, p.y + p.sy / 2);
             sprites.add(spriteOf(p.block));
             double r = Math.sqrt(p.sx * p.sx + p.sy * p.sy + p.sz * p.sz) / 2;
             reach = (float) Math.max(reach, Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z) + r);
@@ -167,7 +197,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
                 anims.computeIfAbsent(a.group, k -> new ArrayList<>()).add(a);
             }
         }
-        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims, plan.aura, reach, bow, arrow);
+        return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims, plan.aura, reach, bow, arrow,
+            plan.parts.isEmpty() ? 0 : highY - lowY);
     }
 
     private static BuildPlan copyWithParts(BuildPlan plan, List<BuildPlan.Part> parts) {
@@ -218,9 +249,10 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             // A bow: its grip where the vanilla bow sprite's grip is, so the bow poses (drawing too) fit it.
             matrices.translate(BOW_GRIP_X, BOW_GRIP_Y, 0.5F);
         } else {
-            // In the hand: a 1.45-block AI sword shows about as big as a vanilla sword.
+            // In the hand: a 1.45-block AI sword shows about as big as a vanilla sword; big ones grow.
+            float scale = handScale(model.length(), mode.isFirstPerson());
             matrices.translate(GRIP_X, GRIP_Y, 0.5F);
-            matrices.scale(HAND_SCALE, HAND_SCALE, HAND_SCALE);
+            matrices.scale(scale, scale, scale);
         }
         matrices.multiply(new Quaternionf().rotateZ(TILT));
         draw(matrices, vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout()), model, light, overlay);
