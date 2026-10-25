@@ -46,8 +46,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     }
 
     /** First person, long weapons: extra tilt (degrees) and how far up the shaft it looks held (per block). */
-    static final float FIRST_PERSON_LONG_TILT = -20.0F;
-    static final float FIRST_PERSON_LONG_SLIDE = 0.45F;
+    static final float FIRST_PERSON_LONG_TILT = 30.0F;
+    static final float FIRST_PERSON_LONG_SLIDE = 0.5F;
 
     /** Hand-held models at least this long (blocks) are held with both hands in third person. */
     public static final float TWO_HANDED_LENGTH = 2.0F;
