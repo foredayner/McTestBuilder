@@ -1,0 +1,105 @@
+{
+  "route": "claude",
+  "results": [
+    {
+      "model": "claude-haiku-5-5",
+      "id": "b1_scythe",
+      "prompt": "게임이나 애니에 나오는 대형 전투낫",
+      "object": true,
+      "success": true,
+      "calls": 1,
+      "summary": "Size: 3 x 4 x 2 (W x H x L), 108 part(s) | anims 0 [] | hit none | idle none",
+      "totalMs": 28356,
+      "inputTokens": 527,
+      "outputTokens": 5587,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 4085,
+      "attempts": [
+        {
+          "route": "claude",
+          "status": 200,
+          "ms": 27413,
+          "inputTokens": 527,
+          "outputTokens": 5587,
+          "cacheRead": 0,
+          "cacheWrite": 4085
+        }
+      ]
+    },
+    {
+      "model": "claude-haiku-5-5",
+      "id": "b2_reaper",
+      "prompt": "사신의 거대한 전투낫, 검은 자루에 은빛 초승달 날",
+      "object": true,
+      "success": true,
+      "calls": 1,
+      "summary": "Size: 4 x 5 x 4 (W x H x L), 239 part(s) | anims 0 [] | hit dust x8 | idle none",
+      "totalMs": 17904,
+      "inputTokens": 548,
+      "outputTokens": 3814,
+      "cacheReadTokens": 4085,
+      "cacheWriteTokens": 0,
+      "attempts": [
+        {
+          "route": "claude",
+          "status": 200,
+          "ms": 17758,
+          "inputTokens": 548,
+          "outputTokens": 3814,
+          "cacheRead": 4085,
+          "cacheWrite": 0
+        }
+      ]
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "id": "b1_scythe",
+      "prompt": "게임이나 애니에 나오는 대형 전투낫",
+      "object": true,
+      "success": true,
+      "calls": 1,
+      "summary": "Size: 3 x 4 x 2 (W x H x L), 243 part(s) | anims 0 [] | hit none | idle none",
+      "totalMs": 8606,
+      "inputTokens": 527,
+      "outputTokens": 1341,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 4085,
+      "attempts": [
+        {
+          "route": "claude",
+          "status": 200,
+          "ms": 8469,
+          "inputTokens": 527,
+          "outputTokens": 1341,
+          "cacheRead": 0,
+          "cacheWrite": 4085
+        }
+      ]
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "id": "b2_reaper",
+      "prompt": "사신의 거대한 전투낫, 검은 자루에 은빛 초승달 날",
+      "object": true,
+      "success": true,
+      "calls": 1,
+      "summary": "Size: 4 x 5 x 2 (W x H x L), 283 part(s) | anims 0 [] | hit dust x10 | idle none",
+      "totalMs": 21359,
+      "inputTokens": 548,
+      "outputTokens": 2734,
+      "cacheReadTokens": 4085,
+      "cacheWriteTokens": 0,
+      "attempts": [
+        {
+          "route": "claude",
+          "status": 200,
+          "ms": 21279,
+          "inputTokens": 548,
+          "outputTokens": 2734,
+          "cacheRead": 4085,
+          "cacheWrite": 0
+        }
+      ]
+    }
+  ]
+}
