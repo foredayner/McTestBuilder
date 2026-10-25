@@ -17,8 +17,11 @@ public enum GearKind {
             + "fish... (this kind only decides sword stats and the swing; the shape is whatever the request says). "
             + "Sword: a grip (0.25-0.35, two-handed 0.4-0.7) around the hand, a guard above it if it has one, then the "
             + "blade straight up, 0.12-0.3 wide (X; a greatsword 0.3-0.6) and 0.04-0.1 thick (Z); 1.0-1.6 long, a "
-            + "greatsword 1.8-3.2. Scythe: a long shaft (1.6-2.8) up from the hand with a big curved blade at the top "
-            + "sweeping out to one side (+X or -X, 0.8-1.6 long) and curving down. Hammer or club: a shaft with a heavy "
+            + "greatsword 1.8-3.2. Scythe: a long shaft (1.6-2.8) up from the hand; at the top a collar or ornament where a "
+            + "big crescent blade starts, sweeping out to one side (+X or -X, 1.0-2.0 long), then tapering and curving "
+            + "down to a point. The blade is wide and heavy: 0.25-0.5 at its widest, at least 0.06 thick; build it from "
+            + "a tapered tube (ai.addTube with r1 > r2) or several overlapping ellipsoids, never one thin curve; a bright "
+            + "metal cutting edge on the inner (lower) side and a darker back. Hammer or club: a shaft with a heavy "
             + "head at the top (a big hammer head 0.6-1.2 wide)."),
     AXE("도끼", Items.IRON_AXE, Items.IRON_AXE,
         "a handle 0.9-1.3 long going up (a great axe 1.6-2.8); near the top a head whose blade sticks out to +X "

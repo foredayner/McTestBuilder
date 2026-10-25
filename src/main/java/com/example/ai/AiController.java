@@ -412,7 +412,7 @@ public class AiController {
 
     /** Hand-held equipment without ai.oversize(): up to a greatsword or scythe taller than the wielder. */
     public static final double HAND_MAX_LONG = 3.5;
-    public static final double HAND_MAX_WIDE = 1.8;
+    public static final double HAND_MAX_WIDE = 2.4;
 
     /** Largest size (blocks) of equipment the order asked to be big (ai.oversize()). */
     public static final double OVERSIZE_MAX = 5.0;
@@ -562,9 +562,9 @@ public class AiController {
             SIZE (decide from what it is; the player is 1.8 tall):
             - Normal weapons and tools (sword, axe, pickaxe, wand...): like vanilla, 1.0-1.6 long.
             - Large ones by nature (greatsword, zweihander, scythe, war hammer, halberd, giant club, guandao, big
-              anime-style blades): as big as the wielder or bigger, 1.8-3.5 long, with heads or blades up to 1.8 wide.
+              anime-style blades): as big as the wielder or bigger, 1.8-3.5 long, with heads or blades up to 2.4 wide.
               Make them heavy and bold: thick blades, big heads, a long two-handed grip (0.4-0.7) at the bottom.
-            - Limits without asking: 3.5 long (Y), 1.8 wide (X and Z).
+            - Limits without asking: 3.5 long (Y), 2.4 wide (X and Z).
             - Only if the request asks for it to be even bigger (huge, giant, 거대한, or a size in blocks over 3.5): call
               ai.oversize() first; then it may be up to 5 blocks in each direction.
 

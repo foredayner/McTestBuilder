@@ -43,6 +43,13 @@ public final class Demo {
             + "ai.addRoundBox('light_gray_concrete', -0.04, 0.5, -0.05, 0.08, 1.9, 0.1, 0)\n"
             + "ai.addCone('iron_block', 0, 2.54, 0, 0.2, 0.36)\n";
 
+    /** A big battle scythe: long shaft, a wide crescent blade sweeping to the side. */
+    public static final String SCYTHE =
+        "ai.addCapsule('black_concrete', 0, -0.3, 0, 0, 2.6, 0, 0.05)\n"
+            + "ai.addCylinder('gold_block', 0, 2.45, 0, 0.08, 0.15)\n"
+            + "ai.addTube('light_gray_concrete', [[0, 2.55, 0], [-0.6, 2.75, 0], [-1.3, 2.6, 0], [-1.75, 2.2, 0]], 0.22, 0.03)\n"
+            + "ai.addTube('iron_block', [[0, 2.45, 0], [-0.6, 2.6, 0], [-1.3, 2.45, 0], [-1.72, 2.12, 0]], 0.12, 0.02)\n";
+
     /** A 4-block balloon on a string, floating above the head: worn on the back, asked to be big. */
     public static final String BALLOON =
         "ai.oversize()\n"

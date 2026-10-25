@@ -189,6 +189,21 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
             context.waitTicks(3);
             context.takeScreenshot("31_greatsword_back");
+            // A battle scythe in first person: its blade must be in view.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                BuildRecord scythe = BuildRecord.create("전투낫", "TEST", "script",
+                    Demo.plan(p.getServerWorld(), p.getBlockPos(), p, Demo.SCYTHE, true));
+                scythe.kind = "gear";
+                scythe.gear = "sword";
+                p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(scythe));
+            });
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
+            context.waitTicks(40);
+            context.takeScreenshot("32_scythe_first_person");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
+            context.waitTicks(3);
+            context.takeScreenshot("33_scythe_third_person");
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
 
             // A bow with its own arrow shape: in the hand, and one of its arrows hanging in the air.

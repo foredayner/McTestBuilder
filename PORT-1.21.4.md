@@ -82,7 +82,7 @@ server and the client of the player who builds. That player needs operator level
     shot from it are AibArrowEntity (they carry the bow, so clients draw its arrow shape); tipped and spectral
     arrows stay vanilla.
     Hand-held size: normal tools 1-1.6 long; large ones by nature (greatsword, scythe, war hammer, halberd)
-    1.8-3.5 long and up to 1.8 wide without asking; ai.oversize() up to 5. The sword kind only decides
+    1.8-3.5 long and up to 2.4 wide without asking; ai.oversize() up to 5. The sword kind only decides
     sword stats and the swing: scythes, hammers and clubs can be ordered as swords. Long models grow toward
     their real size in third person, stay short enough to fit the view in first person, are held with both
     hands in third person (2 blocks or longer), and their swing effects grow with their length.

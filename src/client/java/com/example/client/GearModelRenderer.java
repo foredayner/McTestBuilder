@@ -45,6 +45,10 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
                         float length) {
     }
 
+    /** First person, long weapons: extra tilt (degrees) and how far up the shaft it looks held (per block). */
+    static final float FIRST_PERSON_LONG_TILT = -20.0F;
+    static final float FIRST_PERSON_LONG_SLIDE = 0.45F;
+
     /** Hand-held models at least this long (blocks) are held with both hands in third person. */
     public static final float TWO_HANDED_LENGTH = 2.0F;
 
@@ -255,6 +259,12 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             matrices.scale(scale, scale, scale);
         }
         matrices.multiply(new Quaternionf().rotateZ(TILT));
+        if (mode.isFirstPerson() && !model.bow() && !model.worn() && model.length() >= TWO_HANDED_LENGTH) {
+            // A long weapon in first person: laid a little lower and held further up the shaft (in look only),
+            // so its head or blade is in view instead of above the screen.
+            matrices.multiply(new Quaternionf().rotateZ((float) Math.toRadians(FIRST_PERSON_LONG_TILT)));
+            matrices.translate(0, -(model.length() - 1.6F) * FIRST_PERSON_LONG_SLIDE, 0);
+        }
         draw(matrices, vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout()), model, light, overlay);
         if (mode != ModelTransformationMode.GUI && mode != ModelTransformationMode.FIXED) {
             drawAura(matrices, vertexConsumers, model, overlay);
