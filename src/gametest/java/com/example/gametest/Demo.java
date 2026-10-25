@@ -71,8 +71,8 @@ public final class Demo {
             + "ai.addPart('red_wool', 0.012, 0.02, -0.006, 0.06, 0.16, 0.012)\n"
             + "ai.mirrorOff()\n"
             + "ai.arrowEnd()\n"
-            + "ai.hitEffect('flame', '#ff6600', 6, 'shockwave', 1.5)\n"
-            + "ai.arrowTrail('flame', '#ff6600', 2)\n";
+            + "ai.effect('attack', [shape: 'ring', color: '#ff6600', color2: '#ffdd55', size: 1.2, count: 40, plane: 'flat', start: 'ground', moves: ['expand', 'fade'], ticks: 14])\n"
+            + "ai.effect('trail', [shape: 'star', color: '#ffaa33', size: 0.15, count: 12, moves: ['shrink', 'fade'], ticks: 10, every: 1])\n";
 
     private Demo() {
     }

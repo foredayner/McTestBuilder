@@ -21,11 +21,15 @@ public abstract class HeldItemRendererMixin {
     @Unique
     private String aib$motion = "";
 
+    @Unique
+    private float aib$progress = -1;
+
     @Inject(method = "renderFirstPersonItem", at = @At("HEAD"))
     private void aib$pickMotion(AbstractClientPlayerEntity player, float tickDelta, float pitch, Hand hand, float swingProgress,
                                 ItemStack item, float equipProgress, MatrixStack matrices, VertexConsumerProvider vertexConsumers,
                                 int light, CallbackInfo ci) {
-        aib$motion = player.isUsingItem() ? "" : GearMotionClient.motionOf(item);
+        aib$motion = player.isUsingItem() || hand == Hand.OFF_HAND ? "" : GearMotionClient.motionOf(item);
+        aib$progress = aib$motion.isEmpty() ? -1 : GearMotionClient.motionProgress(player, tickDelta);
     }
 
     /** The normal swing turn (called from the item drawing above): replaced by the ordered motion. */
@@ -34,11 +38,8 @@ public abstract class HeldItemRendererMixin {
         if (aib$motion.isEmpty()) {
             return;
         }
-        // The resting pose of the normal swing, then the ordered motion.
-        int side = arm == Arm.RIGHT ? 1 : -1;
-        matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(side * 45.0F));
-        matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(side * -45.0F));
-        GearMotionClient.firstPerson(matrices, arm, aib$motion, GearMotionClient.progress(swingProgress));
+        // The ordered motion (on its own clock) instead of the normal swing turn.
+        GearMotionClient.firstPerson(matrices, arm, aib$motion, aib$progress);
         ci.cancel();
     }
 

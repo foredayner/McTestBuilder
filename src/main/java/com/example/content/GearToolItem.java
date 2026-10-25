@@ -45,12 +45,6 @@ public class GearToolItem extends Item implements GearItem {
     }
 
     @Override
-    public void inventoryTick(ItemStack stack, World world, net.minecraft.entity.Entity entity, int slot, boolean selected) {
-        super.inventoryTick(stack, world, entity, slot, selected);
-        com.example.ai.build.GearEffects.onTick(stack, entity, selected, kind);
-    }
-
-    @Override
     public void postDamageEntity(ItemStack stack, LivingEntity target, LivingEntity attacker) {
         kind.base.postDamageEntity(stack, target, attacker);
     }

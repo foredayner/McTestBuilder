@@ -40,13 +40,11 @@ public final class AiScriptApi {
         "groupEnd",
         "animate",
         "glow",
-        "hitEffect",
-        "idleEffect",
         "aura",
         "oversize",
         "arrowStart",
         "arrowEnd",
-        "arrowTrail"
+        "effect"
     );
 
     private AiScriptApi() {

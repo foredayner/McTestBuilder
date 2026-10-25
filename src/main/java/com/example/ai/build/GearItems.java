@@ -52,14 +52,7 @@ public final class GearItems {
         if (model.length <= MAX_MODEL_BYTES) {
             nbt.putByteArray(MODEL, model);
         }
-        GearEffects.write(nbt, GearEffects.HIT, record.plan.hit);
-        if (record.plan.moreHits != null) {
-            for (int i = 0; i < Math.min(2, record.plan.moreHits.size()); i++) {
-                GearEffects.write(nbt, GearEffects.HIT + (i + 2), record.plan.moreHits.get(i));
-            }
-        }
-        GearEffects.write(nbt, GearEffects.IDLE, record.plan.idle);
-        GearEffects.write(nbt, GearEffects.TRAIL, record.plan.trail);
+        GearEffects.write(nbt, record.plan.fx);
         String motion = com.example.content.GearMotions.normalize(record.plan.motion);
         if (!motion.isEmpty()) {
             nbt.putString(com.example.content.GearMotions.KEY, motion);

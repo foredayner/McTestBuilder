@@ -42,11 +42,11 @@ public abstract class BipedEntityModelMixin {
         if (m.aib$getMotion().isEmpty()) {
             return;
         }
-        float p = GearMotionClient.progress(state.handSwingProgress);
-        if (p <= 0) {
+        float p = m.aib$getMotionProgress();
+        if (p < 0) {
             return;
         }
-        GearMotionClient.thirdPerson(right ? rightArm : leftArm, body, right, m.aib$getMotion(), p);
+        GearMotionClient.thirdPerson(right ? rightArm : leftArm, right ? leftArm : rightArm, body, right, m.aib$getMotion(), p);
         ci.cancel();
     }
 }

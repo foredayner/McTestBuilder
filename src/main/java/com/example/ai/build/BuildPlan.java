@@ -113,26 +113,6 @@ public final class BuildPlan {
         }
     }
 
-    /** A particle effect (equipment only): which particle, its colour (dust), how many at a time. */
-    public static final class Fx {
-        public String particle;
-        public int color;
-        public int count;
-        /** Hit effects: burst, shockwave, cone, slash, spiral, pillar, magic_circle or lightning. */
-        public String pattern = "burst";
-        /** Hit effects: how big (blocks). */
-        public double size = 1;
-
-        public Fx() {
-        }
-
-        public Fx(String particle, int color, int count) {
-            this.particle = particle;
-            this.color = color;
-            this.count = count;
-        }
-    }
-
     /** A glow around equipment (drawn by the mod): colour and strength (0.2-1). */
     public static final class Aura {
         public int color;
@@ -158,19 +138,14 @@ public final class BuildPlan {
     public String facing = "north";
     /** Equipment: movements of part groups (only when the order asked for an effect). */
     public List<Anim> anims = new ArrayList<>();
-    /** Equipment: particles on hit / while held or worn (null = none). */
-    public Fx hit;
-    /** More hit effects played together with {@code hit} (e.g. lightning + shockwave), at most 2. */
-    public List<Fx> moreHits = new ArrayList<>();
-    public Fx idle;
+    /** Equipment: colour-dot effects on attack, while held or worn, and behind arrows. */
+    public Spark.Effects fx = new Spark.Effects();
     /** Equipment: glow around the model while held or worn (null = none). */
     public Aura aura;
     /** Equipment the order asked to be big (ai.oversize()): it may go past the slot's usual size. */
     public boolean oversize;
     /** Sword: attack motion chosen in the order ("" = the normal swing). */
     public String motion = "";
-    /** Bow: particles that follow its arrows in flight (null = none). */
-    public Fx trail;
 
     public boolean isEmpty() {
         return (ops == null || ops.isEmpty()) && (parts == null || parts.isEmpty());

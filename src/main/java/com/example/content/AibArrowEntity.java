@@ -1,6 +1,5 @@
 package com.example.content;
 
-import com.example.ai.build.BuildPlan;
 import com.example.ai.build.GearEffects;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
@@ -19,15 +18,13 @@ import net.minecraft.world.World;
 
 /**
  * An arrow shot from an AI bow. It carries the bow (synced to clients, which draw the bow's
- * arrow shape if it has one) and plays the bow's trail in flight and its effect where it lands.
+ * arrow shape and trail) and plays the bow's attack effects where it lands.
  * Otherwise a normal arrow: damage, pickup and enchantments are vanilla.
  */
 public class AibArrowEntity extends PersistentProjectileEntity {
 
     private static final TrackedData<ItemStack> BOW = DataTracker.registerData(AibArrowEntity.class, TrackedDataHandlerRegistry.ITEM_STACK);
     private boolean landed;
-    private BuildPlan.Fx trail;
-    private boolean trailRead;
 
     public AibArrowEntity(EntityType<? extends AibArrowEntity> type, World world) {
         super(type, world);
@@ -59,18 +56,9 @@ public class AibArrowEntity extends PersistentProjectileEntity {
         return new ItemStack(Items.ARROW);
     }
 
-    @Override
-    public void tick() {
-        super.tick();
-        if (getWorld() instanceof ServerWorld world && !landed && !isInGround()) {
-            if (!trailRead) {
-                trailRead = true;
-                trail = GearEffects.read(bow(), GearEffects.TRAIL);
-            }
-            if (trail != null) {
-                GearEffects.arrowTrail(world, this, trail);
-            }
-        }
+    /** In flight (not stuck in a block): the client draws the bow's trail behind it. */
+    public boolean isFlying() {
+        return !isInGround() && !landed;
     }
 
     @Override

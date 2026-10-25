@@ -86,6 +86,17 @@ server and the client of the player who builds. That player needs operator level
     sword stats and the swing: scythes, hammers and clubs can be ordered as swords. Long models grow toward
     their real size in third person, stay short enough to fit the view in first person, are held with both
     hands in third person (2 blocks or longer), and their swing effects grow with their length.
+    Effects are colour dots only (no vanilla particles): `ai.effect(when, [shape, color, color2, size, count, dot,
+    plane, start/anchor, moves, speed, ticks, every, fill, lines, points])` with when = attack (on the swing;
+    bows: where the arrow lands), idle (while held or worn) or trail (bows). Shapes: burst, sphere, circle, ring,
+    heart, star, crescent, slash, cross, spiral, bolt, magic_circle, square, triangle, diamond, line, or custom
+    points. Moves: forward, back, rise, fall, expand, shrink, spin, orbit, pulse, scatter, gather, wave, reveal,
+    fade, flicker. The server only sends "these effects play here" (attack, mob hit, arrow landing); each game
+    draws the glowing dots (SparkRenderer) and finds idle effects and arrow trails by itself. Old magic-circle
+    display pieces left in a world are removed on load.
+    Sword attack motions run on their own 12-tick clock in four phases (wind up, strike, hold, recover);
+    third person moves the body and the other arm too (thrust: blade laid sideways, pulled back, then thrust).
+    Opening the AI 공방 (O) empties the effect fields.
   - Objects: the prompt asks the AI to list the real parts and sizes first and to build real things with
     depth on every side (frames, recessed and raised parts, closed backs); a table radio example; objects
     use the 1/32 grid when 400 pieces allow.

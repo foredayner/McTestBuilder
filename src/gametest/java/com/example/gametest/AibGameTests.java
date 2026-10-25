@@ -244,32 +244,36 @@ public class AibGameTests implements FabricGameTest {
             ai.mirrorOff()
             ai.animate('gem', 'spin', 0.12, 1.45, 0, 'y', 0.5, 0)
             ai.glow('gem')
-            ai.hitEffect('flame', '#ff6600', 6)
-            ai.idleEffect('dust', '#33ccff', 2)
+            ai.effect('attack', [shape: 'heart', fill: true, color: '#ff66cc', size: 0.45, moves: ['forward', 'fade'], speed: 7])
+            ai.effect('idle', [shape: 'burst', color: '#33ccff', size: 0.3, count: 6, moves: ['rise', 'fade'], every: 6])
             ai.aura('#ffdd66', 0.6)
-            ai.hitEffect('end_rod', '#ffffff', 4, 'converge', 2)
+            ai.effect('attack', [shape: 'points', points: [[0, 1], [1, 0], [0, -1], [-1, 0], [0, 1]], color: '#ffffff', plane: 'flat', start: 'ground'])
             """);
         check(fx.aura != null && fx.aura.color == 0xffdd66, "aura recorded");
-        check(fx.moreHits.size() == 1 && "converge".equals(fx.moreHits.get(0).pattern), "a second hit effect plays together");
+        check(fx.fx.attack.size() == 2 && "points".equals(fx.fx.attack.get(1).shape) && fx.fx.attack.get(1).points.size() == 5,
+            "a second attack effect with its own points plays together");
+        check("flat".equals(fx.fx.attack.get(1).plane) && "ground".equals(fx.fx.attack.get(1).start), "its settings are kept");
+        check(fx.fx.attack.get(0).dots().size() == fx.fx.attack.get(0).count, "a filled heart has its dots");
         check(fx.parts.stream().anyMatch(q -> q.group > 0), "group parts are marked");
         check(fx.anims.size() == 4, "spin + glow for the gem and its mirrored twin, got " + fx.anims.size());
-        check(fx.hit != null && "flame".equals(fx.hit.particle) && fx.idle != null && fx.idle.color == 0x33ccff, "effects recorded");
+        check("heart".equals(fx.fx.attack.get(0).shape) && fx.fx.attack.get(0).color == 0xff66cc
+            && fx.fx.idle.size() == 1 && fx.fx.idle.get(0).color == 0x33ccff, "effects recorded");
         BuildRecord fxRecord = BuildRecord.create("staff", "TEST", "script", fx);
         fxRecord.kind = "gear";
         fxRecord.gear = "staff";
         net.minecraft.item.ItemStack fxStack = com.example.ai.build.GearItems.stackFor(fxRecord);
-        check(com.example.ai.build.GearEffects.read(fxStack, com.example.ai.build.GearEffects.HIT) != null, "hit effect on the item");
+        check(com.example.ai.build.GearEffects.of(fxStack).attack.size() == 2, "attack effects on the item");
         check(com.example.ai.build.GearItems.modelOf(fxStack).anims.size() == 4, "movements ride in the model");
         check(com.example.ai.build.GearItems.modelOf(fxStack).aura != null, "the aura rides in the model");
-        check(com.example.ai.build.GearEffects.read(fxStack, com.example.ai.build.GearEffects.HIT + 2) != null, "second hit effect on the item");
+        check(com.example.ai.build.GearEffects.of(fxStack).idle.size() == 1, "idle effect on the item");
         com.example.ai.AiController.applyEffectRequest(fx, com.example.content.GearKind.STAFF, "", "");
-        check(fx.hit == null && fx.moreHits.isEmpty() && fx.idle == null && fx.anims.isEmpty() && fx.aura == null,
+        check(fx.fx.isEmpty() && fx.anims.isEmpty() && fx.aura == null,
             "empty effect fields = no effects at all");
         try {
-            Demo.plan(world, origin, player, "ai.addSphere('stone', 0, 0.5, 0, 0.2)\nai.hitEffect('nuke', '#ffffff', 3)");
-            throw new GameTestException("an unknown particle should be refused");
+            Demo.plan(world, origin, player, "ai.addSphere('stone', 0, 0.5, 0, 0.2)\nai.effect('attack', [shape: 'nuke'])");
+            throw new GameTestException("an unknown shape should be refused");
         } catch (IllegalStateException expected) {
-            check(expected.getMessage().contains("unknown particle"), expected.getMessage());
+            check(expected.getMessage().contains("unknown shape"), expected.getMessage());
         }
 
         // A greatsword taller than the player is fine without asking.
@@ -284,31 +288,6 @@ public class AibGameTests implements FabricGameTest {
         context.complete();
     }
 
-    @GameTest(templateName = EMPTY_STRUCTURE)
-    public void magicCircleAppearsAndCleansUp(TestContext context) {
-        ServerWorld world = context.getWorld();
-        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
-        ServerPlayerEntity player = opPlayer(context, origin, 0f);
-        var target = context.spawnEntity(EntityType.ARMOR_STAND, new BlockPos(2, 1, 5));
-        BuildPlan.Fx fx = new BuildPlan.Fx("enchant", 0x9933ff, 4);
-        fx.pattern = "magic_circle";
-        fx.size = 1.5;
-        check(com.example.ai.build.HitEffects.start(world, player, target, fx, com.example.ai.build.GearEffects.particle(fx)),
-            "the effect starts");
-        check(!com.example.ai.build.HitEffects.start(world, player, target, fx, com.example.ai.build.GearEffects.particle(fx)),
-            "one shaped effect per attacker at a time");
-        Box area = new Box(target.getBlockPos()).expand(4);
-        context.waitAndRun(6, () -> {
-            int pieces = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib_fx")).size();
-            check(pieces == 25, "20 ring pieces and 5 star lines, got " + pieces);
-            context.waitAndRun(40, () -> {
-                int left = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib_fx")).size();
-                check(left == 0, "the circle is removed when the effect ends, " + left + " left");
-                context.complete();
-            });
-        });
-    }
-
     /** A sword's attack effect plays when it is swung (in front of the player), even at nothing. */
     @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 100)
     public void swingingASwordPlaysItsAttackEffect(TestContext context) {
@@ -316,7 +295,7 @@ public class AibGameTests implements FabricGameTest {
         BlockPos origin = context.getAbsolutePos(new BlockPos(4, 1, 1));
         ServerPlayerEntity player = opPlayer(context, origin, 0f); // facing south (+Z)
         BuildPlan plan = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_SWORD
-            + "\nai.hitEffect('enchant', '#9933ff', 4, 'magic_circle', 1.5)\n", true);
+            + "\nai.effect('attack', [shape: 'magic_circle', color: '#9933ff', size: 1.5, plane: 'flat', start: 'ground', moves: ['spin', 'fade']])\n", true);
         plan.motion = "thrust";
         BuildRecord record = BuildRecord.create("swing test", "TEST", "script", plan);
         record.kind = "gear";
@@ -324,14 +303,9 @@ public class AibGameTests implements FabricGameTest {
         net.minecraft.item.ItemStack sword = com.example.ai.build.GearItems.stackFor(record);
         check("thrust".equals(com.example.content.GearMotions.of(sword)), "the sword keeps its attack motion");
         player.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, sword);
-        com.example.ai.build.GearEffects.onSwing(player);
-        com.example.ai.build.GearEffects.onSwing(player); // too soon: ignored
-        Box ahead = new Box(origin.add(0, 0, 2)).expand(3);
-        context.waitAndRun(6, () -> {
-            int pieces = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, ahead, e -> e.getCommandTags().contains("aib_fx")).size();
-            check(pieces == 25, "a magic circle in front of the player, got " + pieces + " pieces");
-            context.complete();
-        });
+        check(com.example.ai.build.GearEffects.onSwing(player) == 1, "the swing plays the attack effect");
+        check(com.example.ai.build.GearEffects.onSwing(player) == 0, "a second swing too soon is ignored");
+        context.complete();
     }
 
     /** An AI bow shoots arrows that carry the bow (for their shape) and land like normal arrows. */
@@ -343,10 +317,10 @@ public class AibGameTests implements FabricGameTest {
         BuildPlan plan = Demo.plan(world, origin, player, Demo.BOW, true);
         check(com.example.ai.AiController.gearProblem(plan, com.example.content.GearKind.BOW) == null,
             "the bow fits: " + com.example.ai.AiController.gearProblem(plan, com.example.content.GearKind.BOW));
-        check(plan.trail != null && plan.hit != null, "trail and landing effect recorded");
+        check(plan.fx.trail.size() == 1 && plan.fx.attack.size() == 1, "trail and landing effect recorded");
         check(plan.parts.stream().anyMatch(p -> p.group == BuildPlan.ARROW_GROUP), "arrow pieces recorded");
         com.example.ai.AiController.applyEffectRequest(plan, com.example.content.GearKind.BOW, "불꽃 화살", "");
-        check(plan.trail != null, "the arrow effect field keeps the trail");
+        check(plan.fx.trail.size() == 1, "the arrow effect field keeps the trail");
         BuildRecord record = BuildRecord.create("bow test", "TEST", "script", plan);
         record.kind = "gear";
         record.gear = "bow";

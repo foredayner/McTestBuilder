@@ -221,7 +221,8 @@ public class AibModelBench implements FabricClientGameTest {
                     record.gear = c.mode().substring(5);
                     AiController.applyEffectRequest(record.plan, com.example.content.GearKind.of(record.gear), c.hit(), c.idle());
                     r.summary += " | anims " + record.plan.anims.size() + " " + animTypes(record.plan)
-                        + " | hit " + fxText(record.plan.hit) + " | idle " + fxText(record.plan.idle);
+                        + " | attack " + fxText(record.plan.fx.attack) + " | idle " + fxText(record.plan.fx.idle)
+                        + " | trail " + fxText(record.plan.fx.trail);
                 }
                 save(model, c.id() + ".record.json", record.toJson());
                 break;
@@ -263,8 +264,15 @@ public class AibModelBench implements FabricClientGameTest {
         }
     }
 
-    private static String fxText(com.example.ai.build.BuildPlan.Fx fx) {
-        return fx == null ? "none" : fx.particle + " x" + fx.count;
+    private static String fxText(List<com.example.ai.build.Spark> fx) {
+        if (fx == null || fx.isEmpty()) {
+            return "none";
+        }
+        List<String> parts = new ArrayList<>();
+        for (com.example.ai.build.Spark s : fx) {
+            parts.add(s.shape + " " + String.format("#%06x", s.color) + " " + s.moves);
+        }
+        return String.join(", ", parts);
     }
 
     private static String animTypes(com.example.ai.build.BuildPlan plan) {
@@ -314,7 +322,7 @@ public class AibModelBench implements FabricClientGameTest {
             // A newly held weapon is raised only after its attack cooldown (an axe: about 1 s).
             context.waitTicks(40);
             context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_hand");
-            if (record.plan.hit != null) {
+            if (!record.plan.fx.attack.isEmpty()) {
                 // Hit something 3 blocks ahead and photograph the hit effect a few ticks in.
                 game.getServer().runOnServer(server -> {
                     ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
@@ -325,7 +333,7 @@ public class AibModelBench implements FabricClientGameTest {
                     w.spawnEntity(stand);
                     com.example.ai.build.GearEffects.onHit(p.getMainHandStack(), stand, p);
                 });
-                context.waitTicks(8);
+                context.waitTicks(5);
                 context.takeScreenshot("bench_" + safe(model) + "_" + c.id() + "_hit");
                 context.waitTicks(40);
                 game.getServer().runCommand("kill @e[tag=aib_bench_target]");

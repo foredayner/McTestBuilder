@@ -183,6 +183,34 @@ public final class AiNetworkPayloads {
         }
     }
 
+    /**
+     * Server -> client: play colour-dot effects (a JSON list of Spark) at a point, facing a
+     * direction, at a scale. Each player's game draws the dots.
+     */
+    public record SparkS2CPayload(String sparks, double x, double y, double z, float dx, float dy, float dz, float scale)
+        implements CustomPayload {
+        public static final CustomPayload.Id<SparkS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "spark"));
+        public static final PacketCodec<RegistryByteBuf, SparkS2CPayload> CODEC = PacketCodec.of(
+            (p, buf) -> {
+                PacketCodecs.STRING.encode(buf, p.sparks());
+                PacketCodecs.DOUBLE.encode(buf, p.x());
+                PacketCodecs.DOUBLE.encode(buf, p.y());
+                PacketCodecs.DOUBLE.encode(buf, p.z());
+                PacketCodecs.FLOAT.encode(buf, p.dx());
+                PacketCodecs.FLOAT.encode(buf, p.dy());
+                PacketCodecs.FLOAT.encode(buf, p.dz());
+                PacketCodecs.FLOAT.encode(buf, p.scale());
+            },
+            buf -> new SparkS2CPayload(PacketCodecs.STRING.decode(buf), PacketCodecs.DOUBLE.decode(buf), PacketCodecs.DOUBLE.decode(buf),
+                PacketCodecs.DOUBLE.decode(buf), PacketCodecs.FLOAT.decode(buf), PacketCodecs.FLOAT.decode(buf),
+                PacketCodecs.FLOAT.decode(buf), PacketCodecs.FLOAT.decode(buf)));
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     /** Client -> server: the player swung an AI weapon (attack key, charged): play its attack effect. */
     public record AttackSwingC2SPayload() implements CustomPayload {
         public static final CustomPayload.Id<AttackSwingC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "attack_swing"));

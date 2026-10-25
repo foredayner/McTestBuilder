@@ -7,6 +7,11 @@ public interface AibMotionState {
 
     void aib$setMotion(String motion);
 
+    /** Where the entity is in its attack motion (0-1), or -1. */
+    float aib$getMotionProgress();
+
+    void aib$setMotionProgress(float progress);
+
     /** A long AI weapon in the main hand: held with both hands. */
     boolean aib$isTwoHanded();
 

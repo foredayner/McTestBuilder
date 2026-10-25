@@ -35,6 +35,11 @@ public final class AiClientNetworking {
             context.client().execute(AiClientState::clearPendingApproval);
         });
 
+        ClientPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.SparkS2CPayload.ID, (payload, context) ->
+            context.client().execute(() -> com.example.client.SparkRenderer.play(payload.sparks(),
+                new net.minecraft.util.math.Vec3d(payload.x(), payload.y(), payload.z()),
+                new net.minecraft.util.math.Vec3d(payload.dx(), payload.dy(), payload.dz()), payload.scale())));
+
         ClientPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.NearbyObjectsS2CPayload.ID, (payload, context) -> {
             context.client().execute(() -> AiClientState.setNearby(payload.json()));
         });

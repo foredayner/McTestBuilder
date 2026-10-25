@@ -38,6 +38,7 @@ public final class AiNetworking {
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RebuildPartC2SPayload.ID, AiNetworkPayloads.RebuildPartC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.UndoC2SPayload.ID, AiNetworkPayloads.UndoC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.AttackSwingC2SPayload.ID, AiNetworkPayloads.AttackSwingC2SPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.SparkS2CPayload.ID, AiNetworkPayloads.SparkS2CPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.BreakObjectC2SPayload.ID, AiNetworkPayloads.BreakObjectC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RemoveObjectC2SPayload.ID, AiNetworkPayloads.RemoveObjectC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.NearbyRequestC2SPayload.ID, AiNetworkPayloads.NearbyRequestC2SPayload.CODEC);

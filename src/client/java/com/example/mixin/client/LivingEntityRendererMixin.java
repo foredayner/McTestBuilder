@@ -19,7 +19,9 @@ public abstract class LivingEntityRendererMixin {
         at = @At("TAIL"))
     private void aib$motion(LivingEntity entity, LivingEntityRenderState state, float tickDelta, CallbackInfo ci) {
         if (state instanceof AibMotionState motion) {
-            motion.aib$setMotion(entity.preferredHand == Hand.OFF_HAND ? "" : GearMotionClient.motionOf(entity.getMainHandStack()));
+            String m = entity.preferredHand == Hand.OFF_HAND ? "" : GearMotionClient.motionOf(entity.getMainHandStack());
+            motion.aib$setMotion(m);
+            motion.aib$setMotionProgress(m.isEmpty() ? -1 : GearMotionClient.motionProgress(entity, tickDelta));
             motion.aib$setTwoHanded(!entity.isUsingItem()
                 && com.example.client.GearModelRenderer.twoHanded(entity.getMainHandStack()));
         }

@@ -156,21 +156,32 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.waitTicks(5);
             context.takeScreenshot("20_sword_third_person");
 
-            // A sword ordered with an attack motion (가로베기), frozen in the middle of the swing.
-            game.getServer().runOnServer(server -> {
-                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
-                BuildRecord r = BuildRecord.fromJson(gear.get(0));
-                r.plan.motion = "slash";
-                p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(r));
+            // Swords ordered with attack motions, frozen at the wind-up and at the strike, in third and first person.
+            for (String motion : List.of("thrust", "slash", "smash")) {
+                game.getServer().runOnServer(server -> {
+                    ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                    BuildRecord r = BuildRecord.fromJson(gear.get(0));
+                    r.plan.motion = motion;
+                    p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(r));
+                });
+                context.waitTicks(motion.equals("thrust") ? 40 : 5);
+                for (float[] at : new float[][] { { 0.25F }, { 0.5F } }) {
+                    String phase = at[0] < 0.3F ? "wind" : "strike";
+                    context.runOnClient(client -> {
+                        com.example.client.GearMotionClient.forceProgress = at[0];
+                        client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT);
+                    });
+                    context.waitTicks(2);
+                    context.takeScreenshot("25_" + motion + "_" + phase + "_third_person");
+                    context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
+                    context.waitTicks(2);
+                    context.takeScreenshot("26_" + motion + "_" + phase + "_first_person");
+                }
+            }
+            context.runOnClient(client -> {
+                com.example.client.GearMotionClient.forceProgress = -1;
+                client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT);
             });
-            context.waitTicks(40);
-            context.runOnClient(client -> com.example.client.GearMotionClient.forceProgress = 0.45F);
-            context.waitTicks(2);
-            context.takeScreenshot("25_sword_slash_third_person");
-            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
-            context.waitTicks(2);
-            context.takeScreenshot("26_sword_slash_first_person");
-            context.runOnClient(client -> com.example.client.GearMotionClient.forceProgress = -1);
 
             // A greatsword taller than the player: shortened in first person, real size and two-handed in third.
             game.getServer().runOnServer(server -> {
@@ -204,6 +215,24 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
             context.waitTicks(3);
             context.takeScreenshot("33_scythe_third_person");
+
+            // Colour-dot effects: a pink heart flying forward and a magic circle on the ground, drawn by this game.
+            context.runOnClient(client -> {
+                client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON);
+                var p = client.player;
+                var look = p.getRotationVec(1.0F);
+                var flat = new net.minecraft.util.math.Vec3d(look.x, 0, look.z).normalize();
+                com.example.client.SparkRenderer.play("[" + com.example.ai.build.Spark.fromMap(java.util.Map.of(
+                    "shape", "heart", "fill", true, "color", "ff66cc", "color2", "ffffff", "size", 0.5, "count", 70,
+                    "moves", List.of("forward", "pulse"), "speed", 1.5, "ticks", 60)).toJson() + "]",
+                    p.getEyePos().add(flat.multiply(1.5)).add(0, -0.3, 0), flat, 1);
+                com.example.client.SparkRenderer.play("[" + com.example.ai.build.Spark.fromMap(java.util.Map.of(
+                    "shape", "magic_circle", "color", "b44cff", "size", 1.4, "count", 90, "plane", "flat",
+                    "moves", List.of("spin"), "speed", 0.3, "ticks", 60)).toJson() + "]",
+                    p.getPos().add(flat.multiply(3.5)).add(0, 0.05, 0), flat, 1);
+            });
+            context.waitTicks(10);
+            context.takeScreenshot("34_spark_heart_and_circle");
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
 
             // A bow with its own arrow shape: in the hand, and one of its arrows hanging in the air.

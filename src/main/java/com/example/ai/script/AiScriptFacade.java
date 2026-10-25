@@ -213,16 +213,13 @@ public final class AiScriptFacade {
         MinecraftAI.glow(group);
     }
 
-    public void hitEffect(String particle, String color, Number count) {
-        MinecraftAI.hitEffect(particle, color, count);
-    }
-
-    public void hitEffect(String particle, String color, Number count, String pattern, Number size) {
-        MinecraftAI.hitEffect(particle, color, count, pattern, size);
-    }
-
     public void aura(String color, Number strength) {
         MinecraftAI.aura(color, strength);
+    }
+
+    /** A colour-dot effect: ai.effect('attack', [shape: 'heart', color: '#ff66cc', moves: ['forward', 'fade']]). */
+    public void effect(String when, java.util.Map<?, ?> settings) {
+        MinecraftAI.effect(when, settings);
     }
 
     public void oversize() {
@@ -237,11 +234,4 @@ public final class AiScriptFacade {
         MinecraftAI.arrowEnd();
     }
 
-    public void arrowTrail(String particle, String color, Number count) {
-        MinecraftAI.arrowTrail(particle, color, count);
-    }
-
-    public void idleEffect(String particle, String color, Number count) {
-        MinecraftAI.idleEffect(particle, color, count);
-    }
 }

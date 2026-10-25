@@ -1,6 +1,5 @@
 package com.example.content;
 
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.projectile.ProjectileEntity;
 import net.minecraft.item.BowItem;
@@ -21,12 +20,6 @@ public class GearBowItem extends BowItem implements GearItem {
     @Override
     public GearKind kind() {
         return GearKind.BOW;
-    }
-
-    @Override
-    public void inventoryTick(ItemStack stack, World world, Entity entity, int slot, boolean selected) {
-        super.inventoryTick(stack, world, entity, slot, selected);
-        com.example.ai.build.GearEffects.onTick(stack, entity, selected, GearKind.BOW);
     }
 
     @Override

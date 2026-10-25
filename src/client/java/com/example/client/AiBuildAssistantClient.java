@@ -57,6 +57,7 @@ public class AiBuildAssistantClient implements ClientModInitializer {
                     continue;
                 }
                 AiClientState.clearConversation();
+                AiClientState.setEffects("", ""); // a new order starts with empty effect fields
                 client.setScreen(new AiPromptScreen());
             }
             while (REMOVE_OBJECT_KEY.wasPressed()) {
@@ -65,7 +66,9 @@ public class AiBuildAssistantClient implements ClientModInitializer {
                 }
             }
             ObjectBreaking.tick(client);
+            SparkRenderer.tick(client);
         });
+        net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.AFTER_ENTITIES.register(SparkRenderer::render);
     }
 
     private static KeyBinding REMOVE_OBJECT_KEY;

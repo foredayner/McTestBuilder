@@ -11,6 +11,7 @@ import com.google.gson.JsonParser;
 import com.example.ai.api.MinecraftAI;
 import com.example.ai.approval.BuildApproval;
 import com.example.ai.build.BuildPlan;
+import com.example.ai.build.Spark;
 import com.example.ai.build.BuildRecord;
 import com.example.content.GearKind;
 import com.example.ai.script.ScriptExecutor;
@@ -658,20 +659,23 @@ public class AiController {
             """;
 
     /**
-     * Keep only the effects the order asked for: no hit text = no hit particles; no idle text =
-     * no idle particles, no movement and no glow (worn equipment has no hit effect).
+     * Keep only the effects the order asked for: no attack/arrow text = no attack effects (and no
+     * trail); no idle text = no effects while held or worn, no movement and no glow (worn
+     * equipment has no attack effect).
      */
     public static void applyEffectRequest(BuildPlan plan, GearKind kind, String fxHit, String fxIdle) {
+        if (plan.fx == null) {
+            plan.fx = new Spark.Effects();
+        }
         if (fxHit == null || fxHit.isBlank() || kind.worn()) {
-            plan.hit = null;
-            plan.moreHits.clear();
-            plan.trail = null;
+            plan.fx.attack.clear();
+            plan.fx.trail.clear();
         }
         if (kind != GearKind.BOW) {
-            plan.trail = null;
+            plan.fx.trail.clear();
         }
         if (fxIdle == null || fxIdle.isBlank()) {
-            plan.idle = null;
+            plan.fx.idle.clear();
             plan.anims.clear();
             plan.aura = null;
         }
@@ -683,40 +687,65 @@ public class AiController {
      */
     public static String effectProblem(BuildPlan plan, GearKind kind, String fxHit, String fxIdle) {
         List<String> problems = new java.util.ArrayList<>();
-        if (kind == GearKind.BOW && fxHit != null && !fxHit.isBlank() && plan.hit == null && plan.trail == null) {
+        Spark.Effects fx = plan.fx == null ? new Spark.Effects() : plan.fx;
+        if (kind == GearKind.BOW && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty() && fx.trail.isEmpty()) {
             problems.add("the order asks for an arrow effect (\"" + fxHit.trim() + "\") but the script makes none: "
-                + "call ai.arrowTrail(...) for the flight and/or ai.hitEffect(...) for where it lands.");
-        } else if (kind != GearKind.BOW && !kind.worn() && fxHit != null && !fxHit.isBlank() && plan.hit == null) {
+                + "call ai.effect('trail', [...]) for the flight and/or ai.effect('attack', [...]) for where it lands.");
+        } else if (kind != GearKind.BOW && !kind.worn() && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty()) {
             problems.add("the order asks for an effect on attack (\"" + fxHit.trim() + "\") but the script makes none: "
-                + "call ai.hitEffect(...) with a fitting particle and pattern.");
+                + "call ai.effect('attack', [...]) with a shape, colours and moves that match it.");
         }
-        if (fxIdle != null && !fxIdle.isBlank() && plan.idle == null && plan.anims.isEmpty() && plan.aura == null) {
+        if (fxIdle != null && !fxIdle.isBlank() && fx.idle.isEmpty() && plan.anims.isEmpty() && plan.aura == null) {
             problems.add("the order asks for an effect while " + (kind.worn() ? "worn" : "held") + " (\"" + fxIdle.trim()
-                + "\") but the script makes none: use ai.idleEffect, ai.groupStart/animate, ai.glow and/or ai.aura.");
+                + "\") but the script makes none: use ai.effect('idle', [...]), ai.groupStart/animate, ai.glow and/or ai.aura.");
         }
         return problems.isEmpty() ? null : PLAN_PROBLEMS + "\n- " + String.join("\n- ", problems);
     }
 
     /** API and rules for effects, added to the equipment prompts. */
     static final String EFFECT_API = """
-            EFFECTS AND MOVEMENT (use ONLY what the request's effect lines ask for; if a line says "none", make nothing for it):
-              ai.hitEffect(particle, '#rrggbb', count)      // weapons: burst when it is swung, in front of the wielder where
-                                                            // the blow lands (count 1-12); bows: where the arrow lands
-              ai.hitEffect(particle, '#rrggbb', count, pattern, size)   // a shaped hit effect, size in blocks (0.5-4):
-                'burst' (ball of particles), 'shockwave' (ring spreading over the ground), 'cone' (a wide spray in front of
-                the swing: breath of fire, frost, spores), 'slash' (crescent arc of the swing), 'spiral' (winding up around
-                the target), 'pillar' (column rising from the target), 'magic_circle' (glowing circle with a star on the
-                ground, turning, coloured by '#rrggbb'), 'lightning' (bolt striking the target), 'expand' (a sphere of
-                particles growing out from the hit point), 'converge' (a big sphere shrinking into the target: gathering power)
-                Call hitEffect up to 3 times to combine effects (e.g. lightning + shockwave); they play together.
-              ai.arrowTrail(particle, '#rrggbb', count)     // bows only: particles following the arrow in flight (count 1-4)
-              ai.idleEffect(particle, '#rrggbb', count)     // steady puffs while held or worn (count 1-6 looks best)
-                particle: flame, soul_fire_flame, small_flame, lava, snowflake, electric_spark, enchant, end_rod, glow,
-                portal, witch, dragon_breath, smoke, large_smoke, cloud, heart, crit, enchanted_hit, cherry_leaves,
-                totem_of_undying, sculk_soul, dust (dust uses the colour; others ignore it and keep their own:
-                glow = teal sparkles, end_rod = white light, enchant = runes, witch / portal / dragon_breath = purple,
-                totem_of_undying = green-gold, flame = orange, soul_fire_flame = blue. For a specific colour (gold light,
-                red mist...) use dust)
+            EFFECTS (use ONLY what the request's effect lines ask for; if a line says "none", make nothing for it).
+            Effects are glowing colour dots arranged into a shape and moved over time. Make the shape, colours and
+            movement match the words of the request (a pink heart flying forward = a pink heart shape moving forward).
+              ai.effect(when, [settings])
+                when: 'attack' (weapons: when it is swung; bows: where the arrow lands; up to 3, they play together)
+                      'idle'   (while held or worn; up to 2)
+                      'trail'  (bows only: behind the arrow in flight; copies are left along its path)
+                settings (all optional):
+                  shape: 'burst' (ball of dots), 'sphere' (hollow ball), 'circle', 'ring', 'heart', 'star', 'crescent',
+                         'slash' (wide arc of a sword swing), 'cross', 'spiral', 'bolt' (lightning zigzag),
+                         'magic_circle' (ring + inner ring + pentagram), 'square', 'triangle', 'diamond', 'line',
+                         'points' (your own: points: [[u, v], ...] in -1..1 units; lines: true joins them in order)
+                  fill: true            (dots fill the shape instead of drawing its outline)
+                  color: '#rrggbb'      color2: '#rrggbb' (colour it turns into over its life)
+                  size: blocks (radius, 0.1-4)   count: dots (4-96; outlines 24-48, filled 40-80)   dot: dot size (0.02-0.3)
+                  plane: 'front' (stands up, facing the way it goes), 'flat' (lies flat: ground circles, halos),
+                         'side' (stands along the way it goes: a sword arc seen from the side)
+                  start (attack): 'weapon' (just in front of the wielder), 'target' (on what is hit), 'ground' (on the
+                         ground under it), 'above' (over it), 'self' (around the wielder)
+                  anchor (idle): 'item' (the held item), 'head' (over the head), 'body', 'back', 'feet', 'around'
+                  moves: list of 'forward', 'back', 'rise', 'fall', 'expand', 'shrink', 'spin', 'orbit', 'pulse',
+                         'scatter' (dots fly apart), 'gather' (dots fly in), 'wave', 'reveal' (drawn along its length
+                         like a slash), 'fade', 'flicker'
+                  speed: blocks per second for forward/back/rise/fall/scatter/gather; turns per second for spin/orbit
+                  ticks: how long it lives (20 = 1 second); for idle without 'every', one loop
+                  every: idle and trail: ticks between new copies (0 = one copy that stays and loops, e.g. a ring
+                         orbiting the item)
+            Examples:
+              ai.effect('attack', [shape: 'heart', fill: true, color: '#ff66cc', size: 0.45, count: 60, plane: 'front',
+                                   start: 'weapon', moves: ['forward', 'pulse', 'fade'], speed: 7, ticks: 16])
+              ai.effect('attack', [shape: 'slash', color: '#bfe8ff', color2: '#3060ff', size: 1.3, count: 64,
+                                   plane: 'side', start: 'weapon', moves: ['reveal', 'fade'], ticks: 8])
+              ai.effect('attack', [shape: 'magic_circle', color: '#b44cff', size: 1.5, count: 80, plane: 'flat',
+                                   start: 'ground', moves: ['spin', 'expand', 'fade'], speed: 0.5, ticks: 30])
+              ai.effect('idle', [shape: 'burst', color: '#ffe680', size: 0.3, count: 6, anchor: 'item',
+                                 moves: ['rise', 'fade'], speed: 0.6, ticks: 20, every: 6])
+              ai.effect('idle', [shape: 'ring', color: '#9ff', size: 0.35, count: 24, plane: 'flat', anchor: 'head',
+                                 moves: ['spin', 'pulse'], speed: 0.4, ticks: 40])
+              ai.effect('trail', [shape: 'star', color: '#ffd84a', size: 0.15, count: 12, moves: ['shrink', 'fade'],
+                                  ticks: 10, every: 1])
+
+            MOVEMENT AND GLOW OF THE ITEM ITSELF (part of the while-held/worn line: only if that line is not "none"):
               ai.groupStart('name') ... ai.groupEnd()       // pieces made in between move together
               ai.animate('name', type, pivotX, pivotY, pivotZ, axis, speed, amount)
                 type 'spin'  : turns around the axis through the pivot, speed = turns per second (amount unused)
@@ -727,15 +756,6 @@ public class AiController {
               ai.glow('name')                               // the group glows in the dark (gems, flames, runes)
               ai.aura('#rrggbb', strength)                  // a soft, shining halo of light around the whole item while held
                                                             // or worn (strength 0.2-1): holy, cursed, magical, legendary items
-            Movement, glow and aura are part of the while-held/worn effect: make them only if that line is not "none".
-            Example (a staff whose crystal spins and glows, with sparkles):
-              ai.groupStart('crystal')
-              ai.addEllipsoid('amethyst_block', 0, 1.6, 0, 0.1, 0.16, 0.1)
-              ai.groupEnd()
-              ai.animate('crystal', 'spin', 0, 1.6, 0, 'y', 0.4, 0)
-              ai.animate('crystal', 'bob', 0, 1.6, 0, 'y', 0.5, 0.04)
-              ai.glow('crystal')
-              ai.idleEffect('end_rod', '#ffffff', 2)
             """;
 
     public static AiPrompt gearPrompt(String userPrompt, GearKind kind) {

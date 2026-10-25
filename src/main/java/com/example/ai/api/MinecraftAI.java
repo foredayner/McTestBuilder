@@ -14,6 +14,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
 import com.example.ai.build.BuildPlan;
+import com.example.ai.build.Spark;
 import com.example.ai.build.BuildTaskQueue;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -111,15 +112,6 @@ public class MinecraftAI {
         group = 0;
     }
 
-    /** Bows: particles that follow its arrows in flight. */
-    public static void arrowTrail(String particle, String color, Number count) {
-        if (recorder != null) {
-            BuildPlan.Fx fx = fx(particle, color, count);
-            fx.count = Math.max(1, Math.min(4, fx.count));
-            recorder.trail = fx;
-        }
-    }
-
     private static final java.util.Set<String> ANIMS = java.util.Set.of("spin", "swing", "bob", "pulse");
 
     /**
@@ -187,58 +179,6 @@ public class MinecraftAI {
         }
     }
 
-    /** Particles allowed for equipment effects. */
-    public static final java.util.List<String> PARTICLES = java.util.List.of(
-        "flame", "soul_fire_flame", "small_flame", "lava", "snowflake", "electric_spark", "enchant", "end_rod",
-        "glow", "portal", "witch", "dragon_breath", "smoke", "large_smoke", "cloud", "heart", "crit",
-        "enchanted_hit", "cherry_leaves", "totem_of_undying", "sculk_soul", "dust");
-
-    private static BuildPlan.Fx fx(String particle, String color, Number count) {
-        String p = particle == null ? "" : particle.trim().toLowerCase(Locale.ROOT).replace("minecraft:", "");
-        if (!PARTICLES.contains(p)) {
-            throw new IllegalArgumentException("unknown particle '" + particle + "'; use one of " + PARTICLES);
-        }
-        int rgb = 0xFFFFFF;
-        if (color != null && !color.isBlank()) {
-            try {
-                rgb = Integer.parseInt(color.trim().replace("#", ""), 16) & 0xFFFFFF;
-            } catch (NumberFormatException exception) {
-                throw new IllegalArgumentException("colour must look like '#ff6600', got '" + color + "'");
-            }
-        }
-        int n = Math.max(1, Math.min(12, toInt(count)));
-        return new BuildPlan.Fx(p, rgb, n);
-    }
-
-    /** Particles where a hit lands (weapons). */
-    public static void hitEffect(String particle, String color, Number count) {
-        hitEffect(particle, color, count, "burst", 1);
-    }
-
-    /** Shapes a hit effect can take. */
-    public static final java.util.List<String> PATTERNS = java.util.List.of(
-        "burst", "shockwave", "cone", "slash", "spiral", "pillar", "magic_circle", "lightning", "expand", "converge");
-
-    /** A hit effect with a shape (see PATTERNS) and a size in blocks (0.5-4). */
-    public static void hitEffect(String particle, String color, Number count, String pattern, Number size) {
-        if (recorder == null) {
-            return;
-        }
-        String p = pattern == null ? "burst" : pattern.trim().toLowerCase(Locale.ROOT);
-        if (!PATTERNS.contains(p)) {
-            throw new IllegalArgumentException("unknown hit pattern '" + pattern + "'; use one of " + PATTERNS);
-        }
-        BuildPlan.Fx fx = fx(particle, color, count);
-        fx.pattern = p;
-        fx.size = Math.max(0.5, Math.min(4, Math.abs(toDouble(size))));
-        // Up to three hit effects play together (e.g. a lightning bolt and a shockwave).
-        if (recorder.hit == null) {
-            recorder.hit = fx;
-        } else if (recorder.moreHits.size() < 2) {
-            recorder.moreHits.add(fx);
-        }
-    }
-
     /**
      * A soft glow around the equipment while it is held or worn (drawn by the mod: a see-through,
      * shining shell around every piece), in a colour; strength 0.2-1.
@@ -256,10 +196,32 @@ public class MinecraftAI {
         recorder.aura = new BuildPlan.Aura(rgb, Math.max(0.2, Math.min(1, Math.abs(toDouble(strength)))));
     }
 
-    /** Particles around the item while it is held or worn. */
-    public static void idleEffect(String particle, String color, Number count) {
-        if (recorder != null) {
-            recorder.idle = fx(particle, color, count);
+    /**
+     * A colour-dot effect: when = 'attack' (weapons: when swung; bows: where the arrow lands),
+     * 'idle' (while held or worn) or 'trail' (bows: behind the arrow). See Spark for the settings.
+     */
+    public static void effect(String when, java.util.Map<?, ?> settings) {
+        if (recorder == null) {
+            return;
+        }
+        Spark spark = Spark.fromMap(settings);
+        String w = when == null ? "" : when.trim().toLowerCase(Locale.ROOT);
+        switch (w) {
+            case "attack", "hit", "land" -> {
+                if (recorder.fx.attack.size() < 3) {
+                    recorder.fx.attack.add(spark);
+                }
+            }
+            case "idle", "held", "worn" -> {
+                if (recorder.fx.idle.size() < 2) {
+                    recorder.fx.idle.add(spark);
+                }
+            }
+            case "trail" -> {
+                recorder.fx.trail.clear();
+                recorder.fx.trail.add(spark);
+            }
+            default -> throw new IllegalArgumentException("effect: when must be 'attack', 'idle' or 'trail', got '" + when + "'");
         }
     }
 
