@@ -106,15 +106,17 @@ public final class GearMotionClient {
         return out;
     }
 
-    // First person poses: {x, y, z, yaw, pitch, roll} (blocks, degrees), mirrored for the left hand.
-    private static final float[] FP_THRUST_WIND = { 0.12F, -0.12F, 0.32F, 10, -80, 90 };
-    private static final float[] FP_THRUST_STRIKE = { -0.12F, 0.05F, -0.75F, 0, -88, 90 };
-    private static final float[] FP_SLASH_WIND = { 0.38F, 0.12F, 0.12F, 75, -25, 80 };
-    private static final float[] FP_SLASH_STRIKE = { -0.5F, -0.02F, -0.22F, -105, -30, 80 };
-    private static final float[] FP_SMASH_WIND = { 0.05F, 0.4F, 0.25F, 0, 70, 0 };
-    private static final float[] FP_SMASH_STRIKE = { -0.05F, -0.3F, -0.35F, 0, -115, 0 };
-    private static final float[] FP_SPIN_WIND = { 0.25F, 0.05F, 0.05F, 50, -20, 80 };
-    private static final float[] FP_SPIN_STRIKE = { -0.1F, 0.05F, -0.2F, -330, -20, 80 };
+    // First person poses: {x, y, z, yaw, pitch, roll} (blocks, degrees), mirrored for the left hand. Turns are
+    // made in a frame turned 45 degrees like the vanilla swing (along the blade's diagonal); small moves keep
+    // the weapon in view (moving it toward the camera hides it).
+    private static final float[] FP_THRUST_WIND = { 0.16F, -0.12F, 0.08F, 20, -65, -80 };
+    private static final float[] FP_THRUST_STRIKE = { -0.06F, 0.02F, -0.5F, 0, -75, -80 };
+    private static final float[] FP_SLASH_WIND = { 0.22F, 0.08F, 0.0F, 65, -35, -55 };
+    private static final float[] FP_SLASH_STRIKE = { -0.28F, -0.02F, -0.12F, -85, -40, -55 };
+    private static final float[] FP_SMASH_WIND = { 0.02F, 0.16F, 0.04F, 0, 35, 0 };
+    private static final float[] FP_SMASH_STRIKE = { -0.04F, -0.16F, -0.18F, 0, -105, 0 };
+    private static final float[] FP_SPIN_WIND = { 0.18F, 0.04F, 0.0F, 45, -35, -55 };
+    private static final float[] FP_SPIN_STRIKE = { -0.1F, 0.04F, -0.12F, -320, -35, -55 };
     private static final float[] FP_SPIN_END = { 0, 0, 0, -360, 0, 0 };
 
     /** First person: in place of the normal swing turn, around the hand. */
@@ -134,14 +136,15 @@ public final class GearMotionClient {
             return;
         }
         matrices.translate(side * p[0], p[1], p[2]);
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(side * p[3]));
-        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(p[4]));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(side * 45.0F));
         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(side * p[5]));
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(p[4]));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(side * (p[3] - 45.0F)));
     }
 
     // Third person poses: {arm pitch, arm yaw, arm roll, body yaw, body pitch, other arm pitch, other arm yaw} (radians).
-    private static final float[] TP_THRUST_WIND = { -0.55F, 0.55F, 0, 0.65F, 0, -0.95F, -0.45F };
-    private static final float[] TP_THRUST_STRIKE = { -1.65F, -0.1F, 0, -0.4F, 0.3F, 0.45F, 0.1F };
+    private static final float[] TP_THRUST_WIND = { -0.25F, 0.35F, 0, 0.7F, 0, -0.9F, -0.5F };
+    private static final float[] TP_THRUST_STRIKE = { -1.15F, -0.1F, 0, -0.45F, 0.3F, 0.45F, 0.1F };
     private static final float[] TP_SLASH_WIND = { -1.35F, 1.3F, 0, 0.75F, 0, -0.4F, -0.3F };
     private static final float[] TP_SLASH_STRIKE = { -1.4F, -1.25F, 0, -0.75F, 0.1F, 0.35F, 0.2F };
     private static final float[] TP_SMASH_WIND = { -3.0F, 0.15F, 0, 0.1F, -0.25F, -2.6F, 0.1F };
