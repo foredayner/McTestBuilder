@@ -115,10 +115,12 @@ server and the client of the player who builds. That player needs operator level
 - **Ollama**: `keep_alive` (Settings > "Keep model loaded", default 30 min) so the model is not
   unloaded after 5 minutes, and `num_ctx` 8192 so the long build prompt is not cut off.
 
-## API for other mods (com.example.api.AiBuildApi, version 1)
+## API for other mods (com.example.api.AiBuildApi, version 2)
 
 Used by the scenario map builder (a separate mod that needs this one):
 - `ask(server, prompt, model)`: any question to the configured provider (another model of it if given).
+- `ask(server, prompt, model, images)` (version 2): the same with pictures (`AiImage.ofUrl` or `AiImage.ofBytes`,
+  png/jpeg/gif/webp up to 4.5 MB) the AI looks at before the text; Claude and OpenAI connections only.
 - `designBuilding(world, near, site, request, log)`: a building for a site (width along the front, depth,
   height; front on z = -1, facing +Z), with town style rules, rooms and named spots the script marks with
   `ai.mark(name, x, y, z)`; checked (site bounds, marks) and retried like the mod's own requests.

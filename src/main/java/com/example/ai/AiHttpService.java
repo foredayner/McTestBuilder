@@ -67,6 +67,16 @@ public final class AiHttpService {
         }
     }
 
+    /** Tests: the user content a request with these pictures carries. */
+    static JsonArray imageContentForTests(String text, List<AiImage> images, boolean claude) {
+        IMAGES.set(images);
+        try {
+            return claude ? claudeContent(text) : openAiContent(text);
+        } finally {
+            IMAGES.remove();
+        }
+    }
+
     private static boolean hasImages() {
         List<AiImage> images = IMAGES.get();
         return images != null && !images.isEmpty();

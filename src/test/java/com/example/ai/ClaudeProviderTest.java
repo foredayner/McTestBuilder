@@ -57,6 +57,33 @@ class ClaudeProviderTest {
     }
 
     @Test
+    void picturesGoBeforeTheText() {
+        byte[] png = { (byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0 };
+        AiImage file = AiImage.ofBytes(png);
+        assertEquals("image/png", file.mediaType());
+        assertThrows(IllegalArgumentException.class, () -> AiImage.ofBytes(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 }));
+        AiImage web = AiImage.ofUrl(" https://example.org/police.jpg ");
+        var claude = AiHttpService.imageContentForTests("Describe it", List.of(web, file), true);
+        assertEquals(3, claude.size());
+        assertEquals("url", claude.get(0).getAsJsonObject().getAsJsonObject("source").get("type").getAsString());
+        assertEquals("https://example.org/police.jpg", claude.get(0).getAsJsonObject().getAsJsonObject("source").get("url").getAsString());
+        assertEquals("base64", claude.get(1).getAsJsonObject().getAsJsonObject("source").get("type").getAsString());
+        assertEquals("Describe it", claude.get(2).getAsJsonObject().get("text").getAsString());
+        var openAi = AiHttpService.imageContentForTests("Describe it", List.of(file), false);
+        assertTrue(openAi.get(0).getAsJsonObject().getAsJsonObject("image_url").get("url").getAsString().startsWith("data:image/png;base64,"));
+
+        AiBuilderConfig config = AiBuilderConfig.get();
+        AiProvider before = config.provider;
+        try {
+            config.provider = AiProvider.OLLAMA;
+            assertThrows(IllegalStateException.class, () -> AiHttpService.buildRequest(new AiPrompt("a", "b"), null, List.of(web)),
+                "a connection that cannot see pictures says so");
+        } finally {
+            config.provider = before;
+        }
+    }
+
+    @Test
     void readsTextSearchesUsageAndErrors() {
         String reply = """
             {"content":[
