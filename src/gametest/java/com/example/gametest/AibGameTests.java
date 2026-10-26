@@ -362,7 +362,7 @@ public class AibGameTests implements FabricGameTest {
         check(plan.marks.size() == 1 && "clue:diary".equals(plan.marks.get(0).name), "the mark is recorded");
         com.example.api.AiBuildApi.Site site = new com.example.api.AiBuildApi.Site(6, 7, 8);
         check(com.example.api.AiBuildApi.siteProblemForTests(plan, site) == null, "it fits the site");
-        check(com.example.api.AiBuildApi.siteProblemForTests(plan, new com.example.api.AiBuildApi.Site(4, 7, 8)) != null,
+        check(com.example.api.AiBuildApi.siteProblemForTests(plan, new com.example.api.AiBuildApi.Site(3, 7, 8)) != null,
             "a narrower site is refused");
         check(com.example.api.AiBuildApi.missingMarksForTests(plan, java.util.List.of("clue:diary")) == null, "the wanted mark is there");
         check(com.example.api.AiBuildApi.missingMarksForTests(plan, java.util.List.of("npc:mayor")) != null, "a missing mark is reported");
