@@ -48,6 +48,15 @@ class ScriptLinterTest {
     }
 
     @Test
+    void tablesOfNumbersWorkButMethodDefinitionsDoNot() {
+        assertEquals(List.of(), ScriptLinter.lint("int[][] rects = [[1, 2], [3, 4]]\n"
+            + "for (int k = 0; k < rects.length; k++) { ai.placeBlock(rects[k][0], 0, rects[k][1], 'stone') }"));
+        assertEquals(List.of(), ScriptLinter.lint("String[] walls = ['stone', 'bricks']\n"
+            + "for (int k = 0; k < walls.length; k++) { ai.placeBlock(k, 0, 0, walls[k]) }"));
+        assertTrue(one("def wall(int x) { ai.placeBlock(x, 0, 0, 'stone') }\nwall(1)").startsWith("Does not compile"));
+    }
+
+    @Test
     void classicForLoopsCompileButClosuresDoNot() {
         assertEquals(List.of(), ScriptLinter.lint("for (int i = 0; i < 3; i++) { ai.placeBlock(i, 0, 0, 'stone') }"));
         assertEquals(List.of(), ScriptLinter.lint("for (i in 0..2) { ai.placeBlock(i, 0, 0, 'stone') }"));

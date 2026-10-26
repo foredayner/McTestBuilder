@@ -135,7 +135,10 @@ public final class SafeGroovyShellFactory {
             Number.class,
             Math.class,
             groovy.lang.IntRange.class,
-            groovy.lang.ObjectRange.class
+            groovy.lang.ObjectRange.class,
+            // Arrays of plain values (rects[k][0], rects.length): AI scripts use them as tables.
+            int[].class, int[][].class, long[].class, double[].class, double[][].class, float[].class,
+            boolean[].class, String[].class, String[][].class, Object[].class
         ));
 
         secure.addExpressionCheckers(SafeGroovyShellFactory::isExpressionAuthorized);

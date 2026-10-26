@@ -579,6 +579,7 @@ public class AiController {
             CODE RULES:
             - Block names are quoted strings: 'iron_block'.
             - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
+            - One flat script: never define methods or functions (no def name(...) { }, no classes); repeat code in loops.
             - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
 
             EXAMPLES (only to show the API and the frame; make what the request asks, do not copy):
@@ -655,6 +656,7 @@ public class AiController {
             CODE RULES:
             - Block names are quoted strings: 'red_wool'.
             - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
+            - One flat script: never define methods or functions (no def name(...) { }, no classes); repeat code in loops.
             - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
 
             EXAMPLES (only to show the API and the frame; make what the request asks, do not copy):
@@ -892,6 +894,7 @@ public class AiController {
             CODE RULES:
             - Block names are quoted strings: 'white_concrete'.
             - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
+            - One flat script: never define methods or functions (no def name(...) { }, no classes); repeat code in loops.
             - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
 
             EXAMPLES (style reference; make your own design, do not copy):
@@ -974,6 +977,7 @@ public class AiController {
         prompt.append("- Coordinates are RELATIVE to player feet (0,0,0). getGroundLevel returns relative Y.\n");
         prompt.append("- Use searchBlocks/listBlocks for block names. Forbidden blocks cannot be placed.\n");
         prompt.append("- Block names are quoted strings: 'oak_planks'. Loops: for (int i = 0; i < n; i++); never closures (.each { }).\n");
+        prompt.append("- One flat script: never define methods or functions (no def name(...) { }, no classes); use loops and arrays.\n");
         prompt.append("- Build in front of the player. The FRONT of the building (main door, facade, windows of the main\n");
         prompt.append("  face) must face the player, i.e. point back toward (0, 0, 0).\n");
         prompt.append("- Inspect terrain before building. Output Groovy only. No markdown, no explanation.\n");
