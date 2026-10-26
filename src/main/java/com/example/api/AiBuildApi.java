@@ -64,12 +64,14 @@ public final class AiBuildApi {
                             response.statusCode(), provider), 0, 0));
                         return;
                     }
+                    int[] usage = AiHttpService.usage(response.body());
+                    int in = usage.length > 0 ? usage[0] : 0, outTokens = usage.length > 1 ? usage[1] : 0;
                     try {
-                        int[] usage = AiHttpService.usage(response.body());
                         String text = AiHttpService.extractResponseBody(response.body(), provider);
-                        out.complete(new Answer(true, text, null, usage.length > 0 ? usage[0] : 0, usage.length > 1 ? usage[1] : 0));
+                        out.complete(new Answer(true, text, null, in, outTokens));
                     } catch (RuntimeException exception) {
-                        out.complete(new Answer(false, "", exception.getMessage(), 0, 0));
+                        // Still report what it cost (an answer that ran out of room is paid for).
+                        out.complete(new Answer(false, "", exception.getMessage(), in, outTokens));
                     }
                 }))
                 .exceptionally(ex -> {
@@ -250,6 +252,17 @@ public final class AiBuildApi {
             stats[1] += answer.inputTokens();
             stats[2] += answer.outputTokens();
             if (!answer.ok()) {
+                String error = String.valueOf(answer.error());
+                if (error.contains("max_tokens") && tries < AiBuilderConfig.get().autoRetries) {
+                    // It ran out of room before the script: ask again for a shorter way to the script.
+                    if (log != null) {
+                        log.accept("retry " + (tries + 1) + ": the answer ran out of room");
+                    }
+                    AiPrompt shorter = new AiPrompt(base.system(), base.user() + "\n\nNOTE: the last answer ran out of output room before"
+                        + " the script. Plan briefly, then write a compact script (loops, boxes and walls rather than many single blocks).");
+                    attempt(server, base, shorter, model, log, check, tries + 1, stats, out);
+                    return;
+                }
                 out.complete(new Design(false, answer.error(), null, null, stats[0], stats[1], stats[2]));
                 return;
             }

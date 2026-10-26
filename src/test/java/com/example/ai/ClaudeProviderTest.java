@@ -20,6 +20,18 @@ class ClaudeProviderTest {
     }
 
     @Test
+    void claudeFiveModelsThinkAtMediumEffortWithRoomForTheScript() {
+        assertTrue(AiHttpService.thinksByDefault("claude-sonnet-5-5"));
+        assertTrue(AiHttpService.thinksByDefault("claude-haiku-5-5"));
+        assertTrue(AiHttpService.thinksByDefault("claude-fable-5-1"));
+        assertTrue(AiHttpService.thinksByDefault("claude-opus-6"));
+        assertFalse(AiHttpService.thinksByDefault("claude-sonnet-4-5"));
+        assertFalse(AiHttpService.thinksByDefault("claude-3-5-haiku-latest"));
+        assertFalse(AiHttpService.thinksByDefault("gpt-5"));
+        assertTrue(AiHttpService.ADAPTIVE_MAX_TOKENS > 16000);
+    }
+
+    @Test
     void requestCarriesKeyVersionAndModel() {
         AiBuilderConfig config = AiBuilderConfig.get();
         AiProvider before = config.provider;

@@ -76,8 +76,17 @@ public final class AiHttpService {
             throw new IllegalStateException("Claude API key is required (Settings > API 키)");
         }
         JsonObject body = new JsonObject();
-        body.addProperty("model", model(config));
-        body.addProperty("max_tokens", 16000);
+        String model = model(config);
+        boolean adaptive = thinksByDefault(model);
+        body.addProperty("model", model);
+        // Claude 5 models think before answering by default, and thinking counts against max_tokens:
+        // think at medium effort and leave room for a whole building's script after it.
+        body.addProperty("max_tokens", adaptive ? ADAPTIVE_MAX_TOKENS : 16000);
+        if (adaptive) {
+            JsonObject output = new JsonObject();
+            output.addProperty("effort", "medium");
+            body.add("output_config", output);
+        }
         if (prompt.system() != null && !prompt.system().isBlank()) {
             JsonArray system = new JsonArray();
             JsonObject block = new JsonObject();
@@ -110,9 +119,21 @@ public final class AiHttpService {
             .header("Accept", "application/json")
             .header("x-api-key", apiKey)
             .header("anthropic-version", "2023-06-01")
-            .timeout(Duration.ofSeconds(300))
+            .timeout(Duration.ofSeconds(adaptive ? 600 : 300))
             .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
             .build();
+    }
+
+    /** Output room (thinking plus text) for models that think by default. */
+    static final int ADAPTIVE_MAX_TOKENS = 32000;
+
+    /** Claude 5 models (and later) think by default and take an effort level. */
+    static boolean thinksByDefault(String model) {
+        if (model == null) {
+            return false;
+        }
+        var m = java.util.regex.Pattern.compile("claude-(opus|sonnet|haiku|fable|mythos)-(\\d+)").matcher(model.toLowerCase(java.util.Locale.ROOT));
+        return m.find() && Integer.parseInt(m.group(2)) >= 5;
     }
 
     /** The text of a Claude reply (web search blocks and citations are skipped). */
