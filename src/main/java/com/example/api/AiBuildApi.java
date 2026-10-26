@@ -37,7 +37,7 @@ import java.util.function.Function;
 public final class AiBuildApi {
 
     /** Version of this API, raised when something here changes in a way callers must know. */
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
 
     private AiBuildApi() {
     }
@@ -53,10 +53,19 @@ public final class AiBuildApi {
      * Use for planning steps that are not build scripts (e.g. JSON).
      */
     public static CompletableFuture<Answer> ask(MinecraftServer server, AiPrompt prompt, String model) {
+        return ask(server, prompt, model, List.of());
+    }
+
+    /**
+     * Ask about pictures (API 2): the AI sees the images (a web address or a file's bytes, see
+     * {@link com.example.ai.AiImage}) before the text. Claude and OpenAI connections only.
+     */
+    public static CompletableFuture<Answer> ask(MinecraftServer server, AiPrompt prompt, String model, List<com.example.ai.AiImage> images) {
         CompletableFuture<Answer> out = new CompletableFuture<>();
         AiProvider provider = AiBuilderConfig.get().provider;
         try {
-            var request = AiHttpService.buildRequest(prompt, false, model);
+            var request = images == null || images.isEmpty() ? AiHttpService.buildRequest(prompt, false, model)
+                : AiHttpService.buildRequest(prompt, model, images);
             AiHttpService.client().sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenAccept(response -> server.execute(() -> {
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -281,7 +290,7 @@ public final class AiBuildApi {
             int max = AiBuilderConfig.get().autoRetries;
             if (tries < max) {
                 if (log != null) {
-                    log.accept("retry " + (tries + 1) + "/" + max + ": " + firstLine(problem));
+                    log.accept("retry " + (tries + 1) + "/" + max + ": " + (problem.length() > 1500 ? problem.substring(0, 1500) + "..." : problem));
                 }
                 attempt(server, base, AiController.fixPrompt(base, code, problem), model, log, check, tries + 1, stats, out);
             } else {

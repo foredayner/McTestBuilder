@@ -50,6 +50,71 @@ public final class AiHttpService {
         }
     }
 
+    /** While set, the user message carries these pictures before its text. */
+    private static final ThreadLocal<List<AiImage>> IMAGES = new ThreadLocal<>();
+
+    /** A request with pictures for the AI to look at (Claude and OpenAI connections). */
+    public static HttpRequest buildRequest(AiPrompt prompt, String model, List<AiImage> images) {
+        AiProvider provider = AiBuilderConfig.get().provider;
+        if (images != null && !images.isEmpty() && provider != AiProvider.CLAUDE && provider != AiProvider.OPENAI) {
+            throw new IllegalStateException("This AI connection cannot look at pictures; use Claude or OpenAI.");
+        }
+        IMAGES.set(images);
+        try {
+            return buildRequest(prompt, false, model);
+        } finally {
+            IMAGES.remove();
+        }
+    }
+
+    private static boolean hasImages() {
+        List<AiImage> images = IMAGES.get();
+        return images != null && !images.isEmpty();
+    }
+
+    /** Claude: image blocks, then the text. */
+    private static JsonArray claudeContent(String text) {
+        JsonArray content = new JsonArray();
+        for (AiImage image : IMAGES.get()) {
+            JsonObject block = new JsonObject();
+            block.addProperty("type", "image");
+            JsonObject source = new JsonObject();
+            if (image.isUrl()) {
+                source.addProperty("type", "url");
+                source.addProperty("url", image.url());
+            } else {
+                source.addProperty("type", "base64");
+                source.addProperty("media_type", image.mediaType());
+                source.addProperty("data", image.base64());
+            }
+            block.add("source", source);
+            content.add(block);
+        }
+        JsonObject t = new JsonObject();
+        t.addProperty("type", "text");
+        t.addProperty("text", text);
+        content.add(t);
+        return content;
+    }
+
+    /** OpenAI chat: image_url parts, then the text. */
+    private static JsonArray openAiContent(String text) {
+        JsonArray content = new JsonArray();
+        for (AiImage image : IMAGES.get()) {
+            JsonObject part = new JsonObject();
+            part.addProperty("type", "image_url");
+            JsonObject url = new JsonObject();
+            url.addProperty("url", image.isUrl() ? image.url() : "data:" + image.mediaType() + ";base64," + image.base64());
+            part.add("image_url", url);
+            content.add(part);
+        }
+        JsonObject t = new JsonObject();
+        t.addProperty("type", "text");
+        t.addProperty("text", text);
+        content.add(t);
+        return content;
+    }
+
     public static HttpRequest buildRequest(AiPrompt prompt, boolean useWebSearch) {
         AiBuilderConfig config = AiBuilderConfig.get();
 
@@ -101,7 +166,11 @@ public final class AiHttpService {
         JsonArray messages = new JsonArray();
         JsonObject user = new JsonObject();
         user.addProperty("role", "user");
-        user.addProperty("content", prompt.user());
+        if (hasImages()) {
+            user.add("content", claudeContent(prompt.user()));
+        } else {
+            user.addProperty("content", prompt.user());
+        }
         messages.add(user);
         body.add("messages", messages);
         if (useWebSearch) {
@@ -343,7 +412,11 @@ public final class AiHttpService {
         JsonArray messages = new JsonArray();
         JsonObject userMessage = new JsonObject();
         userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", promptText);
+        if (hasImages()) {
+            userMessage.add("content", openAiContent(promptText));
+        } else {
+            userMessage.addProperty("content", promptText);
+        }
         messages.add(userMessage);
         requestJson.add("messages", messages);
 
