@@ -222,6 +222,10 @@ public final class AiScriptFacade {
         MinecraftAI.effect(when, settings);
     }
 
+    public void mark(String name, Number x, Number y, Number z) {
+        MinecraftAI.mark(name, x, y, z);
+    }
+
     public void oversize() {
         MinecraftAI.oversize();
     }

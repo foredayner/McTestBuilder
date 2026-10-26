@@ -144,6 +144,26 @@ public final class BuildPlan {
     public Aura aura;
     /** Equipment the order asked to be big (ai.oversize()): it may go past the slot's usual size. */
     public boolean oversize;
+    /** Named spots the script marked with ai.mark (e.g. where a clue goes), in the design frame. */
+    public List<Mark> marks = new ArrayList<>();
+
+    public static final class Mark {
+        public String name;
+        public int x;
+        public int y;
+        public int z;
+
+        public Mark() {
+        }
+
+        public Mark(String name, int x, int y, int z) {
+            this.name = name;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+    }
+
     /** Sword: attack motion chosen in the order ("" = the normal swing). */
     public String motion = "";
 

@@ -256,7 +256,12 @@ public class AiController {
 
     /** gear: equipment, drawn on a finer grid. */
     public static Evaluation evaluate(ServerPlayerEntity player, String aiCode, boolean gear) {
-        MinecraftAI.init(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player.getPitch(), player);
+        return evaluate(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player, aiCode, gear);
+    }
+
+    /** As above, without a player (e.g. for other mods): the script runs at {@code origin} looking along {@code yaw}. */
+    public static Evaluation evaluate(ServerWorld world, BlockPos origin, float yaw, ServerPlayerEntity player, String aiCode, boolean gear) {
+        MinecraftAI.init(world, origin, yaw, 0f, player);
         BuildPlan plan = new BuildPlan();
         plan.facing = BuildPlan.normalizeFacing(MinecraftAI.getFacing());
 
@@ -906,6 +911,11 @@ public class AiController {
         String user = "Build request: " + userPrompt + "\n\nWorld Information:\n" + worldInfo
             + "\n\nWrite the Groovy script for it now.";
         return new AiPrompt(buildingSystem(webSearchEnabled), user);
+    }
+
+    /** The fixed building instructions with another request (for other mods; cached by Claude like ours). */
+    public static AiPrompt buildingPromptWith(String userText) {
+        return new AiPrompt(buildingSystem(false), userText);
     }
 
     static String buildingSystem(boolean webSearchEnabled) {

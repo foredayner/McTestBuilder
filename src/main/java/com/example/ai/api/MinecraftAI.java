@@ -157,6 +157,22 @@ public class MinecraftAI {
         }
     }
 
+    /**
+     * Mark a named spot (e.g. 'clue:diary', 'npc:mayor', 'scene:study') so code using this build
+     * can put something there later. Relative coordinates, like placeBlock.
+     */
+    public static void mark(String name, Number x, Number y, Number z) {
+        if (recorder == null) {
+            return;
+        }
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("mark needs a name, e.g. ai.mark('clue:diary', 2, 1, -5)");
+        }
+        if (recorder.marks.size() < 64) {
+            recorder.marks.add(new BuildPlan.Mark(name.trim(), toInt(x), toInt(y), toInt(z)));
+        }
+    }
+
     /** Equipment: the order asked for it to be big, so it may go past the slot's usual size. */
     public static void oversize() {
         if (recorder != null) {
@@ -981,6 +997,12 @@ public class MinecraftAI {
      * item (no cheats needed). extraTags go on the hitboxes (e.g. which saved object to drop).
      */
     public static int executePlanAsServer(ServerWorld w, BuildPlan plan, BlockPos at, int turns, String tag, String title, List<String> extraTags) {
+        return executePlanAsServer(w, plan, at, turns, tag, title, extraTags, BuildTaskQueue.SERVER);
+    }
+
+    /** As the server, in the given placement lane (so other mods can wait for their own builds). */
+    public static int executePlanAsServer(ServerWorld w, BuildPlan plan, BlockPos at, int turns, String tag, String title,
+                                          List<String> extraTags, java.util.UUID lane) {
         java.util.function.Consumer<String> run = command -> {
             ServerCommandSource source = w.getServer().getCommandSource().withWorld(w).withLevel(4).withSilent();
             try {
@@ -989,7 +1011,7 @@ public class MinecraftAI {
                 System.out.println("[ERROR] Object command failed: /" + command + " -> " + exception.getMessage());
             }
         };
-        return executePlan(plan, at, turns, tag, title, extraTags, run, BuildTaskQueue.SERVER);
+        return executePlan(plan, at, turns, tag, title, extraTags, run, lane);
     }
 
     private static java.util.UUID ownerOf(ServerPlayerEntity player) {

@@ -42,6 +42,7 @@ public final class AiScriptApi {
         "glow",
         "aura",
         "oversize",
+        "mark",
         "arrowStart",
         "arrowEnd",
         "effect"

@@ -344,6 +344,46 @@ public class AibGameTests implements FabricGameTest {
         });
     }
 
+    /**
+     * The API other mods use: a building designed for a site (front on z = -1) is checked against
+     * the site and its marked spots, then placed turned so its front faces east, with the marked
+     * spots reported in world positions.
+     */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void apiPlacesASiteBuildingTurnedWithItsMarks(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 180f); // the design frame looks north
+        BuildPlan plan = Demo.plan(world, origin, player,
+            "ai.placeBox(0, 0, -6, 5, 3, 5, 'oak_planks')\n"
+                + "ai.placeBlock(2, 0, -1, 'oak_door[facing=south,half=lower]')\n"
+                + "ai.mark('clue:diary', 2, 1, -4)\n");
+        check(plan.marks.size() == 1 && "clue:diary".equals(plan.marks.get(0).name), "the mark is recorded");
+        com.example.api.AiBuildApi.Site site = new com.example.api.AiBuildApi.Site(6, 7, 8);
+        check(com.example.api.AiBuildApi.siteProblemForTests(plan, site) == null, "it fits the site");
+        check(com.example.api.AiBuildApi.siteProblemForTests(plan, new com.example.api.AiBuildApi.Site(4, 7, 8)) != null,
+            "a narrower site is refused");
+        check(com.example.api.AiBuildApi.missingMarksForTests(plan, java.util.List.of("clue:diary")) == null, "the wanted mark is there");
+        check(com.example.api.AiBuildApi.missingMarksForTests(plan, java.util.List.of("npc:mayor")) != null, "a missing mark is reported");
+
+        com.example.config.AiBuilderConfig.get().ticksPerBlock = 1;
+        BlockPos siteMin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        var placed = com.example.api.AiBuildApi.placeBuilding(world, plan, siteMin, site, "east", "aib_api_test",
+            java.util.UUID.randomUUID(), null);
+        check(placed.min().getX() == siteMin.getX() && placed.min().getZ() == siteMin.getZ(), "the footprint starts at the site corner");
+        int[] size = com.example.api.AiBuildApi.footprint(site, "east");
+        check(placed.max().getX() - placed.min().getX() + 1 == size[0] && placed.max().getZ() - placed.min().getZ() + 1 == size[1],
+            "the footprint is turned: " + size[0] + "x" + size[1]);
+        BlockPos diary = placed.marks().get("clue:diary").get(0);
+        check(world.getBlockState(diary).isOf(Blocks.OAK_PLANKS), "the marked spot is inside the placed building");
+        int[] d = BuildPlan.rotate(2, -1, placed.turns());
+        BlockPos door = placed.origin().add(d[0], 0, d[1]);
+        check(world.getBlockState(door).isOf(Blocks.OAK_DOOR), "the door was placed");
+        check(door.getX() == placed.max().getX(), "the front (door) is on the east side");
+        check(world.getBlockState(door).get(net.minecraft.block.DoorBlock.FACING) == Direction.EAST, "the door turned east");
+        context.complete();
+    }
+
     @GameTest(templateName = EMPTY_STRUCTURE)
     public void reviewRejectsBadScriptsBeforeRunning(TestContext context) {
         ServerWorld world = context.getWorld();

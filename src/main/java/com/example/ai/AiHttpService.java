@@ -32,6 +32,24 @@ public final class AiHttpService {
         return buildRequest(new AiPrompt("", promptText), useWebSearch);
     }
 
+    /** While set (by buildRequest with a model), requests use this model instead of the configured one. */
+    private static final ThreadLocal<String> MODEL_OVERRIDE = new ThreadLocal<>();
+
+    private static String model(AiBuilderConfig config) {
+        String m = MODEL_OVERRIDE.get();
+        return m == null || m.isBlank() ? config.modelName : m;
+    }
+
+    /** A request with another model of the same provider (e.g. a bigger one for planning). */
+    public static HttpRequest buildRequest(AiPrompt prompt, boolean useWebSearch, String model) {
+        MODEL_OVERRIDE.set(model);
+        try {
+            return buildRequest(prompt, useWebSearch);
+        } finally {
+            MODEL_OVERRIDE.remove();
+        }
+    }
+
     public static HttpRequest buildRequest(AiPrompt prompt, boolean useWebSearch) {
         AiBuilderConfig config = AiBuilderConfig.get();
 
@@ -58,7 +76,7 @@ public final class AiHttpService {
             throw new IllegalStateException("Claude API key is required (Settings > API 키)");
         }
         JsonObject body = new JsonObject();
-        body.addProperty("model", config.modelName);
+        body.addProperty("model", model(config));
         body.addProperty("max_tokens", 16000);
         if (prompt.system() != null && !prompt.system().isBlank()) {
             JsonArray system = new JsonArray();
@@ -263,7 +281,7 @@ public final class AiHttpService {
 
     private static HttpRequest buildOllamaRequest(AiBuilderConfig config, String promptText) {
         JsonObject requestJson = new JsonObject();
-        requestJson.addProperty("model", config.modelName);
+        requestJson.addProperty("model", model(config));
         requestJson.addProperty("stream", false);
         requestJson.addProperty("prompt", promptText);
         // Keep the model in memory between builds instead of Ollama's 5-minute default, and give
@@ -293,7 +311,7 @@ public final class AiHttpService {
         }
 
         JsonObject requestJson = new JsonObject();
-        requestJson.addProperty("model", config.modelName);
+        requestJson.addProperty("model", model(config));
 
         JsonArray messages = new JsonArray();
         JsonObject userMessage = new JsonObject();
@@ -319,7 +337,7 @@ public final class AiHttpService {
         }
 
         JsonObject requestJson = new JsonObject();
-        requestJson.addProperty("model", config.modelName);
+        requestJson.addProperty("model", model(config));
         requestJson.addProperty("input", promptText);
 
         JsonArray tools = new JsonArray();
@@ -341,7 +359,7 @@ public final class AiHttpService {
 
     private static HttpRequest buildCustomRequest(AiBuilderConfig config, String promptText) {
         JsonObject requestJson = new JsonObject();
-        requestJson.addProperty("model", config.modelName);
+        requestJson.addProperty("model", model(config));
         requestJson.addProperty("stream", false);
         requestJson.addProperty("prompt", promptText);
 
