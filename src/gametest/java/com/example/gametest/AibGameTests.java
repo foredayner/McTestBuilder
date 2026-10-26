@@ -357,6 +357,7 @@ public class AibGameTests implements FabricGameTest {
         BuildPlan plan = Demo.plan(world, origin, player,
             "ai.placeBox(0, 0, -6, 5, 3, 5, 'oak_planks')\n"
                 + "ai.placeBlock(2, 0, -1, 'oak_door[facing=south,half=lower]')\n"
+                + "ai.placeBlock(2, 1, -1, 'oak_door[facing=south,half=upper]')\n"
                 + "ai.mark('clue:diary', 2, 1, -4)\n");
         check(plan.marks.size() == 1 && "clue:diary".equals(plan.marks.get(0).name), "the mark is recorded");
         com.example.api.AiBuildApi.Site site = new com.example.api.AiBuildApi.Site(6, 7, 8);
