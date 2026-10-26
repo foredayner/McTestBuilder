@@ -145,6 +145,7 @@ Used by the scenario map builder (a separate mod that needs this one):
   all 16,000 tokens on thinking and came back with no script. Requests to Claude 5+ models now ask
   for `output_config.effort: medium` with room for 32,000 tokens (and wait up to 10 minutes); an
   answer that still runs out of room is asked again for a shorter script, and its tokens are counted.
+  Haiku 5 (cheap and quick) gets 64,000 tokens so big buildings fit.
 - Classic `for (int i = 0; i < n; i++)` loops were rejected by the sandbox as "closures" (Groovy
   keeps the loop header as a ClosureListExpression), so many AI scripts failed with `1 error`.
   Closures and lambdas are still blocked; loops now work.

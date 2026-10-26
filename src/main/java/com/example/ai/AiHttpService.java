@@ -81,7 +81,7 @@ public final class AiHttpService {
         body.addProperty("model", model);
         // Claude 5 models think before answering by default, and thinking counts against max_tokens:
         // think at medium effort and leave room for a whole building's script after it.
-        body.addProperty("max_tokens", adaptive ? ADAPTIVE_MAX_TOKENS : 16000);
+        body.addProperty("max_tokens", adaptive ? maxTokensFor(model) : 16000);
         if (adaptive) {
             JsonObject output = new JsonObject();
             output.addProperty("effort", "medium");
@@ -126,6 +126,12 @@ public final class AiHttpService {
 
     /** Output room (thinking plus text) for models that think by default. */
     static final int ADAPTIVE_MAX_TOKENS = 32000;
+    /** Haiku is cheap and quick: give it room for a big building's whole script. */
+    static final int HAIKU_MAX_TOKENS = 64000;
+
+    static int maxTokensFor(String model) {
+        return model != null && model.toLowerCase(java.util.Locale.ROOT).contains("haiku") ? HAIKU_MAX_TOKENS : ADAPTIVE_MAX_TOKENS;
+    }
 
     /** Claude 5 models (and later) think by default and take an effort level. */
     static boolean thinksByDefault(String model) {

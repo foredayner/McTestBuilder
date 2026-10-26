@@ -29,6 +29,8 @@ class ClaudeProviderTest {
         assertFalse(AiHttpService.thinksByDefault("claude-3-5-haiku-latest"));
         assertFalse(AiHttpService.thinksByDefault("gpt-5"));
         assertTrue(AiHttpService.ADAPTIVE_MAX_TOKENS > 16000);
+        assertEquals(64000, AiHttpService.maxTokensFor("claude-haiku-5-5"), "Haiku gets room for big buildings");
+        assertEquals(32000, AiHttpService.maxTokensFor("claude-sonnet-5-5"));
     }
 
     @Test
