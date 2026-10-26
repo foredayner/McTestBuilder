@@ -358,6 +358,7 @@ public class AibGameTests implements FabricGameTest {
             "ai.placeBox(0, 0, -6, 5, 3, 5, 'oak_planks')\n"
                 + "ai.placeBlock(2, 0, -1, 'oak_door[facing=south,half=lower]')\n"
                 + "ai.placeBlock(2, 1, -1, 'oak_door[facing=south,half=upper]')\n"
+                + "ai.placeBlock(2, 1, -4, 'bookshelf')\n"
                 + "ai.mark('clue:diary', 2, 1, -4)\n");
         check(plan.marks.size() == 1 && "clue:diary".equals(plan.marks.get(0).name), "the mark is recorded");
         com.example.api.AiBuildApi.Site site = new com.example.api.AiBuildApi.Site(6, 7, 8);
@@ -376,7 +377,7 @@ public class AibGameTests implements FabricGameTest {
         check(placed.max().getX() - placed.min().getX() + 1 == size[0] && placed.max().getZ() - placed.min().getZ() + 1 == size[1],
             "the footprint is turned: " + size[0] + "x" + size[1]);
         BlockPos diary = placed.marks().get("clue:diary").get(0);
-        check(world.getBlockState(diary).isOf(Blocks.OAK_PLANKS), "the marked spot is inside the placed building");
+        check(world.getBlockState(diary).isOf(Blocks.BOOKSHELF), "the marked spot is where the script put the bookshelf");
         int[] d = BuildPlan.rotate(2, -1, placed.turns());
         BlockPos door = placed.origin().add(d[0], 0, d[1]);
         check(world.getBlockState(door).isOf(Blocks.OAK_DOOR), "the door was placed");
