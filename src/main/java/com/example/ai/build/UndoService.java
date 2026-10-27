@@ -108,6 +108,7 @@ public final class UndoService {
         }
         if (entry.tag() != null) {
             MinecraftAI.init(entry.world(), player.getBlockPos(), player.getYaw(), player.getPitch(), player);
+            ObjectBuilds.cancel(entry.tag()); // still being placed: its remaining parts are not placed
             MinecraftAI.runNow("kill @e[tag=" + entry.tag() + "]"); // display parts and hitboxes
         }
         AiNetworking.sendLog(player, "[AI] Undid \"" + entry.title() + "\" (" + restored + " block(s) restored"

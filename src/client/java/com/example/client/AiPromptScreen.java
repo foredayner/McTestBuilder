@@ -810,7 +810,12 @@ public class AiPromptScreen extends Screen {
         int tab = tabAt(mouseX, mouseY);
         if (button == 0 && tab >= 0) {
             if (TABS[tab].page() == null) {
-                this.client.setScreen(new AiSettingsScreen(this));
+                if (AiClientState.canEditSettings()) {
+                    this.client.setScreen(new AiSettingsScreen(this));
+                } else {
+                    AiClientState.addLog("[Settings] " + com.example.network.AiNetworking.SETTINGS_OWNER_ONLY + " (지금 모델: "
+                        + AiClientState.activeModel() + ")");
+                }
             } else if (TABS[tab].page() != page) {
                 switchPage(TABS[tab].page());
             }

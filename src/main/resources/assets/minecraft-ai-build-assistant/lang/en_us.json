@@ -17,5 +17,7 @@
   "item.minecraft-ai-build-assistant.gear_helmet": "AI Helmet",
   "item.minecraft-ai-build-assistant.gear_hat": "AI Hat",
   "item.minecraft-ai-build-assistant.gear_chestplate": "AI Chestplate",
-  "item.minecraft-ai-build-assistant.gear_back": "AI Back Piece"
+  "item.minecraft-ai-build-assistant.gear_back": "AI Back Piece",
+  "item.minecraft-ai-build-assistant.gear_pants": "AI Pants",
+  "item.minecraft-ai-build-assistant.gear_shoes": "AI Shoes"
 }

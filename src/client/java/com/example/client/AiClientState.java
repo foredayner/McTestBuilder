@@ -30,6 +30,12 @@ public final class AiClientState {
     private static boolean pendingApproval = false;
     private static String pendingDescription = "";
     private static boolean sessionWebSearch = false;
+    /** What the server's AI is (sent when joining and after the owner saves settings); null until known. */
+    private static AiProvider serverProvider;
+    private static String serverModel = "";
+    private static String serverApiUrl = "";
+    private static boolean serverWebSearch;
+    private static boolean canEditSettings;
     private static AiPromptScreen openScreen;
 
     private AiClientState() {
@@ -255,8 +261,54 @@ public final class AiClientState {
         return sessionWebSearch;
     }
 
+    /** The server told us about its AI. */
+    public static void setServerInfo(String provider, String model, String apiUrl, boolean webSearch, boolean canEdit) {
+        try {
+            serverProvider = AiProvider.valueOf(provider);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            serverProvider = null;
+        }
+        serverModel = model == null ? "" : model;
+        serverApiUrl = apiUrl == null ? "" : apiUrl;
+        serverWebSearch = webSearch;
+        canEditSettings = canEdit;
+        refreshOpenScreen(true);
+    }
+
+    /** Forget the server's AI (leaving a world). */
+    public static void clearServerInfo() {
+        serverProvider = null;
+        serverModel = "";
+        serverApiUrl = "";
+        serverWebSearch = false;
+        canEditSettings = false;
+    }
+
+    /** The AI the requests go to: the server's (when known), else this game's own settings. */
+    public static AiProvider activeProvider() {
+        return serverProvider != null ? serverProvider : AiBuilderConfig.get().provider;
+    }
+
+    public static String activeModel() {
+        return serverProvider != null ? serverModel : AiBuilderConfig.get().modelName;
+    }
+
+    public static String serverApiUrl() {
+        return serverApiUrl;
+    }
+
+    /** Whether this player may change the server's AI settings (only its owner). */
+    public static boolean canEditSettings() {
+        return canEditSettings;
+    }
+
+    /** Whether we know the server's settings (we joined a world with this mod). */
+    public static boolean hasServerInfo() {
+        return serverProvider != null;
+    }
+
     public static void toggleSessionWebSearch() {
-        if (!AiBuilderConfig.get().provider.supportsWebSearch()) {
+        if (!activeProvider().supportsWebSearch()) {
             return;
         }
         sessionWebSearch = !sessionWebSearch;
@@ -264,13 +316,12 @@ public final class AiClientState {
     }
 
     public static boolean willUseWebSearch() {
-        AiBuilderConfig config = AiBuilderConfig.get();
-        return config.provider.supportsWebSearch()
-            && (config.openAiWebSearchEnabled || sessionWebSearch);
+        boolean byDefault = serverProvider != null ? serverWebSearch : AiBuilderConfig.get().openAiWebSearchEnabled;
+        return activeProvider().supportsWebSearch() && (byDefault || sessionWebSearch);
     }
 
     public static boolean isWebSearchAvailable() {
-        return AiBuilderConfig.get().provider.supportsWebSearch();
+        return activeProvider().supportsWebSearch();
     }
 
     public static void sendPromptText(String prompt) {
@@ -283,9 +334,9 @@ public final class AiClientState {
             return;
         }
 
-        if (willUseWebSearch() && AiBuilderConfig.get().provider == AiProvider.OPENAI
-            && !OpenAiWebSearchSupport.isModelSupported(AiBuilderConfig.get().modelName)) {
-            addLog("[AI] Error: " + OpenAiWebSearchSupport.unsupportedModelMessage(AiBuilderConfig.get().modelName));
+        if (willUseWebSearch() && activeProvider() == AiProvider.OPENAI
+            && !OpenAiWebSearchSupport.isModelSupported(activeModel())) {
+            addLog("[AI] Error: " + OpenAiWebSearchSupport.unsupportedModelMessage(activeModel()));
             return;
         }
 

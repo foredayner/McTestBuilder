@@ -123,6 +123,10 @@ public final class ObjectItems {
             return;
         }
         String tag = ObjectService.objectTag(target);
+        if (ObjectBuilds.building(tag)) {
+            player.sendMessage(Text.literal("아직 만드는 중이에요. 다 나타난 뒤에 캐 주세요.").formatted(Formatting.GRAY), true);
+            return;
+        }
         String id = savedId(target);
         if (tag == null || id == null) {
             player.sendMessage(Text.literal("이 소품은 캐서 가져갈 수 없어요 (Delete 키로 지울 수 있어요)").formatted(Formatting.GRAY), true);

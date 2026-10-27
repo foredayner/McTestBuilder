@@ -35,6 +35,7 @@ public final class AiNetworking {
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.ApprovalDenyC2SPayload.ID, AiNetworkPayloads.ApprovalDenyC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.AiSettingsSyncC2SPayload.ID, AiNetworkPayloads.AiSettingsSyncC2SPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.BuildCompleteS2CPayload.ID, AiNetworkPayloads.BuildCompleteS2CPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.ServerAiInfoS2CPayload.ID, AiNetworkPayloads.ServerAiInfoS2CPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RebuildPartC2SPayload.ID, AiNetworkPayloads.RebuildPartC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.UndoC2SPayload.ID, AiNetworkPayloads.UndoC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.AttackSwingC2SPayload.ID, AiNetworkPayloads.AttackSwingC2SPayload.CODEC);
@@ -46,6 +47,10 @@ public final class AiNetworking {
     }
 
     public static void registerServerReceivers() {
+        // Everyone learns what the server's AI is when they join (for the web search button and the settings tab).
+        net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+            sendServerInfo(handler.player));
+
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.ApprovalAcceptC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> {
                 if (allowed(context.player())) {
@@ -64,9 +69,17 @@ public final class AiNetworking {
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.AiSettingsSyncC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> {
-                // The server's AI settings (and API key) are only changed by operators.
-                if (allowed(context.player())) {
-                    applySettings(payload);
+                // The server's AI settings (and API key) are changed only by the server's owner: a
+                // friend's own (default) settings must never replace them.
+                ServerPlayerEntity player = context.player();
+                if (!canEditSettings(player)) {
+                    player.sendMessage(Text.literal(SETTINGS_OWNER_ONLY), true);
+                    sendServerInfo(player);
+                    return;
+                }
+                applySettings(payload);
+                for (ServerPlayerEntity p : context.server().getPlayerManager().getPlayerList()) {
+                    sendServerInfo(p);
                 }
             });
         });
@@ -133,6 +146,33 @@ public final class AiNetworking {
         return false;
     }
 
+    public static final String SETTINGS_OWNER_ONLY = "AI 설정은 서버 주인만 바꿀 수 있어요.";
+
+    /**
+     * Whether a player may change the server's AI settings: the player who opened the world (single
+     * player or LAN), or on a dedicated server an operator of the highest level (4).
+     */
+    public static boolean canEditSettings(ServerPlayerEntity player) {
+        if (player == null || player.getServer() == null) {
+            return false;
+        }
+        var server = player.getServer();
+        if (!server.isDedicated()) {
+            return server.isHost(player.getGameProfile());
+        }
+        return player.hasPermissionLevel(4);
+    }
+
+    /** Tell a player what the server's AI is (never the key) and whether they may change it. */
+    public static void sendServerInfo(ServerPlayerEntity player) {
+        if (player == null || !ServerPlayNetworking.canSend(player, AiNetworkPayloads.ServerAiInfoS2CPayload.ID)) {
+            return;
+        }
+        AiBuilderConfig c = AiBuilderConfig.get();
+        ServerPlayNetworking.send(player, new AiNetworkPayloads.ServerAiInfoS2CPayload(c.provider.name(), c.modelName, c.apiUrl,
+            c.openAiWebSearchEnabled, canEditSettings(player)));
+    }
+
     private static void applySettings(AiNetworkPayloads.AiSettingsSyncC2SPayload payload) {
         AiProvider provider;
         try {
@@ -141,11 +181,14 @@ public final class AiNetworking {
             provider = AiProvider.OLLAMA;
         }
 
+        // An empty key keeps the one the server has (a settings screen that does not know the key
+        // must not wipe it).
+        String key = payload.apiKey() == null || payload.apiKey().isBlank() ? AiBuilderConfig.get().apiKey : payload.apiKey();
         AiBuilderConfig.get().applyFrom(
             provider,
             payload.modelName(),
             payload.apiUrl(),
-            payload.apiKey(),
+            key,
             payload.ticksPerBlock(),
             payload.forbiddenBlocksPath(),
             ForbiddenBlockRegistry.decodeFromNetwork(payload.forbiddenBlocksData()),

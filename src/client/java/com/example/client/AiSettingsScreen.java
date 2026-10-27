@@ -69,6 +69,20 @@ public class AiSettingsScreen extends Screen {
         super(Text.literal("Minecraft AI Build Assistant Settings"));
         this.parent = parent;
         this.draft = AiBuilderConfig.get().copy();
+        if (remote()) {
+            // A server elsewhere: show its AI (its key is never sent here; an empty key keeps it).
+            AiProvider p = AiClientState.activeProvider();
+            this.draft.provider = p;
+            this.draft.modelName = AiClientState.activeModel();
+            this.draft.apiUrl = AiClientState.serverApiUrl();
+            this.draft.apiKey = "";
+        }
+    }
+
+    /** Connected to a server that is not running in this game (its settings live there). */
+    private static boolean remote() {
+        var client = net.minecraft.client.MinecraftClient.getInstance();
+        return client.getNetworkHandler() != null && !client.isIntegratedServerRunning() && AiClientState.hasServerInfo();
     }
 
     @Override
@@ -123,7 +137,7 @@ public class AiSettingsScreen extends Screen {
         this.apiKeyField = new TextFieldWidget(this.textRenderer, x + 5, at(176) + 6, w - 10, 12, Text.literal("API Key"));
         this.apiKeyField.setMaxLength(512);
         this.apiKeyField.setText(this.draft.apiKey);
-        this.apiKeyField.setPlaceholder(Text.literal("sk-..."));
+        this.apiKeyField.setPlaceholder(Text.literal(remote() ? "비워 두면 서버의 키를 그대로 써요" : "sk-..."));
         this.apiKeyField.setRenderTextProvider(this::maskApiKey); // 1.21.4 name of addFormatter
         scrolledChild(this.apiKeyField);
 
@@ -295,6 +309,16 @@ public class AiSettingsScreen extends Screen {
 
     private void saveSettings() {
         syncDraft();
+        if (remote()) {
+            // The settings belong to that server: send them there, keep this game's own file as it is.
+            AiClientNetworking.sendSettingsSync(this.draft);
+            AiClientState.addLog("[Settings] 서버에 보냈어요. 모델: " + this.draft.modelName);
+            this.saved = true;
+            if (this.client != null) {
+                this.client.setScreen(this.parent);
+            }
+            return;
+        }
         AiBuilderConfig config = AiBuilderConfig.get();
         config.applyFrom(
             this.draft.provider,

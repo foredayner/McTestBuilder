@@ -455,10 +455,18 @@ public class AiController {
         }
         if (kind.worn() && plan.ops.isEmpty() && plan.isObject()) {
             double[] b = plan.partBounds();
-            boolean head = kind.slot == net.minecraft.entity.EquipmentSlot.HEAD;
-            double[] lim = head
-                ? new double[] { -0.7, -0.25, -0.7, 0.7, 1.3, 0.7 }
-                : new double[] { -1.3, -1.1, -0.5, 1.3, 0.7, 1.0 };
+            double[] lim = switch (kind.slot) {
+                case HEAD -> new double[] { -0.7, -0.25, -0.7, 0.7, 1.3, 0.7 };
+                case LEGS -> new double[] { -0.3, -0.95, -0.45, 0.6, 0.35, 0.45 };
+                case FEET -> new double[] { -0.3, -0.95, -0.5, 0.5, -0.1, 0.4 };
+                default -> new double[] { -1.3, -1.1, -0.5, 1.3, 0.7, 1.0 };
+            };
+            String part = switch (kind.slot) {
+                case HEAD -> "head";
+                case LEGS -> "leg";
+                case FEET -> "foot";
+                default -> "torso";
+            };
             String[] axis = { "x", "y", "z" };
             List<String> problems = new java.util.ArrayList<>();
             for (int i = 0; i < 3; i++) {
@@ -466,7 +474,7 @@ public class AiController {
                 if (b[i] < lim[i] - 0.08 || b[i + 3] > lim[i + 3] + 0.08) {
                     problems.add(String.format(java.util.Locale.ROOT, "it reaches %s = %.2f..%.2f; keep it within %.2f..%.2f "
                         + "(it must stay on the %s; only if the request asks for it to be big, call ai.oversize()).",
-                        axis[i], b[i], b[i + 3], lim[i], lim[i + 3], head ? "head" : "torso"));
+                        axis[i], b[i], b[i + 3], lim[i], lim[i + 3], part));
                 }
             }
             return problems.isEmpty() ? null : PLAN_PROBLEMS + "\n- " + String.join("\n- ", problems);
@@ -625,6 +633,22 @@ public class AiController {
         ai.mirrorOff()
         """;
 
+    public static final String EXAMPLE_PANTS = """
+        // jeans for ONE leg (drawn mirrored on the other); the leg is x -0.125..0.125, y -0.75..0, +X is the outer side
+        ai.addRoundBox('blue_terracotta', -0.155, -0.72, -0.155, 0.31, 0.78, 0.31, 0.03)      // leg from the hip down
+        ai.addRoundBox('brown_terracotta', -0.16, -0.02, -0.16, 0.32, 0.1, 0.32, 0.02)        // belt at the waist
+        ai.addRoundBox('light_blue_terracotta', -0.16, -0.74, -0.16, 0.32, 0.06, 0.32, 0.02)  // rolled cuff
+        ai.addRoundBox('blue_concrete', 0.15, -0.5, -0.06, 0.02, 0.12, 0.12, 0.01)            // pocket on the outer side
+        """;
+
+    public static final String EXAMPLE_SHOES = """
+        // a sneaker for ONE foot (drawn mirrored on the other); the sole is at the bottom of the leg, the toe toward -Z
+        ai.addRoundBox('white_concrete', -0.15, -0.8, -0.24, 0.3, 0.07, 0.4, 0.03)       // sole
+        ai.addRoundBox('red_wool', -0.145, -0.73, -0.22, 0.29, 0.16, 0.37, 0.05)         // upper
+        ai.addRoundBox('white_wool', -0.135, -0.6, -0.14, 0.27, 0.12, 0.27, 0.04)        // ankle collar
+        ai.addRoundBox('white_concrete', -0.04, -0.6, -0.235, 0.08, 0.1, 0.02, 0.01)     // laces
+        """;
+
     /** Instructions for worn equipment (fixed part). */
     static final String WEAR_SYSTEM = """
             You are an expert 3D modeller of things people wear in Minecraft: hats, masks, costume and mascot heads,
@@ -640,13 +664,19 @@ public class AiController {
             - CHEST items: the torso is the box x -0.25..0.25, y -0.75..0, z -0.125..0.125; (0, 0, 0) is the top centre of
               the torso (between the shoulders). The front is -Z, the back is +Z. The head is above, y 0..0.5.
               The arms hang beside the torso (x beyond +-0.25), so keep clothes off them.
+            - LEGS and FEET items: model ONE leg; it is copied, mirrored, onto the other leg. The leg is the box
+              x -0.125..0.125, y -0.75..0, z -0.125..0.125; (0, 0, 0) is the top centre of the leg (the hip), the foot is
+              at the bottom (y -0.75), the front is -Z and +X is the OUTER side of the leg (keep the inner side, x below
+              -0.15, free: the other leg is there). Pants cover the leg from the hip down; shoes cover the bottom, from
+              y -0.8 up, with the toe toward -Z.
             - Pieces inside the body part are hidden, which is fine.
 
             SIZE (decide from what it is):
             - Fitted things (helmets, hoods, glasses, clothes, armour) sit 0.02-0.06 outside the body part.
             - Things that are naturally bigger (mascot or animal heads, big masks, big hair, tall hats, wings) may be
               bigger: a mask or costume head can be about 1.5 times the head, with its face features standing out.
-            - Normal limits: HEAD x and z -0.7..0.7, y -0.25..1.3; CHEST x -1.3..1.3, y -1.1..0.7, z -0.5..1.0.
+            - Normal limits: HEAD x and z -0.7..0.7, y -0.25..1.3; CHEST x -1.3..1.3, y -1.1..0.7, z -0.5..1.0;
+              LEGS x -0.3..0.6, y -0.95..0.35, z -0.45..0.45; FEET x -0.3..0.5, y -0.95..-0.1, z -0.5..0.4.
             - Only if the request asks for it to be big (big, huge, giant, 거대한, 큰, or a size in blocks, e.g. a
               4-block balloon floating above the head): call ai.oversize() first; then it may be up to 5 blocks in each
               direction, within 6 blocks of (0, 0, 0). Something floating above is held by a thin string (ai.addTube).
@@ -785,9 +815,17 @@ public class AiController {
     private static AiPrompt gearPromptBase(String userPrompt, GearKind kind) {
         String shapes = OBJECT_SYSTEM.substring(OBJECT_SYSTEM.indexOf("SMOOTH SHAPES"), OBJECT_SYSTEM.indexOf("STYLE (this"));
         if (kind.worn()) {
-            String system = WEAR_SYSTEM.formatted(shapes, GEAR_STYLE, EXAMPLE_HELMET.strip(), EXAMPLE_HAT.strip(), EXAMPLE_WINGS.strip());
+            boolean legs = kind.slot == net.minecraft.entity.EquipmentSlot.LEGS || kind.slot == net.minecraft.entity.EquipmentSlot.FEET;
+            String system = legs
+                ? WEAR_SYSTEM.formatted(shapes, GEAR_STYLE, EXAMPLE_PANTS.strip(), EXAMPLE_SHOES.strip(), EXAMPLE_HAT.strip())
+                : WEAR_SYSTEM.formatted(shapes, GEAR_STYLE, EXAMPLE_HELMET.strip(), EXAMPLE_HAT.strip(), EXAMPLE_WINGS.strip());
             String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "), worn on the "
-                + (kind.slot == net.minecraft.entity.EquipmentSlot.HEAD ? "HEAD" : "CHEST (torso)")
+                + switch (kind.slot) {
+                    case HEAD -> "HEAD";
+                    case LEGS -> "LEGS (model one leg)";
+                    case FEET -> "FEET (model one foot)";
+                    default -> "CHEST (torso)";
+                }
                 + ". What this kind covers (the request decides what it actually is): " + kind.guide
                 + "\nRequest: " + userPrompt + "\nWrite the Groovy script for it now.";
             return new AiPrompt(system, user);

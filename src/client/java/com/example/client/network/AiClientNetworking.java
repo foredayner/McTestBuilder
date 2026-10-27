@@ -40,6 +40,12 @@ public final class AiClientNetworking {
                 new net.minecraft.util.math.Vec3d(payload.x(), payload.y(), payload.z()),
                 new net.minecraft.util.math.Vec3d(payload.dx(), payload.dy(), payload.dz()), payload.scale())));
 
+        ClientPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.ServerAiInfoS2CPayload.ID, (payload, context) ->
+            context.client().execute(() -> AiClientState.setServerInfo(payload.provider(), payload.modelName(), payload.apiUrl(),
+                payload.webSearchDefault(), payload.canEdit())));
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->
+            client.execute(AiClientState::clearServerInfo));
+
         ClientPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.NearbyObjectsS2CPayload.ID, (payload, context) -> {
             context.client().execute(() -> AiClientState.setNearby(payload.json()));
         });

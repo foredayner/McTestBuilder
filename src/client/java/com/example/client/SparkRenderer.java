@@ -55,9 +55,16 @@ public final class SparkRenderer {
         /** Loops in place, following an entity (idle effects and trails without copies). */
         final Entity follow;
         final String anchor;
+        /** Plays once while following (an effect given off every few ticks moves with what gave it off). */
+        final boolean once;
         boolean seen = true;
 
         Effect(Spark spark, Vec3d origin, Vec3d dir, double scale, double start, Entity follow, String anchor) {
+            this(spark, origin, dir, scale, start, follow, anchor, false);
+        }
+
+        Effect(Spark spark, Vec3d origin, Vec3d dir, double scale, double start, Entity follow, String anchor, boolean once) {
+            this.once = once;
             this.spark = spark;
             this.dots = spark.dots();
             this.origin = origin;
@@ -111,7 +118,8 @@ public final class SparkRenderer {
         return CACHE.computeIfAbsent(data, d -> GearEffects.of(stack));
     }
 
-    private static final EquipmentSlot[] SLOTS = { EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND, EquipmentSlot.HEAD, EquipmentSlot.CHEST };
+    private static final EquipmentSlot[] SLOTS = { EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND, EquipmentSlot.HEAD, EquipmentSlot.CHEST,
+        EquipmentSlot.LEGS, EquipmentSlot.FEET };
 
     /** Every client tick: effects of equipment held or worn nearby, and arrow trails. */
     public static void tick(MinecraftClient client) {
@@ -138,12 +146,16 @@ public final class SparkRenderer {
                         continue;
                     }
                     GearKind kind = ((GearItem) stack.getItem()).kind();
-                    if (kind.worn() != (slot == EquipmentSlot.HEAD || slot == EquipmentSlot.CHEST) || (kind.worn() && kind.slot != slot)) {
+                    boolean armorSlot = slot != EquipmentSlot.MAINHAND && slot != EquipmentSlot.OFFHAND;
+                    if (kind.worn() != armorSlot || (kind.worn() && kind.slot != slot)) {
                         continue; // a worn piece only counts where it is worn; hand items only in hands
                     }
                     for (int i = 0; i < fx.idle.size(); i++) {
                         Spark s = fx.idle.get(i);
                         String anchor = !s.anchor.isEmpty() ? s.anchor : defaultAnchor(kind, slot);
+                        if ("item".equals(anchor) && slot == EquipmentSlot.OFFHAND) {
+                            anchor = "item_off";
+                        }
                         emitOrFollow(entity, s, anchor, slot.name() + i, time, now);
                     }
                 }
@@ -166,7 +178,9 @@ public final class SparkRenderer {
     private static void emitOrFollow(Entity entity, Spark s, String anchor, String key, long time, double now) {
         if (s.every > 0) {
             if ((time + entity.getId()) % s.every == 0) {
-                add(new Effect(s, anchorPos(entity, anchor, 1.0F), lookOf(entity), 1, now, null, anchor));
+                // Arrows leave theirs behind as a trail; on a wearer or a held item it moves along with them.
+                Entity follow = entity instanceof AibArrowEntity ? null : entity;
+                add(new Effect(s, anchorPos(entity, anchor, 1.0F), dirOf(entity, anchor, 1.0F), 1, now, follow, anchor, true));
             }
             return;
         }
@@ -176,7 +190,7 @@ public final class SparkRenderer {
             if (e != null) {
                 EFFECTS.remove(e);
             }
-            e = new Effect(s, anchorPos(entity, anchor, 1.0F), lookOf(entity), 1, now, entity, anchor);
+            e = new Effect(s, anchorPos(entity, anchor, 1.0F), dirOf(entity, anchor, 1.0F), 1, now, entity, anchor);
             FOLLOWING.put(id, e);
             add(e);
         }
@@ -190,6 +204,12 @@ public final class SparkRenderer {
         if (kind.slot == EquipmentSlot.HEAD) {
             return "head";
         }
+        if (kind.slot == EquipmentSlot.LEGS) {
+            return "legs";
+        }
+        if (kind.slot == EquipmentSlot.FEET) {
+            return "feet";
+        }
         return kind == GearKind.BACK ? "back" : "body";
     }
 
@@ -202,20 +222,87 @@ public final class SparkRenderer {
         return new Vec3d(-MathHelper.sin(yaw), 0, MathHelper.cos(yaw));
     }
 
-    /** Where an effect sits on an entity. */
-    private static Vec3d anchorPos(Entity entity, String anchor, float delta) {
+    /** Where an effect sits on an entity: on the head as it turns and nods, on the held item as the arm moves. */
+    static Vec3d anchorPos(Entity entity, String anchor, float delta) {
         Vec3d base = entity.getLerpedPos(delta);
         Vec3d forward = lookOf(entity);
         Vec3d right = new Vec3d(-forward.z, 0, forward.x);
         double h = entity.getHeight();
         return switch (anchor) {
             case "arrow" -> base;
-            case "head" -> base.add(0, entity.getStandingEyeHeight() + 0.45, 0);
+            case "head" -> {
+                // Above the head, tilting with it: up is the head's own up, not the world's.
+                Vec3d eye = entity.getCameraPosVec(delta);
+                Vec3d[] axes = headAxes(entity, delta);
+                yield eye.add(axes[1].multiply(0.45)).add(axes[0].multiply(-0.05));
+            }
             case "body", "around" -> base.add(0, h * 0.55, 0);
             case "back" -> base.add(0, h * 0.62, 0).subtract(forward.multiply(0.4));
             case "feet" -> base.add(0, 0.05, 0);
-            default -> base.add(0, h * 0.5, 0).add(right.multiply(-0.38)).add(forward.multiply(0.35)); // right hand
+            case "legs" -> base.add(0, h * 0.28, 0);
+            case "item_off" -> heldItem(entity, delta, false, right, forward, base, h);
+            default -> heldItem(entity, delta, true, right, forward, base, h);
         };
+    }
+
+    /** Which way an effect faces: where the head looks for head effects, along the item for held ones, else the body. */
+    static Vec3d dirOf(Entity entity, String anchor, float delta) {
+        if ("head".equals(anchor)) {
+            return headAxes(entity, delta)[0];
+        }
+        return lookOf(entity);
+    }
+
+    /** The head's forward and up directions (it turns with the head yaw and nods with the pitch). */
+    private static Vec3d[] headAxes(Entity entity, float delta) {
+        Vec3d look = entity.getRotationVec(delta).normalize();
+        Vec3d flat = new Vec3d(look.x, 0, look.z);
+        Vec3d side = flat.lengthSquared() < 1e-6 ? new Vec3d(1, 0, 0) : new Vec3d(-flat.z, 0, flat.x).normalize();
+        Vec3d up = side.crossProduct(look).normalize();
+        if (up.y < 0) {
+            up = up.multiply(-1);
+        }
+        return new Vec3d[] { look, up };
+    }
+
+    /**
+     * The middle of the item held in a hand, following the arm: it swings with walking, lifts for
+     * an attack and points ahead while a bow is drawn (the same arm movements the player model makes).
+     */
+    private static Vec3d heldItem(Entity entity, float delta, boolean mainHand, Vec3d right, Vec3d forward, Vec3d base, double h) {
+        boolean rightSide = mainHand;
+        if (entity instanceof LivingEntity living && living.getMainArm() == net.minecraft.util.Arm.LEFT) {
+            rightSide = !mainHand;
+        }
+        Vec3d up = new Vec3d(0, 1, 0);
+        Vec3d shoulder = base.add(0, h * 0.75, 0).add(right.multiply(rightSide ? -0.37 : 0.37));
+        double pitch = -Math.PI / 10; // the arm holding an item, a little forward
+        double along = 0.5;
+        if (entity instanceof LivingEntity living) {
+            float limbPos = living.limbAnimator.getPos(delta);
+            float limbSpeed = Math.min(1.0F, living.limbAnimator.getSpeed(delta));
+            pitch += MathHelper.cos(limbPos * 0.6662F + (rightSide ? (float) Math.PI : 0)) * limbSpeed * 0.5;
+            if (mainHand) {
+                float swing = living.getHandSwingProgress(delta);
+                if (swing > 0) {
+                    pitch -= Math.sin(swing * Math.PI) * 1.3; // up and over for the attack
+                }
+            }
+            if (living.isUsingItem() && (living.getActiveHand() == net.minecraft.util.Hand.MAIN_HAND) == mainHand) {
+                pitch = -Math.PI / 2 - living.getPitch(delta) * MathHelper.RADIANS_PER_DEGREE; // aimed where it looks
+            }
+            ItemStack stack = mainHand ? living.getMainHandStack() : living.getOffHandStack();
+            GearModelRenderer.Model model = stack.getItem() instanceof GearItem ? GearModelRenderer.modelFor(stack) : null;
+            if (model != null) {
+                along = Math.max(0.2, Math.min(1.6, model.length() * 0.5));
+            }
+        }
+        // The arm hangs down at pitch 0 and turns forward as the pitch goes negative.
+        Vec3d arm = up.multiply(-Math.cos(pitch)).add(forward.multiply(-Math.sin(pitch)));
+        Vec3d hand = shoulder.add(arm.multiply(0.62));
+        // The item sticks out of the fist at a right angle to the arm.
+        Vec3d item = forward.multiply(Math.cos(pitch)).add(up.multiply(-Math.sin(pitch)));
+        return hand.add(item.multiply(along));
     }
 
     // ------------------------------------------------------------------ drawing
@@ -240,18 +327,23 @@ public final class SparkRenderer {
             Effect e = it.next();
             Spark s = e.spark;
             double age = Math.max(0, now - e.start);
-            boolean loops = e.follow != null;
+            boolean loops = e.follow != null && !e.once;
             double t = age / s.ticks;
             if (!loops && t >= 1) {
                 it.remove();
                 continue;
             }
-            if (loops) {
+            if (e.follow != null) {
                 if (e.follow.isRemoved()) {
+                    if (!loops) {
+                        it.remove();
+                    }
                     continue;
                 }
                 e.origin = anchorPos(e.follow, e.anchor, delta);
-                e.dir = lookOf(e.follow);
+                e.dir = dirOf(e.follow, e.anchor, delta);
+            }
+            if (loops) {
                 t = t - Math.floor(t);
             }
             budget -= draw(buffer, e, t, age / 20.0, cam, camRight, camUp, budget);

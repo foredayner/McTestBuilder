@@ -1019,10 +1019,24 @@ public class MinecraftAI {
     }
 
     private static int executePlan(BuildPlan plan, BlockPos at, int turns, String tag, String title, List<String> extraTags,
-                                   java.util.function.Consumer<String> runner, java.util.UUID owner) {
+                                   java.util.function.Consumer<String> run, java.util.UUID owner) {
         int count = 0;
+        boolean object = !plan.parts.isEmpty() && tag != null;
+        // An object removed while it is still being placed: its remaining commands are skipped.
+        java.util.function.Consumer<String> runner = object
+            ? command -> {
+                if (!com.example.ai.build.ObjectBuilds.cancelled(tag)) {
+                    run.accept(command);
+                }
+            }
+            : run;
+        if (object) {
+            com.example.ai.build.ObjectBuilds.start(tag);
+        }
+        boolean hasHitboxes = false;
         if (!plan.parts.isEmpty()) {
             List<String> hitboxes = hitboxCommands(plan, at, turns, tag, title, extraTags);
+            hasHitboxes = !hitboxes.isEmpty();
             BuildTaskQueue.enqueue(owner, () -> hitboxes.forEach(runner));
         }
         for (BuildPlan.Op op : plan.ops) {
@@ -1043,14 +1057,26 @@ public class MinecraftAI {
             batch.add(summonCommand(part, at, turns, tag, floor));
             count++;
             if (batch.size() == 8) {
-                List<String> run = List.copyOf(batch);
-                BuildTaskQueue.enqueue(owner, () -> run.forEach(runner));
+                List<String> part8 = List.copyOf(batch);
+                BuildTaskQueue.enqueue(owner, () -> part8.forEach(runner));
                 batch.clear();
             }
         }
         if (!batch.isEmpty()) {
-            List<String> run = List.copyOf(batch);
-            BuildTaskQueue.enqueue(owner, () -> run.forEach(runner));
+            List<String> last = List.copyOf(batch);
+            BuildTaskQueue.enqueue(owner, () -> last.forEach(runner));
+        }
+        if (object) {
+            // Done: it may be mined now. If its hitboxes are gone (removed some other way), take away
+            // whatever parts were left so nothing stays that cannot be mined or deleted.
+            String cleanup = "execute unless entity @e[tag=aib_box,tag=" + tag + "] run kill @e[tag=" + tag + "]";
+            boolean check = hasHitboxes;
+            BuildTaskQueue.enqueue(owner, () -> {
+                com.example.ai.build.ObjectBuilds.finish(tag);
+                if (check) {
+                    run.accept(cleanup);
+                }
+            });
         }
         return count;
     }

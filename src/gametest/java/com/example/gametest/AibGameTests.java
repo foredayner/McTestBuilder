@@ -224,6 +224,21 @@ public class AibGameTests implements FabricGameTest {
         check(com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.BACK) == null,
             "wings example fits: " + com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.BACK));
         check(com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.HELMET) != null, "wings are too wide for a head");
+        // Pants and shoes: one leg, drawn on both; they go in the leg and foot slots.
+        BuildPlan pants = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_PANTS, true);
+        check(com.example.ai.AiController.gearProblem(pants, com.example.content.GearKind.PANTS) == null,
+            "pants example fits: " + com.example.ai.AiController.gearProblem(pants, com.example.content.GearKind.PANTS));
+        BuildPlan shoes = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_SHOES, true);
+        check(com.example.ai.AiController.gearProblem(shoes, com.example.content.GearKind.SHOES) == null,
+            "shoes example fits: " + com.example.ai.AiController.gearProblem(shoes, com.example.content.GearKind.SHOES));
+        check(com.example.ai.AiController.gearProblem(wings, com.example.content.GearKind.SHOES) != null, "wings are not shoes");
+        for (var kind : new com.example.content.GearKind[] { com.example.content.GearKind.PANTS, com.example.content.GearKind.SHOES }) {
+            BuildRecord r = BuildRecord.create(kind.id(), "TEST", "script", kind == com.example.content.GearKind.PANTS ? pants : shoes);
+            r.kind = "gear";
+            r.gear = kind.id();
+            var eq = com.example.ai.build.GearItems.stackFor(r).get(net.minecraft.component.DataComponentTypes.EQUIPPABLE);
+            check(eq != null && eq.slot() == kind.slot, kind + " goes in its slot: " + (eq == null ? null : eq.slot()));
+        }
         BuildRecord helm = BuildRecord.create("helm", "TEST", "script", helmet);
         helm.kind = "gear";
         helm.gear = "helmet";
@@ -543,6 +558,44 @@ public class AibGameTests implements FabricGameTest {
                 check(drops.size() == 1 && record.id.equals(com.example.ai.build.ObjectItems.idOf(drops.get(0).getStack())),
                     "mining drops the object item, got " + drops.size());
                 check(placedFrom.getCount() == before, "count unchanged");
+                context.complete();
+            });
+        });
+    }
+
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 600)
+    public void anObjectStillBeingPlacedCannotBeMinedAndRemovingItStopsIt(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        // 64 small cubes: placed 8 at a time, so it takes several ticks to appear.
+        String cubes = "for (int i = 0; i < 8; i++) {\n for (int j = 0; j < 8; j++) {\n"
+            + "  ai.addRoundBox('red_concrete', i * 0.3, 0, j * 0.3, 0.2, 0.2, 0.2, 0.02)\n }\n}\n";
+        BuildRecord record = BuildRecord.create("cubes", "TEST", "script", Demo.plan(world, origin, player, cubes));
+        check(record.plan.parts.size() > 40, "an object of several batches: " + record.plan.parts.size());
+        com.example.ai.build.BlueprintStore.give(player, record);
+        net.minecraft.item.ItemStack item = net.minecraft.item.ItemStack.EMPTY;
+        for (int i = 0; i < player.getInventory().size(); i++) {
+            if (com.example.ai.build.ObjectItems.idOf(player.getInventory().getStack(i)) != null) {
+                item = player.getInventory().getStack(i);
+            }
+        }
+        BlockPos clicked = origin.add(0, -1, 3);
+        check(com.example.ai.build.ObjectItems.use(player, item, clicked), "placed from the item");
+        Box area = new Box(clicked).expand(4);
+        context.waitAndRun(2, () -> {
+            var boxes = world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area, e -> true);
+            check(!boxes.isEmpty(), "the hitboxes come first");
+            String tag = com.example.ai.build.ObjectService.objectTag(boxes.get(0));
+            check(com.example.ai.build.ObjectBuilds.building(tag), "it is still being placed");
+            com.example.ai.build.ObjectItems.breakObject(player, boxes.get(0).getId(), true);
+            check(!boxes.get(0).isRemoved(), "it cannot be mined while being placed");
+            check(world.getEntitiesByClass(net.minecraft.entity.ItemEntity.class, area, e -> true).isEmpty(), "and nothing drops");
+            com.example.ai.build.ObjectService.removeByTag(player, tag); // Delete / the nearby list while it is placed
+            context.waitAndRun(40, () -> {
+                int left = world.getEntitiesByClass(net.minecraft.entity.Entity.class, area, e -> e.getCommandTags().contains(tag)).size();
+                check(left == 0, "the parts still waiting were not placed, " + left + " left");
+                check(!com.example.ai.build.ObjectBuilds.building(tag), "no longer being placed");
                 context.complete();
             });
         });

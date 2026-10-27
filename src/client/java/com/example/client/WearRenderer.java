@@ -19,8 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Draws worn AI equipment (helmets, hats, armour, back items) on players, zombies, armour stands
- * and other biped models, attached to the head or the torso so it follows their movement.
+ * Draws worn AI equipment (helmets, hats, armour, back items, pants, shoes) on players, zombies,
+ * armour stands and other biped models, attached to the head, the torso or both legs so it follows
+ * their movement. Pants and shoes are modelled for one leg and drawn on both, mirrored.
  *
  * <p>The AI designs with +Y up; entity models have +Y down, so the model is flipped on Y (which
  * also turns its faces inside out, hence a no-cull layer).
@@ -50,13 +51,23 @@ public final class WearRenderer implements ArmorRenderer {
         if (model == null || model.parts().isEmpty()) {
             return;
         }
-        ModelPart bone = slot == EquipmentSlot.HEAD ? contextModel.head : contextModel.body;
+        if (slot == EquipmentSlot.LEGS || slot == EquipmentSlot.FEET) {
+            // One leg is modelled with +X on its outer side: the right leg (model -X) is drawn mirrored.
+            drawOn(matrices, vertexConsumers, model, light, contextModel.rightLeg, -1.0F);
+            drawOn(matrices, vertexConsumers, model, light, contextModel.leftLeg, 1.0F);
+            return;
+        }
+        drawOn(matrices, vertexConsumers, model, light, slot == EquipmentSlot.HEAD ? contextModel.head : contextModel.body, 1.0F);
+    }
+
+    private static void drawOn(MatrixStack matrices, VertexConsumerProvider vertexConsumers, GearModelRenderer.Model model, int light,
+                               ModelPart bone, float xScale) {
         if (!bone.visible) {
             return;
         }
         matrices.push();
         bone.rotate(matrices);
-        matrices.scale(1.0F, -1.0F, 1.0F);
+        matrices.scale(xScale, -1.0F, 1.0F);
         GearModelRenderer.draw(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCull(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)),
             model, light, OverlayTexture.DEFAULT_UV);
         GearModelRenderer.drawAura(matrices, vertexConsumers, model, OverlayTexture.DEFAULT_UV);

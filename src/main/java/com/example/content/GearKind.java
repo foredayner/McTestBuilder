@@ -45,9 +45,13 @@ public enum GearKind {
             + "up with whatever sits on top."),
 
     BOW("활", Items.BOW, Items.BOW,
-        "a bow held at the middle of its grip at (0, 0, 0): the limbs go up and down along Y (tips at about y = +-0.55 to "
-            + "+-0.7) and bend toward +X at the tips (x about 0.2-0.35); the string runs between the tips on the +X side; "
-            + "arrows fly toward -X. Keep it thin in Z (0.04-0.1). You may also design the arrow it shoots between "
+        "anything that shoots (this kind only decides bow stats and that it shoots; the shape is whatever the request says: "
+            + "a bow, crossbow, gun, slingshot, wand, blowpipe, cannon, a fish that spits...). The hand holds it at (0, 0, 0) "
+            + "and the shots fly toward -X, so the part they leave from (a muzzle, a tip, the arrow rest) points to -X. "
+            + "A bow: the limbs go up and down along Y (tips at about y = +-0.55 to +-0.7) and bend toward +X at the tips "
+            + "(x about 0.2-0.35), the string runs between the tips on the +X side, thin in Z (0.04-0.1). A gun or crossbow: "
+            + "lying along X with the grip under the hand and the muzzle at x = -0.4 to -0.9. You may also design the "
+            + "projectile it shoots between "
             + "ai.arrowStart() and ai.arrowEnd(): the arrow points UP (+Y), fletching at y = 0 to 0.2, shaft up to the head "
             + "at y = 0.6-0.9, centred on x = z = 0, about 0.03-0.08 thick (without it, arrows look normal)."),
 
@@ -64,7 +68,17 @@ public enum GearKind {
             + "0.02-0.06 outside the torso box, shoulder parts may stick out to x = +-0.4."),
     BACK("등 장식", Items.LEATHER_CHESTPLATE, Items.ELYTRA, EquipmentSlot.CHEST,
         "something on the back or behind or above the wearer: wings, a backpack, a cape, a shell, a tail, a balloon "
-            + "on a string; carried things are held on by straps over the front of the torso.");
+            + "on a string; carried things are held on by straps over the front of the torso."),
+    PANTS("바지", Items.IRON_LEGGINGS, Items.LEATHER_LEGGINGS, EquipmentSlot.LEGS,
+        "something worn on the legs: trousers, shorts, a skirt, leg armour, greaves, tights, a kilt. Model ONE leg "
+            + "(it is copied, mirrored, onto the other leg): fitted parts 0.02-0.06 outside the leg box; a waistband at "
+            + "the top (y 0 to 0.12) may reach in to x = -0.15 and out a little; a skirt or kilt flares out to x 0.3 and "
+            + "z +-0.3 at its hem."),
+    SHOES("신발", Items.IRON_BOOTS, Items.LEATHER_BOOTS, EquipmentSlot.FEET,
+        "something worn on the feet: shoes, boots, sneakers, sandals, socks, slippers, skates, fins. Model ONE foot "
+            + "(it is copied, mirrored, onto the other one): the sole at y = -0.75 (the bottom of the leg) and a little "
+            + "under it (to -0.8), the toe sticking out to the front (-Z, to about -0.25), boots going up the leg (to "
+            + "y -0.4 or higher).");
 
     /** Where it is worn (head or chest), or null for hand-held equipment. */
     public final EquipmentSlot slot;

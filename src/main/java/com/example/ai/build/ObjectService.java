@@ -84,6 +84,7 @@ public final class ObjectService {
             return;
         }
         ServerWorld world = player.getServerWorld();
+        ObjectBuilds.cancel(tag); // still being placed: its remaining parts are not placed
         Box area = new Box(player.getBlockPos()).expand(NEARBY_RADIUS + 16);
         List<Entity> found = world.getEntitiesByClass(Entity.class, area, e -> e.getCommandTags().contains(tag));
         String name = null;

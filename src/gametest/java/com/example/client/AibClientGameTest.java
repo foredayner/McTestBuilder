@@ -276,6 +276,17 @@ public class AibClientGameTest implements FabricClientGameTest {
                 wings.gear = "back";
                 player.equipStack(net.minecraft.entity.EquipmentSlot.HEAD, com.example.ai.build.GearItems.stackFor(helmet));
                 player.equipStack(net.minecraft.entity.EquipmentSlot.CHEST, com.example.ai.build.GearItems.stackFor(wings));
+                // Jeans and sneakers: modelled for one leg, drawn on both.
+                BuildRecord pants = BuildRecord.create("청바지", "TEST", "script",
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_PANTS, true));
+                pants.kind = "gear";
+                pants.gear = "pants";
+                BuildRecord shoes = BuildRecord.create("운동화", "TEST", "script",
+                    Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_SHOES, true));
+                shoes.kind = "gear";
+                shoes.gear = "shoes";
+                player.equipStack(net.minecraft.entity.EquipmentSlot.LEGS, com.example.ai.build.GearItems.stackFor(pants));
+                player.equipStack(net.minecraft.entity.EquipmentSlot.FEET, com.example.ai.build.GearItems.stackFor(shoes));
             });
             context.waitTicks(10);
             context.runOnClient(client -> client.inGameHud.getChatHud().clear(false));
@@ -313,6 +324,8 @@ public class AibClientGameTest implements FabricClientGameTest {
                 ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
                 player.equipStack(net.minecraft.entity.EquipmentSlot.HEAD, net.minecraft.item.ItemStack.EMPTY);
                 player.equipStack(net.minecraft.entity.EquipmentSlot.CHEST, net.minecraft.item.ItemStack.EMPTY);
+                player.equipStack(net.minecraft.entity.EquipmentSlot.LEGS, net.minecraft.item.ItemStack.EMPTY);
+                player.equipStack(net.minecraft.entity.EquipmentSlot.FEET, net.minecraft.item.ItemStack.EMPTY);
             });
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
 

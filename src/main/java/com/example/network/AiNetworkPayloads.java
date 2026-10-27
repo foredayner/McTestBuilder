@@ -127,6 +127,27 @@ public final class AiNetworkPayloads {
         }
     }
 
+    /**
+     * Server -> client: what the server's AI is (never its key), and whether this player may change
+     * the settings (only the server's owner may).
+     */
+    public record ServerAiInfoS2CPayload(String provider, String modelName, String apiUrl, boolean webSearchDefault, boolean canEdit)
+        implements CustomPayload {
+        public static final CustomPayload.Id<ServerAiInfoS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "server_ai_info"));
+        public static final PacketCodec<RegistryByteBuf, ServerAiInfoS2CPayload> CODEC = PacketCodec.tuple(
+            PacketCodecs.STRING, ServerAiInfoS2CPayload::provider,
+            PacketCodecs.STRING, ServerAiInfoS2CPayload::modelName,
+            PacketCodecs.STRING, ServerAiInfoS2CPayload::apiUrl,
+            PacketCodecs.BOOLEAN, ServerAiInfoS2CPayload::webSearchDefault,
+            PacketCodecs.BOOLEAN, ServerAiInfoS2CPayload::canEdit,
+            ServerAiInfoS2CPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     /** Server -> client: a finished build (gzip'd BuildRecord JSON) for the history tab. */
     public record BuildCompleteS2CPayload(byte[] data) implements CustomPayload {
         public static final CustomPayload.Id<BuildCompleteS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "build_complete"));
