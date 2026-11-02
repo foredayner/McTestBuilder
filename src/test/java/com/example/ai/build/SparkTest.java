@@ -71,6 +71,18 @@ class SparkTest {
     }
 
     @Test
+    void smoothPiecesAreFormsWithAnArcAndAWidth() {
+        Spark s = Spark.fromMap(Map.of("form", "swipe", "arc", 999, "width", 0.5));
+        assertEquals("swipe", s.form);
+        assertEquals(330, s.arc, 1e-9, "the arc is capped");
+        assertEquals(0.5, s.width, 1e-9);
+        assertEquals("dots", Spark.fromMap(Map.of("shape", "star")).form, "dots by default");
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> Spark.fromMap(Map.of("form", "laser")));
+        assertTrue(e.getMessage().contains("unknown form"));
+        assertEquals("dots", Spark.Effects.fromJson("{\"attack\":[{\"form\":\"nope\"}]}").attack.get(0).form);
+    }
+
+    @Test
     void jsonRoundTripIsClamped() {
         Spark.Effects fx = new Spark.Effects();
         fx.attack.add(Spark.fromMap(Map.of("shape", "star", "moves", List.of("spin"))));

@@ -29,6 +29,13 @@ public final class Spark {
     /** Where an effect while held or worn sits. */
     public static final List<String> ANCHORS = List.of("item", "head", "body", "back", "feet", "around");
     public static final int MAX_DOTS = 96;
+    /**
+     * What the effect is drawn as: dots (the shape's dots), or one smooth piece: swipe (the glowing
+     * band a blade leaves), shockwave (a ring spreading over the ground), pillar (a column of light
+     * going up), beam (a ray going ahead), disc (a magic circle), ribbon (a band left behind along
+     * the path of what it follows: arrows, orbiting lights).
+     */
+    public static final List<String> FORMS = List.of("dots", "swipe", "shockwave", "pillar", "beam", "disc", "ribbon");
     /** What each dot looks like (cells of textures/misc/looks.png). */
     public static final List<String> LOOKS = List.of("dot", "glow", "star", "streak", "shard", "rune", "ember", "ring");
     /** Vanilla particles an effect may use instead of its own dots ("dust" takes the effect's colours). */
@@ -63,6 +70,12 @@ public final class Spark {
     public int ticks = 14;
     /** Held/worn and trails: ticks between new copies (0 = one copy that loops in place). */
     public int every = 0;
+    /** What it is drawn as (see {@link #FORMS}). */
+    public String form = "dots";
+    /** Swipe: how far round the blade's arc goes, in degrees. */
+    public double arc = 160;
+    /** Swipe, shockwave, pillar, beam, ribbon: how thick, as a part of the size (0.05-1). */
+    public double width = 0.4;
     /** How each dot looks (see {@link #LOOKS}). */
     public String look = "dot";
     /** A vanilla particle drawn instead of the dots ("" = our own dots; see {@link #PARTICLES}). */
@@ -183,6 +196,9 @@ public final class Spark {
         color &= 0xFFFFFF;
         color2 = color2 < 0 ? -1 : color2 & 0xFFFFFF;
         look = look != null && LOOKS.contains(look) ? look : "dot";
+        form = form != null && FORMS.contains(form) ? form : "dots";
+        arc = clamp(arc, 30, 330);
+        width = clamp(width, 0.05, 1);
         particle = particle != null && PARTICLES.contains(particle) ? particle : "";
         if (colors != null) {
             int n = Math.min(4, colors.length);
@@ -246,6 +262,9 @@ public final class Spark {
                 case "fill" -> s.fill = Boolean.TRUE.equals(v) || "true".equals(String.valueOf(v));
                 case "lines" -> s.lines = Boolean.TRUE.equals(v) || "true".equals(String.valueOf(v));
                 case "look" -> s.look = word(v, LOOKS, "look");
+                case "form" -> s.form = word(v, FORMS, "form");
+                case "arc" -> s.arc = num(v, key);
+                case "width", "thickness" -> s.width = num(v, key);
                 case "particle" -> {
                     String p = String.valueOf(v).trim().toLowerCase(Locale.ROOT).replace("minecraft:", "");
                     s.particle = word(p, PARTICLES, "particle");
@@ -301,7 +320,7 @@ public final class Spark {
                     s.shape = "points";
                 }
                 default -> throw new IllegalArgumentException("unknown effect setting '" + key + "'; use shape, color, color2, "
-                    + "colors, size, count, dot, look, particle, vary, gravity, drag, turbulence, plane, start, anchor, moves, speed, "
+                    + "colors, size, count, dot, look, form, arc, width, particle, vary, gravity, drag, turbulence, plane, start, anchor, moves, speed, "
                     + "ticks, every, fill, lines, points, sound, volume, pitch");
             }
         }

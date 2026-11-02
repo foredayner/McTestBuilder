@@ -265,6 +265,38 @@ public class AibClientGameTest implements FabricClientGameTest {
             });
             context.waitTicks(8);
             context.takeScreenshot("34b_spark_looks");
+            // Smooth pieces: a blade's swipe, a shockwave, a column of light, a magic circle and an orbiting ribbon.
+            context.waitTicks(60);
+            context.runOnClient(client -> {
+                var p = client.player;
+                var look = p.getRotationVec(1.0F);
+                var flat = new net.minecraft.util.math.Vec3d(look.x, 0, look.z).normalize();
+                var side = new net.minecraft.util.math.Vec3d(-flat.z, 0, flat.x);
+                java.util.function.Function<java.util.Map<String, Object>, String> one = m ->
+                    "[" + com.example.ai.build.Spark.fromMap(m).toJson() + "]";
+                com.example.client.SparkRenderer.play(one.apply(java.util.Map.of("form", "swipe", "colors",
+                    List.of("#ffffff", "#ffc040", "#ff3000"), "size", 1.4, "arc", 170, "width", 0.45, "plane", "side", "ticks", 30)),
+                    p.getEyePos().add(flat.multiply(2.5)).add(0, -0.5, 0), side, 1);
+                com.example.client.SparkRenderer.play(one.apply(java.util.Map.of("form", "shockwave", "color", "#a0e0ff",
+                    "size", 2.4, "width", 0.3, "ticks", 40)), p.getPos().add(flat.multiply(3)), flat, 1);
+                com.example.client.SparkRenderer.play(one.apply(java.util.Map.of("form", "pillar", "colors",
+                    List.of("#ffffff", "#ffe080"), "size", 0.8, "width", 0.3, "ticks", 60)),
+                    p.getPos().add(flat.multiply(4)).add(side.multiply(2)), flat, 1);
+                com.example.client.SparkRenderer.play(one.apply(java.util.Map.of("form", "disc", "colors",
+                    List.of("#e0b0ff", "#7020ff"), "size", 1.3, "plane", "flat", "moves", List.of("spin"), "speed", 0.2, "ticks", 60)),
+                    p.getPos().add(flat.multiply(3.5)).add(side.multiply(-2)).add(0, 0.05, 0), flat, 1);
+                com.example.client.SparkRenderer.attachForTests(p, one.apply(java.util.Map.of("form", "ribbon", "colors",
+                    List.of("#ffffff", "#40c0ff"), "size", 0.35, "width", 0.6, "moves", List.of("orbit"), "speed", 0.6, "ticks", 14)),
+                    "body");
+            });
+            context.waitTicks(10);
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
+            context.waitTicks(4);
+            context.takeScreenshot("34c_spark_forms");
+            context.runOnClient(client -> {
+                com.example.client.SparkRenderer.clearForTests();
+                client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON);
+            });
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
 
             // A bow with its own arrow shape: in the hand, and one of its arrows hanging in the air.

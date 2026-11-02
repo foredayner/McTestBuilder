@@ -42,6 +42,9 @@ public final class SparkRenderer {
     /** The dot looks side by side (dot, glow, star, streak, shard, rune, ember, ring). */
     private static final Identifier TEXTURE = Identifier.of(AiBuildAssistantMod.MOD_ID, "textures/misc/looks.png");
     private static final int LOOK_CELLS = 8;
+    /** Smooth pieces: blade band, ground ring, light column, magic circle (cells of forms.png). */
+    private static final Identifier FORMS = Identifier.of(AiBuildAssistantMod.MOD_ID, "textures/misc/forms.png");
+    private static final int FORM_CELLS = 4;
     private static final int MAX_EFFECTS = 160;
     private static final int MAX_DOTS_PER_FRAME = 9000;
     private static final double RANGE = 48;
@@ -64,6 +67,8 @@ public final class SparkRenderer {
         int emitted;
         double emitAcc;
         double lastAge = -1;
+        /** Ribbon: where it has been ({x, y, z, time}), newest last. */
+        final java.util.ArrayDeque<double[]> path = new java.util.ArrayDeque<>();
 
         Effect(Spark spark, Vec3d origin, Vec3d dir, double scale, double start, Entity follow, String anchor) {
             this(spark, origin, dir, scale, start, follow, anchor, false);
@@ -183,7 +188,7 @@ public final class SparkRenderer {
     }
 
     private static void emitOrFollow(Entity entity, Spark s, String anchor, String key, long time, double now) {
-        if (s.every > 0) {
+        if (s.every > 0 && !"ribbon".equals(s.form)) { // a ribbon is one band that follows, never copies
             if ((time + entity.getId()) % s.every == 0) {
                 // Arrows leave theirs behind as a trail; on a wearer or a held item it moves along with them.
                 Entity follow = entity instanceof AibArrowEntity ? null : entity;
@@ -335,6 +340,7 @@ public final class SparkRenderer {
         VertexConsumer buffer = immediate.getBuffer(layer);
         int budget = MAX_DOTS_PER_FRAME;
         particlesThisFrame = 0;
+        List<Object[]> forms = new ArrayList<>(); // smooth pieces, drawn after the dots with their own texture
         for (Iterator<Effect> it = EFFECTS.iterator(); it.hasNext(); ) {
             Effect e = it.next();
             Spark s = e.spark;
@@ -361,12 +367,207 @@ public final class SparkRenderer {
             if (!s.particle.isEmpty() && emitParticles(client, e, t, age / 20.0, loops)) {
                 continue;
             }
+            if (!"dots".equals(s.form)) {
+                if ("ribbon".equals(s.form)) {
+                    remember(e, now, age / 20.0);
+                }
+                forms.add(new Object[] { e, t, age / 20.0, loops, now });
+                continue;
+            }
             budget -= draw(buffer, e, t, age / 20.0, cam, camRight, camUp, budget, loops);
             if (budget <= 0) {
                 break;
             }
         }
         immediate.draw(layer);
+        if (!forms.isEmpty()) {
+            RenderLayer formLayer = RenderLayer.getEntityTranslucentEmissive(FORMS);
+            VertexConsumer formBuffer = immediate.getBuffer(formLayer);
+            for (Object[] f : forms) {
+                drawForm(formBuffer, (Effect) f[0], (double) f[1], (double) f[2], (boolean) f[3], (double) f[4], cam);
+            }
+            immediate.draw(formLayer);
+        }
+    }
+
+    // ------------------------------------------------------------------ smooth pieces
+
+    /** Ribbon: add where it is now to its path (when it has moved) and forget what is too old. */
+    private static void remember(Effect e, double now, double seconds) {
+        double[] last = e.path.peekLast();
+        Vec3d o = centerOf(e, axes(e), seconds); // an orbiting ribbon follows its orbit
+        if (last == null || (o.x - last[0]) * (o.x - last[0]) + (o.y - last[1]) * (o.y - last[1]) + (o.z - last[2]) * (o.z - last[2]) > 0.0025) {
+            e.path.addLast(new double[] { o.x, o.y, o.z, now });
+        }
+        while (!e.path.isEmpty() && (now - e.path.peekFirst()[3] > e.spark.ticks || e.path.size() > 64)) {
+            e.path.pollFirst();
+        }
+    }
+
+    private static double sizeAt(Effect e, double t, double seconds) {
+        Spark s = e.spark;
+        double size = s.size * e.scale;
+        if (s.moves.contains("expand")) {
+            size *= 1 + 1.6 * t;
+        }
+        if (s.moves.contains("shrink")) {
+            size *= 1 - 0.9 * t;
+        }
+        if (s.moves.contains("pulse")) {
+            size *= 1 + 0.18 * Math.sin(seconds * Math.PI * 2 * Math.max(0.5, s.speed));
+        }
+        return size;
+    }
+
+    private static double smooth(double edge0, double edge1, double x) {
+        double k = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+        return k * k * (3 - 2 * k);
+    }
+
+    /** One smooth piece: a blade band, a ground ring, a light column or ray, a magic circle or a ribbon. */
+    private static void drawForm(VertexConsumer b, Effect e, double t, double seconds, boolean loops, double now, Vec3d cam) {
+        Spark s = e.spark;
+        Axes ax = axes(e);
+        Vec3d c = centerOf(e, ax, seconds);
+        double size = sizeAt(e, t, seconds);
+        // Smooth pieces fade out at the end of their life rather than vanish at once.
+        float alpha = loops ? 1 : (float) (s.moves.contains("fade") ? 1 - t * t : 1 - smooth(0.65, 1, t));
+        if (s.moves.contains("flicker")) {
+            alpha *= 0.5F + 0.5F * (float) Math.abs(Math.sin(seconds * 23));
+        }
+        int rgb = colorAt(s, t);
+        double spin = s.moves.contains("spin") ? seconds * Math.PI * 2 * s.speed : 0;
+        Vec3d u = ax.u(), v = ax.v();
+        if (spin != 0) {
+            Vec3d nu = u.multiply(Math.cos(spin)).add(v.multiply(Math.sin(spin)));
+            Vec3d nv = v.multiply(Math.cos(spin)).subtract(u.multiply(Math.sin(spin)));
+            u = nu;
+            v = nv;
+        }
+        switch (s.form) {
+            case "swipe" -> {
+                // The band a blade leaves: it sweeps along the arc quickly, then the tail catches up.
+                double head = Math.min(1, t / 0.3), tail = Math.max(0, (t - 0.2) / 0.8);
+                double span = Math.toRadians(s.arc);
+                int k = 28;
+                for (int i = 0; i < k; i++) {
+                    double s0 = tail + (head - tail) * i / k, s1 = tail + (head - tail) * (i + 1) / k;
+                    Vec3d[] q0 = swipeEdge(c, u, v, size, span, s0, s.width);
+                    Vec3d[] q1 = swipeEdge(c, u, v, size, span, s1, s.width);
+                    // Brightest at the head (where the blade is), clear at the tail.
+                    float a0 = alpha * (float) Math.pow((double) i / k, 0.7), a1 = alpha * (float) Math.pow((double) (i + 1) / k, 0.7);
+                    face(b, cam, q0[0], q1[0], q1[1], q0[1], 0, a0, a1, a1, a0, rgb, (float) s0, (float) s1);
+                }
+            }
+            case "shockwave" -> {
+                // A ring spreading out over the ground, thinning as it goes.
+                double eased = 1 - Math.pow(1 - Math.min(1, t), 3);
+                double outer = size * (0.15 + eased);
+                double inner = Math.max(0, outer - size * s.width * (1 - 0.6 * t));
+                ring(b, cam, c.add(0, 0.03, 0), ax.flatRight(), ax.flatForward(), inner, outer, 1, rgb, alpha * (float) (1 - 0.5 * t));
+            }
+            case "disc" -> {
+                // A magic circle, turning when it spins.
+                Vec3d p0 = c.add(u.multiply(-size)).add(v.multiply(-size)), p1 = c.add(u.multiply(size)).add(v.multiply(-size));
+                Vec3d p2 = c.add(u.multiply(size)).add(v.multiply(size)), p3 = c.add(u.multiply(-size)).add(v.multiply(size));
+                int argb = argb(alpha, rgb);
+                quadUv(b, cam, p0, p1, p2, p3, 3, 0, 1, 1, 0, argb, argb, argb, argb);
+            }
+            case "pillar", "beam" -> {
+                // A column of light up from the ground, or a ray ahead; it shoots out quickly.
+                Vec3d axis = "pillar".equals(s.form) ? new Vec3d(0, 1, 0) : ax.d();
+                double length = size * 4 * Math.min(1, t * 5 + (loops ? 1 : 0));
+                Vec3d end = c.add(axis.multiply(length));
+                double half = size * s.width * 0.6;
+                beam(b, cam, c, end, half, half * 0.6, argb(alpha, rgb), argb(alpha * 0.25F, rgb));
+            }
+            case "ribbon" -> {
+                // A band through where it has been: wide and bright at the newest end, thin and clear at the oldest.
+                double[] prev = null;
+                double half = size * s.width * 0.5;
+                for (double[] p : e.path) {
+                    if (prev != null) {
+                        float f0 = (float) Math.max(0, 1 - (now - prev[3]) / s.ticks), f1 = (float) Math.max(0, 1 - (now - p[3]) / s.ticks);
+                        beam(b, cam, new Vec3d(prev[0], prev[1], prev[2]), new Vec3d(p[0], p[1], p[2]), half * f0, half * f1,
+                            argb(alpha * f0, colorAt(s, 1 - f0)), argb(alpha * f1, colorAt(s, 1 - f1)));
+                    }
+                    prev = p;
+                }
+            }
+            default -> {
+            }
+        }
+    }
+
+    /** The outer and inner edge of the swipe at a point along its arc (thick in the middle, thin at the tips). */
+    private static Vec3d[] swipeEdge(Vec3d c, Vec3d u, Vec3d v, double size, double span, double along, double width) {
+        double a = Math.PI / 2 - span / 2 + span * along;
+        double thick = Math.min(0.95, width * 1.4 * Math.sin(Math.PI * along) + 0.04);
+        double cos = Math.cos(a), sin = Math.sin(a) * 0.55;
+        Vec3d outer = c.add(u.multiply(cos * size)).add(v.multiply(sin * size));
+        Vec3d inner = c.add(u.multiply(cos * size * (1 - thick))).add(v.multiply(sin * size * (1 - thick)));
+        return new Vec3d[] { outer, inner };
+    }
+
+    /** A flat ring between two radii (texture across it: outer edge v = 0). */
+    private static void ring(VertexConsumer b, Vec3d cam, Vec3d c, Vec3d x, Vec3d z, double inner, double outer, int cell, int rgb, float alpha) {
+        int n = 48;
+        int argb = argb(alpha, rgb);
+        for (int i = 0; i < n; i++) {
+            double a0 = Math.PI * 2 * i / n, a1 = Math.PI * 2 * (i + 1) / n;
+            Vec3d d0 = x.multiply(Math.cos(a0)).add(z.multiply(Math.sin(a0))), d1 = x.multiply(Math.cos(a1)).add(z.multiply(Math.sin(a1)));
+            quadUv(b, cam, c.add(d0.multiply(outer)), c.add(d1.multiply(outer)), c.add(d1.multiply(inner)), c.add(d0.multiply(inner)),
+                cell, (float) i / n, (float) (i + 1) / n, 0, 1, argb, argb, argb, argb);
+        }
+    }
+
+    /** A band of light from one point to another, always turned to face the camera (texture across its width). */
+    private static void beam(VertexConsumer b, Vec3d cam, Vec3d from, Vec3d to, double halfFrom, double halfTo, int argbFrom, int argbTo) {
+        Vec3d axis = to.subtract(from);
+        if (axis.lengthSquared() < 1e-8) {
+            return;
+        }
+        Vec3d mid = from.add(to).multiply(0.5);
+        Vec3d side = axis.crossProduct(mid.subtract(cam));
+        if (side.lengthSquared() < 1e-8) {
+            return;
+        }
+        side = side.normalize();
+        quadUv(b, cam, from.add(side.multiply(halfFrom)), from.subtract(side.multiply(halfFrom)), to.subtract(side.multiply(halfTo)),
+            to.add(side.multiply(halfTo)), 2, 1, 0, 1, 0, argbFrom, argbFrom, argbTo, argbTo);
+    }
+
+    /** A swipe segment: outer edge v = 0, inner edge v = 1, alpha per corner. */
+    private static void face(VertexConsumer b, Vec3d cam, Vec3d o0, Vec3d o1, Vec3d i1, Vec3d i0, int cell, float ao0, float ao1, float ai1,
+                             float ai0, int rgb, float s0, float s1) {
+        quadUv(b, cam, o0, o1, i1, i0, cell, s0, s1, 0, 1, argb(ao0, rgb), argb(ao1, rgb), argb(ai1, rgb), argb(ai0, rgb));
+    }
+
+    private static int argb(float alpha, int rgb) {
+        return ((int) (Math.max(0, Math.min(1, alpha)) * 255) << 24) | (rgb & 0xFFFFFF);
+    }
+
+    /**
+     * A quad p0 p1 p2 p3 in a forms.png cell: u from uA (p0, p3) to uB (p1, p2) inside the cell, v from
+     * vA (p0, p1) to vB (p2, p3). Drawn from both sides.
+     */
+    private static void quadUv(VertexConsumer b, Vec3d cam, Vec3d p0, Vec3d p1, Vec3d p2, Vec3d p3, int cell, float uA, float uB, float vA,
+                               float vB, int c0, int c1, int c2, int c3) {
+        float base = cell / (float) FORM_CELLS, w = 1F / FORM_CELLS;
+        float ua = base + w * Math.max(0, Math.min(1, uA)), ub = base + w * Math.max(0, Math.min(1, uB));
+        vert(b, cam, p0, ua, vA, c0);
+        vert(b, cam, p1, ub, vA, c1);
+        vert(b, cam, p2, ub, vB, c2);
+        vert(b, cam, p3, ua, vB, c3);
+        vert(b, cam, p3, ua, vB, c3);
+        vert(b, cam, p2, ub, vB, c2);
+        vert(b, cam, p1, ub, vA, c1);
+        vert(b, cam, p0, ua, vA, c0);
+    }
+
+    private static void vert(VertexConsumer b, Vec3d cam, Vec3d p, float u, float v, int argb) {
+        b.vertex((float) (p.x - cam.x), (float) (p.y - cam.y), (float) (p.z - cam.z)).color(argb).texture(u, v)
+            .overlay(OverlayTexture.DEFAULT_UV).light(0xF000F0).normal(0, 1, 0);
     }
 
     /** The axes an effect is drawn in this frame: its shape plane (u, v, w) and its direction. */
@@ -411,22 +612,10 @@ public final class SparkRenderer {
         return k < 1e-3 ? 0.5 * g * seconds * seconds : g * (seconds / k - (1 - Math.exp(-k * seconds)) / (k * k));
     }
 
-    /** Where dot i is at this time (world). */
-    private static Vec3d dotPos(Effect e, Axes ax, int i, int n, double[] p, double seconds, double t) {
+    /** Where the middle of the effect is at this time: it may go forward, back, up or down, or orbit. */
+    private static Vec3d centerOf(Effect e, Axes ax, double seconds) {
         Spark s = e.spark;
         List<String> m = s.moves;
-        double size = s.size * e.scale;
-        if (m.contains("expand")) {
-            size *= 1 + 1.6 * t;
-        }
-        if (m.contains("shrink")) {
-            size *= 1 - 0.9 * t;
-        }
-        if (m.contains("pulse")) {
-            size *= 1 + 0.18 * Math.sin(seconds * Math.PI * 2 * Math.max(0.5, s.speed));
-        }
-        double spin = m.contains("spin") ? seconds * Math.PI * 2 * s.speed : 0;
-        double cos = Math.cos(spin), sin = Math.sin(spin);
         Vec3d center = e.origin;
         double travel = travel(s, seconds);
         if (m.contains("forward")) {
@@ -445,6 +634,27 @@ public final class SparkRenderer {
             double a = seconds * Math.PI * 2 * Math.max(0.2, s.speed);
             center = center.add(ax.flatRight().multiply(Math.cos(a) * 0.6 * e.scale)).add(ax.flatForward().multiply(Math.sin(a) * 0.6 * e.scale));
         }
+        return center;
+    }
+
+    /** Where dot i is at this time (world). */
+    private static Vec3d dotPos(Effect e, Axes ax, int i, int n, double[] p, double seconds, double t) {
+        Spark s = e.spark;
+        List<String> m = s.moves;
+        double size = s.size * e.scale;
+        if (m.contains("expand")) {
+            size *= 1 + 1.6 * t;
+        }
+        if (m.contains("shrink")) {
+            size *= 1 - 0.9 * t;
+        }
+        if (m.contains("pulse")) {
+            size *= 1 + 0.18 * Math.sin(seconds * Math.PI * 2 * Math.max(0.5, s.speed));
+        }
+        double spin = m.contains("spin") ? seconds * Math.PI * 2 * s.speed : 0;
+        double cos = Math.cos(spin), sin = Math.sin(spin);
+        Vec3d center = centerOf(e, ax, seconds);
+        double travel = travel(s, seconds);
         double pu = p[0] * cos - p[1] * sin;
         double pv = p[0] * sin + p[1] * cos;
         double pw = p[2];
@@ -664,6 +874,23 @@ public final class SparkRenderer {
         int g = (int) MathHelper.lerp(t, (a >> 8) & 255, (b >> 8) & 255);
         int bl = (int) MathHelper.lerp(t, a & 255, b & 255);
         return (r << 16) | (g << 8) | bl;
+    }
+
+    /** Tests: an effect that follows an entity and loops (like one on equipment), e.g. an orbiting ribbon. */
+    public static void attachForTests(Entity entity, String json, String anchor) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.world == null) {
+            return;
+        }
+        for (Spark s : Spark.listFromJson(json)) {
+            add(new Effect(s, anchorPos(entity, anchor, 1.0F), dirOf(entity, anchor, 1.0F), 1, now(client), entity, anchor));
+        }
+    }
+
+    /** Tests: stop every effect. */
+    public static void clearForTests() {
+        EFFECTS.clear();
+        FOLLOWING.clear();
     }
 
     /** Tests: how many effects are being drawn. */

@@ -759,6 +759,18 @@ public class AiController {
                   color: '#rrggbb'      color2: '#rrggbb' (colour it turns into over its life)
                   colors: ['#ffffff', '#ffd040', '#ff4010', '#401010']  (2-4 stops over its life, e.g. fire: white -> yellow
                          -> red -> dark; ice: white -> light blue -> blue; overrides color/color2)
+                  form: what it is drawn as: 'dots' (the shape's dots, the default) or one smooth glowing piece:
+                         'swipe'     the band a blade leaves along its swing (attack; plane 'side' for a sideways cut,
+                                     'front' for an overhead one; arc: degrees round, 120-200; width: 0.2-0.6)
+                         'shockwave' a ring spreading over the ground (attack with start 'ground' or 'target'; width)
+                         'pillar'    a column of light shooting up (start 'target' or 'ground'; width: 0.1-0.4)
+                         'beam'      a ray shooting ahead from the start (width)
+                         'disc'      a glowing magic circle (plane 'flat' on the ground; moves ['spin'] to turn it)
+                         'ribbon'    a band left behind along the path (bow 'trail', or 'idle' with moves ['orbit'];
+                                     width; ticks = how long the band is)
+                         Smooth pieces take color/colors, size, plane, start/anchor, moves (expand, spin, fade, rise...)
+                         and ticks; count, dot, look and particle are for dots. Combine a smooth piece with dots
+                         (a swipe + sparks flying off it, a shockwave + dust, a pillar + rising embers).
                   look: what each dot looks like: 'dot' (round), 'glow' (big soft light), 'star' (twinkling 4-point
                          star), 'streak' (stretched along its motion: sparks, rain, speed lines), 'shard' (spinning
                          crystal or glass chip), 'rune' (spinning magic glyph), 'ember' (bright core, faint halo), 'ring'
@@ -789,10 +801,10 @@ public class AiController {
                   every: idle and trail: ticks between new copies (0 = one copy that stays and loops, e.g. a ring
                          orbiting the item)
             Examples:
-              // a fire slash: a glowing arc, sparks thrown off it that fall, and real flames
-              ai.effect('attack', [shape: 'slash', look: 'glow', colors: ['#ffffff', '#ffc040', '#ff3000'], size: 1.3,
-                                   count: 48, plane: 'side', start: 'weapon', moves: ['reveal', 'fade'], ticks: 9,
-                                   sound: 'entity.blaze.shoot', volume: 0.6])
+              // a fire slash: the blade's glowing band, sparks thrown off it that fall, and real flames
+              ai.effect('attack', [form: 'swipe', colors: ['#ffffff', '#ffc040', '#ff3000'], size: 1.4, arc: 170,
+                                   width: 0.45, plane: 'side', start: 'weapon', ticks: 9, sound: 'entity.blaze.shoot',
+                                   volume: 0.6])
               ai.effect('attack', [shape: 'slash', look: 'streak', colors: ['#ffffa0', '#ff6000'], size: 1.3, count: 40,
                                    plane: 'side', start: 'weapon', moves: ['scatter', 'fade'], speed: 4, gravity: 5,
                                    drag: 0.3, vary: 0.6, ticks: 16])
@@ -802,8 +814,12 @@ public class AiController {
                                    start: 'weapon', moves: ['forward', 'pulse', 'fade'], speed: 7, ticks: 16])
               ai.effect('attack', [shape: 'slash', color: '#bfe8ff', color2: '#3060ff', size: 1.3, count: 64,
                                    plane: 'side', start: 'weapon', moves: ['reveal', 'fade'], ticks: 8])
-              ai.effect('attack', [shape: 'magic_circle', color: '#b44cff', size: 1.5, count: 80, plane: 'flat',
-                                   start: 'ground', moves: ['spin', 'expand', 'fade'], speed: 0.5, ticks: 30])
+              ai.effect('attack', [form: 'disc', colors: ['#e0b0ff', '#7020ff'], size: 1.5, plane: 'flat',
+                                   start: 'ground', moves: ['spin', 'fade'], speed: 0.4, ticks: 30])
+              ai.effect('attack', [form: 'pillar', colors: ['#ffffff', '#ffe080'], size: 0.8, width: 0.3,
+                                   start: 'target', ticks: 14, sound: 'block.beacon.activate'])
+              ai.effect('attack', [form: 'shockwave', color: '#a0e0ff', size: 2.2, width: 0.25, start: 'ground',
+                                   ticks: 14])
               ai.effect('idle', [shape: 'burst', look: 'ember', colors: ['#fff0a0', '#ff8020', '#602010'], size: 0.3,
                                  count: 8, anchor: 'item', moves: ['rise', 'fade'], speed: 0.6, turbulence: 0.5, vary: 0.5,
                                  ticks: 24, every: 6])
@@ -811,6 +827,7 @@ public class AiController {
                                  ticks: 40])
               ai.effect('idle', [shape: 'ring', color: '#9ff', size: 0.35, count: 24, plane: 'flat', anchor: 'head',
                                  moves: ['spin', 'pulse'], speed: 0.4, ticks: 40])
+              ai.effect('trail', [form: 'ribbon', colors: ['#ffffff', '#40c0ff'], size: 0.4, width: 0.5, ticks: 12])
               ai.effect('trail', [shape: 'star', color: '#ffd84a', size: 0.15, count: 12, moves: ['shrink', 'fade'],
                                   ticks: 10, every: 1])
 
