@@ -118,11 +118,11 @@ public class AiController {
         """;
 
     public static final String EXAMPLE_PIXEL_WINGS = """
-        // pixel art angel wings: one 12 x 8 wing behind the back, mirrored to the other side
+        // pixel art angel wings: one 12 x 8 wing on the upper back, mirrored to the other side
         def p = [O: '#9aa7b8', W: '#ffffff', w: '#dfe7f2']
         ai.mirrorOn()
         ai.pixelArt(p, ['..........OO', '.......OOOWO', '....OOOWWWWO', '..OOWWWWWwWO',
-                        '.OWWWwWWWwO.', 'OWWwWWWwOO..', 'OWwWWOOO....', '.OOOO.......'], 0.5, -0.55, 0.2, 0.0625, -20, 0, 0)
+                        '.OWWWwWWWwO.', 'OWWwWWWwOO..', 'OWwWWOOO....', '.OOOO.......'], 0.5, -0.4, 0.2, 0.0625, -20, 0, 0)
         ai.mirrorOff()
         """;
 
