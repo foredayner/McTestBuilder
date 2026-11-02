@@ -132,6 +132,28 @@ public final class AiScriptFacade {
         return MinecraftAI.isBlockAllowed(blockName);
     }
 
+    public void pixelArt(java.util.Map<?, ?> palette, java.util.List<?> rows) {
+        MinecraftAI.pixelArt(palette, rows);
+    }
+
+    public void pixelArt(java.util.Map<?, ?> palette, java.util.List<?> rows, Number x, Number y, Number z) {
+        MinecraftAI.pixelArt(palette, rows, x, y, z);
+    }
+
+    public void pixelArt(java.util.Map<?, ?> palette, java.util.List<?> rows, Number x, Number y, Number z, Number pixelSize) {
+        MinecraftAI.pixelArt(palette, rows, x, y, z, pixelSize);
+    }
+
+    public void pixelArt(java.util.Map<?, ?> palette, java.util.List<?> rows, Number x, Number y, Number z, Number pixelSize,
+                         Number yaw, Number pitch, Number roll) {
+        MinecraftAI.pixelArt(palette, rows, x, y, z, pixelSize, yaw, pitch, roll);
+    }
+
+    public void pixelBox(java.util.Map<?, ?> palette, Number x, Number y, Number z, Number sx, Number sy, Number sz,
+                         java.util.Map<?, ?> faces) {
+        MinecraftAI.pixelBox(palette, x, y, z, sx, sy, sz, faces);
+    }
+
     public void addPart(String blockName, Number x, Number y, Number z, Number sx, Number sy, Number sz) {
         MinecraftAI.addPart(blockName, x, y, z, sx, sy, sz);
     }

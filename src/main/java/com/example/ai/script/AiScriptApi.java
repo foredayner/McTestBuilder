@@ -46,7 +46,9 @@ public final class AiScriptApi {
         "arrowStart",
         "arrowEnd",
         "effect",
-        "preset"
+        "preset",
+        "pixelArt",
+        "pixelBox"
     );
 
     private AiScriptApi() {

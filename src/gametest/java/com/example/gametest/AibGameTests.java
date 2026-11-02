@@ -361,6 +361,30 @@ public class AibGameTests implements FabricGameTest {
         context.complete();
     }
 
+    /** The pixel art examples pass the review and fit their kind (the AI copies their style). */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void pixelArtExamplesFitTheirKinds(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        String[][] cases = {
+            { com.example.ai.AiController.EXAMPLE_PIXEL_SWORD, "sword" },
+            { com.example.ai.AiController.EXAMPLE_PIXEL_STAFF, "staff" },
+            { com.example.ai.AiController.EXAMPLE_PIXEL_HELMET, "helmet" },
+            { com.example.ai.AiController.EXAMPLE_PIXEL_WINGS, "back" },
+            { com.example.ai.AiController.EXAMPLE_PIXEL_PANTS, "pants" } };
+        for (String[] c : cases) {
+            BuildPlan plan = Demo.plan(world, origin, player, c[0], true);
+            check(!plan.parts.isEmpty() && plan.parts.size() <= BuildPlan.MAX_PARTS, c[1] + ": " + plan.parts.size() + " pieces");
+            String problem = com.example.ai.AiController.gearProblem(plan, com.example.content.GearKind.of(c[1]));
+            check(problem == null, c[1] + ": " + problem);
+        }
+        check(com.example.ai.AiController.pixelOf("gear:sword:pixel") && !com.example.ai.AiController.pixelOf("gear:sword"), "pixel mode");
+        check(com.example.ai.AiController.gearPrompt("검", com.example.content.GearKind.SWORD, "", "", true).system().contains("ai.pixelArt"),
+            "the pixel order gets the pixel art guide");
+        context.complete();
+    }
+
     /** The shared 보관함 and 작업 일지: kept with the world, one journal entry per request. */
     @GameTest(templateName = EMPTY_STRUCTURE)
     public void sharedHistoryAndJournal(TestContext context) {

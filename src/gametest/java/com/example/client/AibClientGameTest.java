@@ -412,6 +412,37 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
             context.waitTicks(5);
             context.takeScreenshot("22_worn_back");
+            // The same in pixel art: a knight helmet, jeans and angel wings, and a pixel sword in the hand.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                var world = player.getServerWorld();
+                var origin = player.getBlockPos();
+                String[][] worn = {
+                    { com.example.ai.AiController.EXAMPLE_PIXEL_HELMET, "helmet" },
+                    { com.example.ai.AiController.EXAMPLE_PIXEL_WINGS, "back" },
+                    { com.example.ai.AiController.EXAMPLE_PIXEL_PANTS, "pants" },
+                    { com.example.ai.AiController.EXAMPLE_PIXEL_SWORD, "sword" } };
+                for (String[] w : worn) {
+                    BuildRecord r = BuildRecord.create("pixel " + w[1], "TEST", "script", Demo.plan(world, origin, player, w[0], true));
+                    r.kind = "gear";
+                    r.gear = w[1];
+                    var stack = com.example.ai.build.GearItems.stackFor(r);
+                    switch (w[1]) {
+                        case "helmet" -> player.equipStack(net.minecraft.entity.EquipmentSlot.HEAD, stack);
+                        case "back" -> player.equipStack(net.minecraft.entity.EquipmentSlot.CHEST, stack);
+                        case "pants" -> player.equipStack(net.minecraft.entity.EquipmentSlot.LEGS, stack);
+                        default -> player.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, stack);
+                    }
+                }
+            });
+            context.waitTicks(10);
+            context.takeScreenshot("22q_pixel_worn_back");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
+            context.waitTicks(5);
+            context.takeScreenshot("22p_pixel_worn_front");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
+            context.waitTicks(40);
+            context.takeScreenshot("22r_pixel_sword_first_person");
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT));
             // A beanie and a big balloon (asked to be big: it goes past the usual size) above the head.
             game.getServer().runOnServer(server -> {

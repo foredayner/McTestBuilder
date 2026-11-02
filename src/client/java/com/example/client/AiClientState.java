@@ -179,6 +179,18 @@ public final class AiClientState {
         return gearKind;
     }
 
+    /** Equipment: "모양: 픽셀" (pixel art) instead of block pieces. */
+    private static boolean pixel = false;
+
+    public static boolean isPixel() {
+        return pixel;
+    }
+
+    public static void togglePixel() {
+        pixel = !pixel;
+        refreshOpenScreen(true);
+    }
+
     /** Swords: the attack motion picked in the order ("" = normal swing). */
     private static String motion = "";
 
@@ -341,6 +353,9 @@ public final class AiClientState {
         }
 
         String flag = mode == 1 ? "--object " : mode == 2 ? "--gear=" + gearKind.id() + " " : "";
+        if (mode == 2 && pixel) {
+            flag += "--pixel ";
+        }
         if (mode == 2 && gearKind == com.example.content.GearKind.SWORD && !motion.isEmpty()) {
             flag += "--motion=" + motion + " ";
         }

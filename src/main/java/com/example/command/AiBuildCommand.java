@@ -39,6 +39,7 @@ public class AiBuildCommand {
         boolean useWebSearch = webFlag;
         String mode = "build";
         String motion = "";
+        boolean pixel = false;
         while (true) {
             if (prompt.startsWith("--web ")) {
                 useWebSearch = true;
@@ -46,6 +47,9 @@ public class AiBuildCommand {
             } else if (prompt.startsWith("--object ")) {
                 mode = "object";
                 prompt = prompt.substring(9).trim();
+            } else if (prompt.startsWith("--pixel ")) {
+                pixel = true;
+                prompt = prompt.substring(8).trim();
             } else if (prompt.startsWith("--motion=") && prompt.indexOf(' ') > 0) {
                 motion = prompt.substring(9, prompt.indexOf(' '));
                 prompt = prompt.substring(prompt.indexOf(' ') + 1).trim();
@@ -55,6 +59,9 @@ public class AiBuildCommand {
             } else {
                 break;
             }
+        }
+        if (pixel && mode.startsWith("gear:")) {
+            mode += ":pixel"; // 모양: 픽셀 (pixel art)
         }
         // Equipment effect fields ride after the request: "<request>||hit:<text>||idle:<text>".
         String fxHit = "";

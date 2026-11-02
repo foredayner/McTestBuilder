@@ -700,6 +700,48 @@ public class MinecraftAI {
         }
     }
 
+    // Pixel art (equipment): pictures drawn as rows of palette letters, made of pieces.
+
+    public static void pixelArt(java.util.Map<?, ?> palette, List<?> rows) {
+        pixelArt(palette, rows, 0, 0, 0, 1.0 / 16, 0, 0, 0);
+    }
+
+    public static void pixelArt(java.util.Map<?, ?> palette, List<?> rows, Number x, Number y, Number z) {
+        pixelArt(palette, rows, x, y, z, 1.0 / 16, 0, 0, 0);
+    }
+
+    public static void pixelArt(java.util.Map<?, ?> palette, List<?> rows, Number x, Number y, Number z, Number pixelSize) {
+        pixelArt(palette, rows, x, y, z, pixelSize, 0, 0, 0);
+    }
+
+    /**
+     * A flat picture one pixel thick, like a vanilla item: in the X-Y plane facing -Z, its
+     * bottom-centre at (x, y, z), turned around that point by yaw, pitch and roll (degrees).
+     */
+    public static void pixelArt(java.util.Map<?, ?> palette, List<?> rows, Number x, Number y, Number z, Number pixelSize,
+                                Number yaw, Number pitch, Number roll) {
+        double p = toDouble(pixelSize);
+        if (!(p > 0.005 && p <= 1)) {
+            throw new IllegalArgumentException("pixelArt pixelSize must be 0.005-1 blocks (default 0.0625), got " + p);
+        }
+        double a = toDouble(yaw), b = toDouble(pitch), c = toDouble(roll);
+        for (com.example.ai.build.PixelArt.Piece piece : com.example.ai.build.PixelArt.sprite(palette, rows, p)) {
+            double[] at = com.example.ai.build.PixelArt.turn(new double[] { piece.cx(), piece.cy(), piece.cz() }, a, b, c);
+            addPart(piece.material(), toDouble(x) + at[0] - piece.sx() / 2, toDouble(y) + at[1] - piece.sy() / 2,
+                toDouble(z) + at[2] - piece.sz() / 2, piece.sx(), piece.sy(), piece.sz(), a, b, c);
+        }
+    }
+
+    /** A box (min corner + size) with a picture on each face given ([front: rows, left: rows, ...]). */
+    public static void pixelBox(java.util.Map<?, ?> palette, Number x, Number y, Number z, Number sx, Number sy, Number sz,
+                                java.util.Map<?, ?> faces) {
+        for (com.example.ai.build.PixelArt.Piece piece : com.example.ai.build.PixelArt.box(palette, toDouble(x), toDouble(y),
+            toDouble(z), Math.abs(toDouble(sx)), Math.abs(toDouble(sy)), Math.abs(toDouble(sz)), faces)) {
+            addPart(piece.material(), piece.cx() - piece.sx() / 2, piece.cy() - piece.sy() / 2, piece.cz() - piece.sz() / 2,
+                piece.sx(), piece.sy(), piece.sz());
+        }
+    }
+
     /** Left-right mirror of a block state: facing=east <-> west. */
     static String mirrorBlockState(String block) {
         if (block == null || !block.contains("[")) {

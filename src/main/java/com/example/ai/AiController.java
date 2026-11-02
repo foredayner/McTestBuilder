@@ -37,8 +37,102 @@ public class AiController {
     }
 
     private static GearKind gearOf(String mode) {
-        return mode != null && mode.startsWith("gear:") ? GearKind.of(mode.substring(5)) : null;
+        if (mode == null || !mode.startsWith("gear:")) {
+            return null;
+        }
+        String kind = mode.substring(5);
+        return GearKind.of(kind.contains(":") ? kind.substring(0, kind.indexOf(':')) : kind);
     }
+
+    /** The order's "모양: 픽셀": draw the equipment as pixel art (the mode ends with ":pixel"). */
+    public static boolean pixelOf(String mode) {
+        return mode != null && mode.startsWith("gear:") && mode.endsWith(":pixel");
+    }
+
+    static final String PIXEL_API = """
+            PIXEL ART (this order asks for it: draw the equipment as pixel art, like a good resource pack, not blocky shapes):
+              ai.pixelArt(palette, rows)                                      // a flat picture, 1 pixel thick, like a vanilla item
+              ai.pixelArt(palette, rows, x, y, z)                             // its bottom-centre at (x, y, z)
+              ai.pixelArt(palette, rows, x, y, z, pixelSize)                  // blocks per pixel (default 0.0625 = 1/16)
+              ai.pixelArt(palette, rows, x, y, z, pixelSize, yaw, pitch, roll) // turned around its bottom-centre, degrees
+              ai.pixelBox(palette, x, y, z, sizeX, sizeY, sizeZ, faces)       // a box (min corner + size) with a picture on its faces
+            - palette: one letter per colour: [O: '#1e2430', L: '#e8eef5', S: '#b8c2cc', G: '#d4af37']; a see-through
+              colour like '#9fe3ff/50' is fine. '.' (and space) is an empty pixel.
+            - rows: equal-length strings, top row first: ['..O..', '.OLO.', ...]. At most 64 x 64.
+            - pixelArt lies in the X-Y plane and faces -Z (the viewer); its left column is at -X.
+            - pixelBox faces: [front: rows, back: rows, left: rows, right: rows, top: rows, bottom: rows]; leave out faces
+              nobody sees. Each picture is stretched over its face (8 x 8 on a 0.5 face = 1/16-block pixels) and is seen from
+              outside: front = the -Z side, left column at -X; back = +Z, left column at +X; left = the -X side, left column
+              at the back; right = the +X side, left column at the front; top seen from above with the front at the bottom
+              row; bottom seen from below with the front at the top row.
+            - ai.mirrorOn() also works on pictures (wings, horns, shoulder plates); groups, glow and animations too.
+            """;
+
+    static final String PIXEL_STYLE = """
+            PIXEL STYLE (this decides the quality):
+            - Draw like a resource-pack artist: a 1-pixel outline in a dark shade of the main colour (not pure black),
+              2-3 shades per material (light on the top-left, dark on the bottom-right), a few bright highlight pixels
+              and small accents (gems, runes, rivets, stitches). Clean, readable shapes; no noise.
+            - 3-6 colours, at most 16. Each run of same-coloured pixels becomes one piece: at most 400 pieces in all.
+            - Hand-held: draw it UPRIGHT (pointing up), the handle at the bottom centre, and place it with
+              ai.pixelArt(palette, rows, 0, -0.2, 0) so the hand holds the handle. 16-32 pixels tall for normal weapons
+              and tools (1-2 blocks), up to 48 for big ones; at most 24 wide. Make it bigger with pixelSize, not with
+              more pixels. A bow is held at its middle: its bottom-centre at y = -(height / 2).
+            - Worn: cover the body part with ai.pixelBox a little outside it (0.03), 8 x 8 pixels per head face, 8 x 12
+              for the torso front and back, 4 x 12 for its sides and for each leg face; add things that stick out (horns,
+              crests, plumes, wings, feathers, ears) with ai.pixelArt, turned with yaw so they face the right way
+              (yaw 90: the picture faces -X; yaw 180: +Z) and mirrored with mirrorOn().
+            - Use smooth shapes only where a picture cannot work, in the same flat colours.
+            """;
+
+    public static final String EXAMPLE_PIXEL_SWORD = """
+        // pixel art knight sword: 9 x 24 pixels, upright, handle at the bottom
+        def p = [O: '#1e2430', L: '#e8eef5', S: '#b8c2cc', D: '#7f8b97', G: '#d4af37', g: '#9c7a1c', B: '#6b4423', b: '#4a2e17']
+        ai.pixelArt(p, [
+          '....O....', '...OLO...', '...OLDO..',
+          '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..',
+          '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..',
+          'OGGGGGGGO', '.OgGGGgO.', '...OBO...', '...ObO...', '...OBO...', '...ObO...',
+          '..OGGGO..', '..OGgGO..', '...OOO...'], 0, -0.2, 0)
+        """;
+
+    public static final String EXAMPLE_PIXEL_STAFF = """
+        // pixel art magic staff: purple gem on a wooden shaft, 7 x 24 pixels, drawn a little bigger
+        def pal = [O: '#2a1a3a', P: '#9b59d0', p: '#6c3483', W: '#f5e6ff', G: '#d4af37', B: '#7a5230', b: '#5a3a20']
+        ai.pixelArt(pal, [
+          '..OOO..', '.OPWPO.', 'OPWPpPO', 'OPPppPO', '.OppPO.', '..OGO..',
+          '..OBO..', '..ObO..', '..OBO..', '..OBO..', '..ObO..', '..OBO..', '..OBO..', '..ObO..',
+          '..OBO..', '..OBO..', '..ObO..', '..OBO..', '..OBO..', '..ObO..', '..OBO..', '..OGO..',
+          '..OGO..', '...O...'], 0, -0.25, 0, 0.07)
+        """;
+
+    public static final String EXAMPLE_PIXEL_HELMET = """
+        // pixel art knight helmet: an 8 x 8 picture on each face of a box just outside the head, and a red plume
+        def p = [O: '#2b3038', I: '#c9d1d9', i: '#8d98a5', K: '#121417', R: '#c0392b', r: '#7b241c']
+        def side = ['OOOOOOOO', 'OIIIIIIO', 'OIIIIIIO', 'OIIiIIIO', 'OIIiIIIO', 'OIIIIIIO', 'OIiiiiIO', 'OOOOOOOO']
+        ai.pixelBox(p, -0.28, -0.02, -0.28, 0.56, 0.56, 0.56, [
+          front: ['OOOOOOOO', 'OIIIIIIO', 'OIiiiiIO', 'OKKKKKKO', 'OIIIIIIO', 'OIIiiIIO', 'OIIiiIIO', 'OOOOOOOO'],
+          back: side, left: side, right: side,
+          top: ['OOOOOOOO', 'OIIIIIIO', 'OIiIIiIO', 'OIiIIiIO', 'OIiIIiIO', 'OIiIIiIO', 'OIIIIIIO', 'OOOOOOOO']])
+        ai.pixelArt(p, ['..RRR', '.RRrR', 'RRrr.', 'Rrr..', '.Or..'], 0, 0.54, 0.05, 0.0625, 90, 0, 0)  // plume, side on
+        """;
+
+    public static final String EXAMPLE_PIXEL_WINGS = """
+        // pixel art angel wings: one 12 x 8 wing behind the back, mirrored to the other side
+        def p = [O: '#9aa7b8', W: '#ffffff', w: '#dfe7f2']
+        ai.mirrorOn()
+        ai.pixelArt(p, ['..........OO', '.......OOOWO', '....OOOWWWWO', '..OOWWWWWwWO',
+                        '.OWWWwWWWwO.', 'OWWwWWWwOO..', 'OWwWWOOO....', '.OOOO.......'], 0.5, -0.55, 0.2, 0.0625, -20, 0, 0)
+        ai.mirrorOff()
+        """;
+
+    public static final String EXAMPLE_PIXEL_PANTS = """
+        // pixel art jeans for ONE leg (copied to the other): a 4 x 12 picture on each side of a box around the leg
+        def p = [O: '#1f2f4a', B: '#3b5b8c', b: '#2c4870', L: '#4f74ad', K: '#6b4423', s: '#c8c8c8']
+        def leg = ['KKKK', 'BsBB', 'BBLB', 'BBLB', 'BbBB', 'BBBB', 'BBLB', 'BbBB', 'BBBB', 'BBLB', 'bbbb', 'OOOO']
+        ai.pixelBox(p, -0.155, -0.75, -0.155, 0.31, 0.77, 0.31, [front: leg, back: leg, left: leg, right: leg])
+        """;
+
 
     public static void requestBuild(ServerPlayerEntity player, String prompt) {
         requestBuild(player, prompt, false);
@@ -107,7 +201,7 @@ public class AiController {
 
             debug("[DEBUG] Building prompt...");
             AiPrompt promptText = withWebNote(gearOf(mode) != null
-                ? gearPrompt(prompt, gearOf(mode), hitText, idleText)
+                ? gearPrompt(prompt, gearOf(mode), hitText, idleText, pixelOf(mode))
                 : objectMode ? objectPrompt(prompt) : buildingPrompt(prompt, worldInfo, webSearch), webSearch);
 
             debug("[DEBUG] Sending to AI provider...");
@@ -303,7 +397,7 @@ public class AiController {
 
     public static AiPrompt promptFor(ServerPlayerEntity player, String userPrompt, String mode, String fxHit, String fxIdle) {
         if (gearOf(mode) != null) {
-            return gearPrompt(userPrompt, gearOf(mode), fxHit, fxIdle);
+            return gearPrompt(userPrompt, gearOf(mode), fxHit, fxIdle, pixelOf(mode));
         }
         boolean objectMode = "object".equals(mode);
         MinecraftAI.init(player.getServerWorld(), player.getBlockPos(), player.getYaw(), player.getPitch());
@@ -870,7 +964,12 @@ public class AiController {
     }
 
     public static AiPrompt gearPrompt(String userPrompt, GearKind kind, String fxHit, String fxIdle) {
-        AiPrompt base = gearPromptBase(userPrompt, kind);
+        return gearPrompt(userPrompt, kind, fxHit, fxIdle, false);
+    }
+
+    /** pixel: the order's "모양: 픽셀" (pixel art instead of block pieces). */
+    public static AiPrompt gearPrompt(String userPrompt, GearKind kind, String fxHit, String fxIdle, boolean pixel) {
+        AiPrompt base = gearPromptBase(userPrompt, kind, pixel);
         String hit = kind.worn() ? "none (worn equipment has no hit effect)" : blankToNone(fxHit);
         String hitLine = kind == GearKind.BOW ? "\nArrow effect (trail in flight and/or where it lands): " : "\nEffect on attack (swing): ";
         String effects = hitLine + hit + "\nEffect while " + (kind.worn() ? "worn" : "held")
@@ -882,13 +981,21 @@ public class AiController {
         return text == null || text.isBlank() ? "none" : text.trim();
     }
 
-    private static AiPrompt gearPromptBase(String userPrompt, GearKind kind) {
+    private static AiPrompt gearPromptBase(String userPrompt, GearKind kind, boolean pixel) {
         String shapes = OBJECT_SYSTEM.substring(OBJECT_SYSTEM.indexOf("SMOOTH SHAPES"), OBJECT_SYSTEM.indexOf("STYLE (this"));
+        String style = GEAR_STYLE;
+        if (pixel) {
+            shapes = PIXEL_API + "\n" + shapes;
+            style = PIXEL_STYLE;
+        }
         if (kind.worn()) {
             boolean legs = kind.slot == net.minecraft.entity.EquipmentSlot.LEGS || kind.slot == net.minecraft.entity.EquipmentSlot.FEET;
-            String system = legs
-                ? WEAR_SYSTEM.formatted(shapes, GEAR_STYLE, EXAMPLE_PANTS.strip(), EXAMPLE_SHOES.strip(), EXAMPLE_HAT.strip())
-                : WEAR_SYSTEM.formatted(shapes, GEAR_STYLE, EXAMPLE_HELMET.strip(), EXAMPLE_HAT.strip(), EXAMPLE_WINGS.strip());
+            String system = pixel
+                ? WEAR_SYSTEM.formatted(shapes, style, (legs ? EXAMPLE_PIXEL_PANTS : EXAMPLE_PIXEL_HELMET).strip(),
+                    EXAMPLE_PIXEL_WINGS.strip(), (legs ? EXAMPLE_PIXEL_HELMET : EXAMPLE_PIXEL_PANTS).strip())
+                : legs
+                ? WEAR_SYSTEM.formatted(shapes, style, EXAMPLE_PANTS.strip(), EXAMPLE_SHOES.strip(), EXAMPLE_HAT.strip())
+                : WEAR_SYSTEM.formatted(shapes, style, EXAMPLE_HELMET.strip(), EXAMPLE_HAT.strip(), EXAMPLE_WINGS.strip());
             String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "), worn on the "
                 + switch (kind.slot) {
                     case HEAD -> "HEAD";
@@ -900,7 +1007,9 @@ public class AiController {
                 + "\nRequest: " + userPrompt + "\nWrite the Groovy script for it now.";
             return new AiPrompt(system, user);
         }
-        String system = GEAR_SYSTEM.formatted(shapes, GEAR_STYLE, EXAMPLE_SWORD.strip(), EXAMPLE_AXE.strip());
+        String system = pixel
+            ? GEAR_SYSTEM.formatted(shapes, style, EXAMPLE_PIXEL_SWORD.strip(), EXAMPLE_PIXEL_STAFF.strip())
+            : GEAR_SYSTEM.formatted(shapes, style, EXAMPLE_SWORD.strip(), EXAMPLE_AXE.strip());
         String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "). Typical shape for this kind "
             + "(follow the request where it differs): " + kind.guide
             + "\nRequest: " + userPrompt + "\nWrite the Groovy script for it now.";

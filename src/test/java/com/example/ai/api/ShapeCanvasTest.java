@@ -37,6 +37,52 @@ class ShapeCanvasTest {
     }
 
     @Test
+    void seeThroughBoxesNeverOverlap() {
+        List<int[]> plus = List.of(new int[] { 1, 0, 0 }, new int[] { 0, 0, 1 }, new int[] { 1, 0, 1 }, new int[] { 2, 0, 1 }, new int[] { 1, 0, 2 });
+        List<int[]> boxes = ShapeCanvas.cover(plus, true);
+        int covered = 0;
+        for (int[] b : boxes) {
+            covered += (b[3] - b[0] + 1) * (b[4] - b[1] + 1) * (b[5] - b[2] + 1);
+        }
+        assertEquals(5, covered, "every cell is covered exactly once");
+        assertTrue(ShapeCanvas.seeThrough("#ffffff/50"));
+        assertTrue(ShapeCanvas.seeThrough("minecraft:light_blue_stained_glass"));
+        assertFalse(ShapeCanvas.seeThrough("#ffffff"));
+        assertFalse(ShapeCanvas.seeThrough("minecraft:stone"));
+        // A see-through ball: its boxes do not overlap, so it does not look thicker where they would.
+        BuildPlan ball = record(() -> MinecraftAI.addSphere("#eef2ff/50", 0, 0.5, 2, 0.45));
+        for (BuildPlan.Part p : ball.parts) {
+            assertEquals("#eef2ff/50", p.block);
+        }
+        for (int i = 0; i < ball.parts.size(); i++) {
+            for (int j = i + 1; j < ball.parts.size(); j++) {
+                BuildPlan.Part a = ball.parts.get(i), b = ball.parts.get(j);
+                double ox = Math.min(a.x + a.sx / 2, b.x + b.sx / 2) - Math.max(a.x - a.sx / 2, b.x - b.sx / 2);
+                double oy = Math.min(a.y + a.sy / 2, b.y + b.sy / 2) - Math.max(a.y - a.sy / 2, b.y - b.sy / 2);
+                double oz = Math.min(a.z + a.sz / 2, b.z + b.sz / 2) - Math.max(a.z - a.sz / 2, b.z - b.sz / 2);
+                assertFalse(ox > 1e-6 && oy > 1e-6 && oz > 1e-6, "pieces " + i + " and " + j + " overlap");
+            }
+        }
+    }
+
+    @Test
+    void pixelArtBecomesPieces() {
+        BuildPlan plan = new BuildPlan();
+        MinecraftAI.startRecording(plan, true);
+        try {
+            MinecraftAI.pixelArt(java.util.Map.of("A", "#ff0000", "B", "#0000ff/50"), List.of("AA.", "AB."), 0, -0.2, 0);
+        } finally {
+            MinecraftAI.stopRecording();
+        }
+        // "AA" + "A" is two runs of red (or one L cut in two), "B" one see-through piece.
+        assertTrue(plan.parts.size() >= 2 && plan.parts.size() <= 3, "got " + plan.parts.size());
+        assertTrue(plan.parts.stream().anyMatch(p -> p.block.equals("#0000ff/50")));
+        double low = plan.parts.stream().mapToDouble(p -> p.y - p.sy / 2).min().orElse(0);
+        assertEquals(-0.2, low, 1e-9, "its bottom is at the given y");
+        assertThrows(IllegalArgumentException.class, () -> MinecraftAI.pixelArt(java.util.Map.of("A", "#ff0000"), List.of("AA", "A")));
+    }
+
+    @Test
     void equipmentUsesTheFinerGrid() {
         BuildPlan plan = new BuildPlan();
         MinecraftAI.startRecording(plan, true);

@@ -227,19 +227,23 @@ public class AiPromptScreen extends Screen {
         boolean gear = AiClientState.isGearMode();
         button(gear ? "모드: 장비" : object ? "모드: 소품" : "모드: 건물", right() - 84, top(), 84, b -> AiClientState.cycleMode());
         if (gear) {
-            // Choose the kind of equipment first, then describe it.
+            // Choose the kind of equipment first, then describe it. Buttons line up from the right.
             com.example.content.GearKind kind = AiClientState.getGearKind();
-            button("   종류: " + kind.korean, right() - 84 - 92, top(), 88, b -> AiClientState.cycleGearKind());
-            this.icons.add(new IconAt(new ItemStack(kind.icon), right() - 84 - 89, top() + 1));
-            int sx = right() - 84 - 92 - 80;
+            int bx = right() - 84 - 4 - 88;
+            button("   종류: " + kind.korean, bx, top(), 88, b -> AiClientState.cycleGearKind());
+            this.icons.add(new IconAt(new ItemStack(kind.icon), bx + 3, top() + 1));
+            // Pixel art (like a resource pack) or pieces of blocks and colours.
+            bx -= 4 + 72;
+            button(AiClientState.isPixel() ? "모양: 픽셀" : "모양: 블록", bx, top(), 72, b -> AiClientState.togglePixel());
             if (kind == com.example.content.GearKind.SWORD) {
                 // Swords only: how the attack swing looks.
-                button("모션: " + com.example.content.GearMotions.korean(AiClientState.getMotion()), right() - 84 - 92 - 96, top(), 92,
+                bx -= 4 + 88;
+                button("모션: " + com.example.content.GearMotions.korean(AiClientState.getMotion()), bx, top(), 88,
                     b -> AiClientState.cycleMotion());
-                sx -= 96 - 80 + 80;
             }
             // This player's own choice: big hits shake the view.
-            button(com.example.config.AiBuilderConfig.get().screenShake ? "흔들림: 켬" : "흔들림: 끔", sx, top(), 76, b -> {
+            bx -= 4 + 72;
+            button(com.example.config.AiBuilderConfig.get().screenShake ? "흔들림: 켬" : "흔들림: 끔", bx, top(), 72, b -> {
                 com.example.config.AiBuilderConfig.get().screenShake = !com.example.config.AiBuilderConfig.get().screenShake;
                 com.example.config.AiBuilderConfig.save();
                 rebuild();
@@ -327,7 +331,10 @@ public class AiPromptScreen extends Screen {
         boolean gear = AiClientState.isGearMode();
         String header = gear ? "종류를 고르고 원하는 장비를 이야기해 주세요"
             : object ? "원하는 소품을 이야기해 주세요" : "원하는 건물을 이야기해 주세요";
-        ctx.drawText(this.textRenderer, ellipsize(header, right() - left() - (gear ? 190 : 96)), left() + 2, top() + 5, INK_SOFT, false);
+        if (!gear) {
+            // In 장비 mode the order's buttons take the whole row.
+            ctx.drawText(this.textRenderer, ellipsize(header, right() - left() - 96), left() + 2, top() + 5, INK_SOFT, false);
+        }
 
         int l = left(), r = right(), t = chatTop(), b = chatBottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);

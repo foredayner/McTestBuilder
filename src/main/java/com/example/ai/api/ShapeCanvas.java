@@ -182,7 +182,7 @@ public final class ShapeCanvas {
                     mine.add(new int[] { kx(k), ky(k), kz(k) });
                 }
             }
-            for (int[] box : cover(mine)) {
+            for (int[] box : cover(mine, seeThrough(blocks.get(id)))) {
                 double w = (box[3] - box[0] + 1.0) / res, h = (box[4] - box[1] + 1.0) / res, l = (box[5] - box[2] + 1.0) / res;
                 parts.add(new BuildPlan.Part(blocks.get(id),
                     box[0] / (double) res + w / 2, box[1] / (double) res + h / 2, box[2] / (double) res + l / 2,
@@ -217,6 +217,23 @@ public final class ShapeCanvas {
      * overlap cannot be seen), which needs far fewer boxes than cutting the set into pieces.
      */
     static List<int[]> cover(List<int[]> cells) {
+        return cover(cells, false);
+    }
+
+    /**
+     * See-through materials (pale colours, glass, ice, slime, honey): there, overlapping boxes
+     * would show as darker layers, so their boxes must not overlap.
+     */
+    static boolean seeThrough(String block) {
+        if (com.example.ai.build.Paint.valid(block)) {
+            return com.example.ai.build.Paint.opacity(block) < 100;
+        }
+        return block != null && (block.contains("glass") || block.equals("minecraft:ice") || block.equals("minecraft:frosted_ice")
+            || block.equals("minecraft:slime_block") || block.equals("minecraft:honey_block"));
+    }
+
+    /** disjoint: boxes never overlap (for see-through materials); otherwise they may, which needs fewer. */
+    static List<int[]> cover(List<int[]> cells, boolean disjoint) {
         List<int[]> out = new ArrayList<>();
         if (cells.isEmpty()) {
             return out;
@@ -254,6 +271,9 @@ public final class ShapeCanvas {
                         for (int zz = z0; zz <= z1; zz++) {
                             for (int xx = x0; xx <= x1; xx++) {
                                 done[(yy * nz + zz) * nx + xx] = true;
+                                if (disjoint) {
+                                    full[(yy * nz + zz) * nx + xx] = false; // later boxes may not grow through it
+                                }
                             }
                         }
                     }

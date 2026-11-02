@@ -52,6 +52,8 @@ public final class WorkJournal {
         public String fxHit = "";
         public String fxIdle = "";
         public String motion = "";
+        /** Equipment ordered as pixel art. */
+        public boolean pixel;
         /** The AI that was asked (when the request was sent); empty in older entries. */
         public String provider = "";
         public String model = "";
@@ -62,7 +64,7 @@ public final class WorkJournal {
         /** "Jo님이 장비(검)를 요청했어요" */
         public String summary() {
             String what = switch (kind == null ? "" : kind) {
-                case "gear" -> "장비(" + com.example.content.GearKind.of(gear).korean + ")를";
+                case "gear" -> "장비(" + com.example.content.GearKind.of(gear).korean + (pixel ? ", 픽셀" : "") + ")를";
                 case "object" -> "소품을";
                 default -> "건물을";
             };
@@ -146,7 +148,9 @@ public final class WorkJournal {
         job.player = player.getName().getString();
         String m = mode == null ? "build" : mode;
         job.kind = m.startsWith("gear:") ? "gear" : "object".equals(m) ? "object" : "build";
-        job.gear = m.startsWith("gear:") ? m.substring(5) : "";
+        String gearPart = m.startsWith("gear:") ? m.substring(5) : "";
+        job.pixel = gearPart.endsWith(":pixel");
+        job.gear = gearPart.contains(":") ? gearPart.substring(0, gearPart.indexOf(':')) : gearPart;
         job.prompt = cut(prompt);
         job.fxHit = cut(fxHit);
         job.fxIdle = cut(fxIdle);
