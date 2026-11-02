@@ -68,7 +68,7 @@ public final class WearRenderer implements ArmorRenderer {
         matrices.push();
         bone.rotate(matrices);
         matrices.scale(xScale, -1.0F, 1.0F);
-        GearModelRenderer.draw(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCull(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)),
+        GearModelRenderer.draw(matrices, vertexConsumers, RenderLayer.getEntityCutoutNoCull(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE),
             model, light, OverlayTexture.DEFAULT_UV);
         GearModelRenderer.drawAura(matrices, vertexConsumers, model, OverlayTexture.DEFAULT_UV);
         matrices.pop();

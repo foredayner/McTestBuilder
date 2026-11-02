@@ -110,7 +110,8 @@ public final class ScriptLinter {
                 if (wall && WALL_DIRECTIONS.contains(value.toLowerCase(Locale.ROOT))) {
                     continue;
                 }
-                String problem = blockProblem(value);
+                String problem = com.example.ai.build.Paint.is(value)
+                    ? paintProblem(name, value) : blockProblem(value);
                 // On a wall with no valid direction, the unknown word is the bad direction, not a block.
                 if (problem != null && !missingDirection) {
                     problems.add("line " + line + ": " + problem);
@@ -127,6 +128,15 @@ public final class ScriptLinter {
         if (missingDirection) {
             problems.add("line " + line + ": placeWall needs a direction \"x\" or \"z\" (north/south = x, east/west = z).");
         }
+    }
+
+    /** Colours are for object and equipment pieces only, and must be '#rrggbb' or '#rrggbb/50'. */
+    static String paintProblem(String call, String value) {
+        if (call.startsWith("place") || "clearArea".equals(call)) {
+            return call + " places real blocks: a colour like \"" + value + "\" only works for object and equipment pieces "
+                + "(addPart, addSphere, ...). Use a block name here.";
+        }
+        return com.example.ai.build.Paint.parse(value) == null ? "\"" + value + "\" is not a colour: " + com.example.ai.build.Paint.HELP + "." : null;
     }
 
     /** Null if the block can be placed, otherwise why not. */

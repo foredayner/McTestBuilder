@@ -242,6 +242,9 @@ public final class BuildPreview {
     }
 
     private static int colorOf(String block) {
+        if (com.example.ai.build.Paint.valid(block)) {
+            return com.example.ai.build.Paint.argb(block);
+        }
         try {
             String id = block.contains("[") ? block.substring(0, block.indexOf('[')) : block;
             if (id.contains("glass")) {

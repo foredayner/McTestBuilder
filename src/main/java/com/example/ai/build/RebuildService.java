@@ -228,7 +228,7 @@ public final class RebuildService {
     }
 
     /** Only plain setblock/fill with sane coordinates, known modes and allowed blocks. */
-    static String validate(BuildPlan plan) {
+    public static String validate(BuildPlan plan) {
         if (plan.isEmpty()) {
             return "it has no blocks";
         }
@@ -236,7 +236,9 @@ public final class RebuildService {
             return "too many object parts (" + plan.parts.size() + ")";
         }
         for (BuildPlan.Part part : plan.parts) {
-            if (part.block == null || !BLOCK.matcher(part.block).matches()) {
+            if (Paint.valid(part.block)) {
+                // A painted piece: nothing to check but its size and place (below).
+            } else if (part.block == null || !BLOCK.matcher(part.block).matches()) {
                 return "bad block " + part.block;
             }
             String id = part.block.contains("[") ? part.block.substring(0, part.block.indexOf('[')) : part.block;

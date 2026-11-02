@@ -587,7 +587,7 @@ public class AiController {
             %s
             %s
             CODE RULES:
-            - Block names are quoted strings: 'iron_block'.
+            - Block names and colours are quoted strings: 'iron_block', '#c0392b'.
             - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
             - One flat script: never define methods or functions (no def name(...) { }, no classes); repeat code in loops.
             - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
@@ -686,7 +686,7 @@ public class AiController {
             %s
             %s
             CODE RULES:
-            - Block names are quoted strings: 'red_wool'.
+            - Block names and colours are quoted strings: 'red_wool', '#c0392b'.
             - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
             - One flat script: never define methods or functions (no def name(...) { }, no classes); repeat code in loops.
             - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).
@@ -974,6 +974,15 @@ public class AiController {
               ai.mirrorOn()    // until mirrorOff, every piece is also made on the other side of x = 0 (eyes, ears, arms, legs, wings)
               ai.mirrorOff()
             BLOCKS: ai.searchBlocks(keyword)
+            MATERIAL (the first argument of every piece): a block name, or a smooth colour:
+              'oak_planks', 'white_concrete'      // the block's texture (wood grain, stone, bricks, ore)
+              '#c0392b'                           // one smooth colour, no texture: a clean, modelled look
+              '#88ccff/50'                        // a see-through colour; opacity 25, 50 or 75 (percent)
+            - Colours look like a polished model instead of blocks: use them for smooth, stylised or toy-like things and
+              for exact shades (skin, fur, painted metal, plastic, cloth). Use blocks where the material's texture is the
+              point (wood, stone, bricks, ore). Mixing both in one thing is fine.
+            - See-through things (ghosts, spirits, slime, jelly, ice, crystal, glass, water, magic or energy blades): a pale
+              colour with /50 or /25, or glass, *_stained_glass, ice, slime_block or honey_block. Keep solid parts solid.
 
             STYLE (this decides the quality):
             - PLAN FIRST: before the code, write short // comments listing the thing's real parts with their real sizes
@@ -1000,7 +1009,7 @@ public class AiController {
             - Prefer a few smooth shapes over many tiny boxes. At most 400 pieces after merging.
 
             CODE RULES:
-            - Block names are quoted strings: 'white_concrete'.
+            - Block names and colours are quoted strings: 'white_concrete', '#c0392b'.
             - Loops: for (int i = 0; i < n; i++) or for (i in 0..<n). Never closures: no .each { }, .times { }, { -> }.
             - One flat script: never define methods or functions (no def name(...) { }, no classes); repeat code in loops.
             - No methods, classes or imports. Output Groovy only; no markdown, no explanation (short // comments are fine).

@@ -27,6 +27,26 @@ public final class Demo {
             + "ai.placeBlock(3, 2, 7, 'glass')\n"
             + "ai.placeBlock(-1, 0, 5, 'oak_stairs[facing=south]')\n";
 
+    /** Painted pieces: a see-through ghost with solid eyes, two smooth coloured boxes and a pale bubble. */
+    public static final String PAINTED = """
+        ai.addSphere('#eef2ff/50', 0, 1.0, 2.2, 0.45)
+        ai.addCone('#eef2ff/50', 0, 0.2, 2.2, 0.45, 0.35, 0.8)
+        ai.mirrorOn()
+        ai.addSphere('#1c1c2e', 0.16, 1.05, 1.8, 0.07)
+        ai.mirrorOff()
+        ai.addRoundBox('#e74c3c', 0.9, 0, 1.9, 0.5, 0.5, 0.5, 0.12)
+        ai.addRoundBox('#2e86de', -1.4, 0, 1.9, 0.5, 0.5, 0.5, 0.12)
+        ai.addSphere('#88ccff/25', -1.15, 0.85, 2.15, 0.22)
+        """;
+
+    /** A painted sword: smooth gold and leather, a see-through ice blade. */
+    public static final String PAINTED_SWORD = """
+        ai.addPart('#5a3a22', -0.04, -0.2, -0.04, 0.08, 0.3, 0.08)
+        ai.addSphere('#d4af37', 0, -0.22, 0, 0.05)
+        ai.addRoundBox('#d4af37', -0.18, 0.1, -0.05, 0.36, 0.07, 0.1, 0.03)
+        ai.addPart('#9fe3ff/50', -0.06, 0.17, -0.02, 0.12, 1.1, 0.04)
+        """;
+
     public static final String APPLE =
         "def cx = 1.5\n"
             + "def cz = 2.5\n"

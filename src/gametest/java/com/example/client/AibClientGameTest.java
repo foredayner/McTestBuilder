@@ -183,6 +183,23 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.waitTicks(5);
             context.takeScreenshot("20_sword_third_person");
 
+            // Painted pieces: a smooth gold sword with a see-through blade, and a painted ghost with coloured boxes.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                var world = p.getServerWorld();
+                BuildRecord painted = BuildRecord.create("얼음 칼날 검", "TEST", "script",
+                    Demo.plan(world, p.getBlockPos(), p, com.example.gametest.Demo.PAINTED_SWORD, true));
+                painted.kind = "gear";
+                painted.gear = "sword";
+                p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(painted));
+                Demo.place(p, p.getBlockPos(), Demo.plan(world, p.getBlockPos(), p, com.example.gametest.Demo.PAINTED), 0, "painted ghost");
+            });
+            context.waitTicks(40);
+            context.takeScreenshot("20p_painted_third_person");
+            context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
+            context.waitTicks(5);
+            context.takeScreenshot("20q_painted_first_person");
+
             // Swords ordered with attack motions, frozen at the wind-up and at the strike, in third and first person.
             for (String motion : List.of("thrust", "slash", "smash")) {
                 game.getServer().runOnServer(server -> {

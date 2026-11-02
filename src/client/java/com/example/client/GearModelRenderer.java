@@ -42,7 +42,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     /** A decoded model: parts with their textures, and its outline after the sword tilt. */
     public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn,
                         Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura, float reach, boolean bow, Model arrow,
-                        float length) {
+                        float length, int[] colors, boolean[] clear) {
     }
 
     /** First person, long weapons: extra tilt (degrees) and how far up the shaft it looks held (per block). */
@@ -152,7 +152,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         return model;
     }
 
-    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null, 0, false, null, 0);
+    private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null, 0, false, null, 0,
+        new int[0], new boolean[0]);
 
     private static Model decode(BuildPlan plan, boolean worn, boolean bow) {
         // A bow's arrow pieces are not part of the bow: they are the shape of the arrows it shoots.
@@ -169,7 +170,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
                 arrowSprites.add(spriteOf(p.block));
                 reach = (float) Math.max(reach, p.y + p.sy / 2);
             }
-            arrow = new Model(arrowParts, arrowSprites, new float[4], false, Map.of(), null, reach, false, null, reach);
+            arrow = new Model(arrowParts, arrowSprites, new float[4], false, Map.of(), null, reach, false, null, reach,
+                colorsOf(arrowParts), clearOf(arrowParts));
         }
         if (own.isEmpty()) {
             own = arrowParts; // only an arrow: show it
@@ -202,7 +204,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             }
         }
         return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims, plan.aura, reach, bow, arrow,
-            plan.parts.isEmpty() ? 0 : highY - lowY);
+            plan.parts.isEmpty() ? 0 : highY - lowY, colorsOf(plan.parts), clearOf(plan.parts));
     }
 
     private static BuildPlan copyWithParts(BuildPlan plan, List<BuildPlan.Part> parts) {
@@ -213,7 +215,46 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         return copy;
     }
 
+    /** Painted pieces: their colour (with opacity); block pieces draw their texture as it is. */
+    private static int[] colorsOf(List<BuildPlan.Part> parts) {
+        int[] out = new int[parts.size()];
+        for (int i = 0; i < out.length; i++) {
+            String b = parts.get(i).block;
+            out[i] = com.example.ai.build.Paint.valid(b) ? com.example.ai.build.Paint.argb(b) : 0xFFFFFFFF;
+        }
+        return out;
+    }
+
+    /** See-through pieces (a colour below full opacity, or glass, ice, slime, honey...): drawn translucent. */
+    private static boolean[] clearOf(List<BuildPlan.Part> parts) {
+        boolean[] out = new boolean[parts.size()];
+        for (int i = 0; i < out.length; i++) {
+            String b = parts.get(i).block;
+            if (com.example.ai.build.Paint.valid(b)) {
+                out[i] = com.example.ai.build.Paint.opacity(b) < 100;
+                continue;
+            }
+            try {
+                String id = b.contains("[") ? b.substring(0, b.indexOf('[')) : b;
+                Identifier parsed = Identifier.tryParse(id);
+                Block block = parsed == null ? null : Registries.BLOCK.get(parsed);
+                out[i] = block != null && net.minecraft.client.render.RenderLayers.getBlockLayer(block.getDefaultState())
+                    == net.minecraft.client.render.RenderLayer.getTranslucent();
+            } catch (RuntimeException exception) {
+                out[i] = false;
+            }
+        }
+        return out;
+    }
+
+    /** The white texture painted pieces are tinted from. */
+    private static final Identifier PAINT_SPRITE = Identifier.of(AiBuildAssistantMod.MOD_ID, "block/paint");
+
     private static Sprite spriteOf(String block) {
+        if (com.example.ai.build.Paint.valid(block)) {
+            return MinecraftClient.getInstance().getSpriteAtlas(net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)
+                .apply(PAINT_SPRITE);
+        }
         String id = block.contains("[") ? block.substring(0, block.indexOf('[')) : block;
         Identifier parsed = Identifier.tryParse(id);
         Block b = Registries.BLOCK.get(parsed == null ? Identifier.ofVanilla("stone") : parsed);
@@ -237,7 +278,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             matrices.translate(0.5F, 0.5F, 0.5F);
             matrices.scale(scale, scale, scale);
             matrices.translate(-(t[0] + t[2]) / 2, -(t[1] + t[3]) / 2, 0);
-            draw(matrices, vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout()), model, light, overlay);
+            draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), model, light, overlay);
             matrices.pop();
             return;
         }
@@ -265,7 +306,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             matrices.multiply(new Quaternionf().rotateZ((float) Math.toRadians(FIRST_PERSON_LONG_TILT)));
             matrices.translate(0, -(model.length() - 1.6F) * FIRST_PERSON_LONG_SLIDE, 0);
         }
-        draw(matrices, vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout()), model, light, overlay);
+        draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), model, light, overlay);
         if (mode != ModelTransformationMode.GUI && mode != ModelTransformationMode.FIXED) {
             drawAura(matrices, vertexConsumers, model, overlay);
         }
@@ -326,14 +367,39 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         matrices.pop();
     }
 
-    /** Every part of the model as a textured box, in the current matrix, moving parts at this moment. */
-    static void draw(MatrixStack matrices, VertexConsumer buffer, Model model, int light, int overlay) {
+    /**
+     * Every part of the model as a textured box, in the current matrix, moving parts at this
+     * moment: solid pieces in {@code solid}, see-through ones (pale colours, glass, ice...) after
+     * them in a translucent layer.
+     */
+    static void draw(MatrixStack matrices, VertexConsumerProvider vertexConsumers, net.minecraft.client.render.RenderLayer solid,
+                     Model model, int light, int overlay) {
+        draw(matrices, vertexConsumers.getBuffer(solid), model, light, overlay, false);
+        if (hasClear(model)) {
+            draw(matrices, vertexConsumers.getBuffer(net.minecraft.client.render.RenderLayer.getEntityTranslucent(
+                net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)), model, light, overlay, true);
+        }
+    }
+
+    private static boolean hasClear(Model model) {
+        for (boolean c : model.clear()) {
+            if (c) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void draw(MatrixStack matrices, VertexConsumer buffer, Model model, int light, int overlay, boolean clear) {
         double seconds = seconds();
         for (int i = 0; i < model.parts().size(); i++) {
+            if (model.clear()[i] != clear) {
+                continue;
+            }
             BuildPlan.Part part = model.parts().get(i);
             List<BuildPlan.Anim> anims = part.group == 0 ? null : model.anims().get(part.group);
             if (anims == null) {
-                box(matrices, buffer, part, model.sprites().get(i), light, overlay);
+                box(matrices, buffer, part, model.sprites().get(i), model.colors()[i], light, overlay);
                 continue;
             }
             matrices.push();
@@ -341,7 +407,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             for (BuildPlan.Anim a : anims) {
                 partLight = animate(matrices, a, seconds, partLight);
             }
-            box(matrices, buffer, part, model.sprites().get(i), partLight, overlay);
+            box(matrices, buffer, part, model.sprites().get(i), model.colors()[i], partLight, overlay);
             matrices.pop();
         }
     }
@@ -403,7 +469,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         { 0, 1, 5, 4, 0, -1, 0 },  // -y
     };
 
-    private static void box(MatrixStack matrices, VertexConsumer buffer, BuildPlan.Part p, Sprite sprite, int light, int overlay) {
+    private static void box(MatrixStack matrices, VertexConsumer buffer, BuildPlan.Part p, Sprite sprite, int color, int light,
+                            int overlay) {
         matrices.push();
         matrices.translate((float) p.x, (float) p.y, (float) p.z);
         matrices.multiply(new Quaternionf()
@@ -427,7 +494,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             float v1 = v0 + (sprite.getMaxV() - v0) * Math.min(1, h);
             float[][] uv = { { u0, v1 }, { u1, v1 }, { u1, v0 }, { u0, v0 } };
             for (int k = 0; k < 4; k++) {
-                buffer.vertex(e, corner[f[k]]).color(0xFFFFFFFF).texture(uv[k][0], uv[k][1]).overlay(overlay).light(light)
+                buffer.vertex(e, corner[f[k]]).color(color).texture(uv[k][0], uv[k][1]).overlay(overlay).light(light)
                     .normal(e, f[4], f[5], f[6]);
             }
         }

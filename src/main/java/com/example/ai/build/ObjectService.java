@@ -107,7 +107,9 @@ public final class ObjectService {
         ServerWorld world = player.getServerWorld();
         Box area = new Box(player.getBlockPos()).expand(NEARBY_RADIUS);
         Map<String, List<Entity>> groups = new LinkedHashMap<>();
-        for (Entity e : world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib"))) {
+        List<Entity> pieces = new ArrayList<>(world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains("aib")));
+        pieces.addAll(world.getEntitiesByType(EntityType.ITEM_DISPLAY, area, e -> e.getCommandTags().contains("aib"))); // painted pieces
+        for (Entity e : pieces) {
             String tag = objectTag(e);
             if (tag != null) {
                 groups.computeIfAbsent(tag, k -> new ArrayList<>()).add(e);

@@ -659,6 +659,9 @@ public class MinecraftAI {
     }
 
     public static boolean isBlockAllowed(String blockName) {
+        if (com.example.ai.build.Paint.is(blockName)) {
+            return com.example.ai.build.Paint.parse(blockName) != null;
+        }
         return BlockCatalog.isAllowed(blockName);
     }
 
@@ -683,7 +686,7 @@ public class MinecraftAI {
         double w = Math.abs(toDouble(sx));
         double h = Math.abs(toDouble(sy));
         double l = Math.abs(toDouble(sz));
-        String block = normalizeBlockId(blockName);
+        String block = pieceMaterial(blockName);
         double cx = toDouble(x) + w / 2;
         BuildPlan.Part part = new BuildPlan.Part(block, cx, toDouble(y) + h / 2, toDouble(z) + l / 2, w, h, l,
             toDouble(yaw), toDouble(pitch), toDouble(roll));
@@ -717,7 +720,19 @@ public class MinecraftAI {
         if (recorder == null || canvas == null || blockName == null || ForbiddenBlockRegistry.isForbidden(blockName)) {
             return;
         }
-        canvas.add(normalizeBlockId(blockName), shape, mirrorX, group, mirrorX != null && group != 0 ? mirrorGroup() : 0);
+        canvas.add(pieceMaterial(blockName), shape, mirrorX, group, mirrorX != null && group != 0 ? mirrorGroup() : 0);
+    }
+
+    /** What an object or equipment piece is made of: a block id, or a colour ('#rrggbb', see-through '#rrggbb/50'). */
+    private static String pieceMaterial(String blockName) {
+        if (com.example.ai.build.Paint.is(blockName)) {
+            String paint = com.example.ai.build.Paint.parse(blockName);
+            if (paint == null) {
+                throw new IllegalArgumentException("\"" + blockName + "\" is not a colour: " + com.example.ai.build.Paint.HELP);
+            }
+            return paint;
+        }
+        return normalizeBlockId(blockName);
     }
 
     /** Upright cylinder: centre (cx, cz), bottom at y. */
@@ -833,7 +848,8 @@ public class MinecraftAI {
             .rotateX((float) Math.toRadians(part.pitch))
             .rotateZ((float) Math.toRadians(part.roll));
         Vector3f half = q.transform(new Vector3f((float) part.sx / 2, (float) part.sy / 2, (float) part.sz / 2));
-        String block = rotateBlockState(part.block, turns);
+        boolean paint = com.example.ai.build.Paint.valid(part.block);
+        String block = paint ? part.block : rotateBlockState(part.block, turns);
         // The game hides a display entity when its culling box (width x height, standing on the
         // entity position) is off screen; the default box is empty, so a big part would vanish
         // as soon as its centre left the screen. Stand the entity at the bottom of a box that
@@ -843,6 +859,18 @@ public class MinecraftAI {
         double base = Math.min(part.y, Math.max(part.y - r, floor));
         double drop = part.y - base;
         double boxH = part.y + r - base;
+        if (paint) {
+            // A painted piece: an item display of a white cube dyed in its colour (the item's
+            // texture carries the opacity). Its model is centred on the entity, not cornered.
+            return String.format(Locale.ROOT,
+                "summon minecraft:item_display %.4f %.4f %.4f {item:{id:\"%s\",count:1,components:{\"minecraft:dyed_color\":{rgb:%d}}},"
+                    + "transformation:{left_rotation:[%.6ff,%.6ff,%.6ff,%.6ff],"
+                    + "right_rotation:[0f,0f,0f,1f],translation:[0f,%.4ff,0f],scale:[%.4ff,%.4ff,%.4ff]},"
+                    + "width:%.4ff,height:%.4ff,Tags:[\"aib\",\"%s\"]}",
+                at.getX() + cx, at.getY() + base, at.getZ() + cz, com.example.ai.build.Paint.itemId(part.block),
+                com.example.ai.build.Paint.rgb(part.block),
+                q.x, q.y, q.z, q.w, drop, part.sx, part.sy, part.sz, 2 * r, boxH, tag);
+        }
         return String.format(Locale.ROOT,
             "summon minecraft:block_display %.4f %.4f %.4f {block_state:%s,transformation:{left_rotation:[%.6ff,%.6ff,%.6ff,%.6ff],"
                 + "right_rotation:[0f,0f,0f,1f],translation:[%.4ff,%.4ff,%.4ff],scale:[%.4ff,%.4ff,%.4ff]},"

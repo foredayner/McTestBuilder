@@ -19,5 +19,9 @@
   "item.minecraft-ai-build-assistant.gear_chestplate": "AI 갑옷",
   "item.minecraft-ai-build-assistant.gear_back": "AI 등 장식",
   "item.minecraft-ai-build-assistant.gear_pants": "AI 바지",
-  "item.minecraft-ai-build-assistant.gear_shoes": "AI 신발"
+  "item.minecraft-ai-build-assistant.gear_shoes": "AI 신발",
+  "item.minecraft-ai-build-assistant.paint": "AI 색칠 조각",
+  "item.minecraft-ai-build-assistant.paint_75": "AI 색칠 조각 (75%)",
+  "item.minecraft-ai-build-assistant.paint_50": "AI 색칠 조각 (50%)",
+  "item.minecraft-ai-build-assistant.paint_25": "AI 색칠 조각 (25%)"
 }

@@ -56,7 +56,7 @@ public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, A
         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(state.pitch));
         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-90.0F));
         matrices.translate(0, -state.arrow.reach() * 0.6F, 0);
-        GearModelRenderer.draw(matrices, vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout()), state.arrow, light,
+        GearModelRenderer.draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), state.arrow, light,
             OverlayTexture.DEFAULT_UV);
         matrices.pop();
     }

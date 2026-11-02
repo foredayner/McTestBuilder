@@ -119,6 +119,38 @@ public class AibGameTests implements FabricGameTest {
         });
     }
 
+    /** Painted pieces are item displays of a dyed cube (see-through ones a paler item); colours are for pieces only. */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void paintedPiecesAreDyedItemDisplays(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(3, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        BuildPlan plan = Demo.plan(world, origin, player, Demo.PAINTED);
+        check(plan.parts.stream().allMatch(p -> com.example.ai.build.Paint.valid(p.block)), "every piece is a stored colour");
+        check(plan.parts.stream().anyMatch(p -> p.block.equals("#eef2ff/50")), "the ghost keeps its opacity");
+        check(com.example.ai.build.RebuildService.validate(plan) == null, "a painted design can be placed again from the 보관함");
+        BuildRecord record = Demo.place(player, origin, plan, 1, "painted");
+        String tag = "aib_" + record.id;
+        Box area = new Box(origin).expand(8);
+        var shown = world.getEntitiesByType(EntityType.ITEM_DISPLAY, area, e -> e.getCommandTags().contains(tag));
+        check(shown.size() == plan.parts.size(), plan.parts.size() + " painted pieces, got " + shown.size());
+        java.util.List<net.minecraft.nbt.NbtCompound> items = shown.stream()
+            .map(e -> e.writeNbt(new net.minecraft.nbt.NbtCompound()).getCompound("item")).toList();
+        check(items.stream().anyMatch(i -> "minecraft-ai-build-assistant:paint_50".equals(i.getString("id"))),
+            "see-through pieces show the 50% item: " + items.get(0));
+        check(items.stream().anyMatch(i -> {
+            net.minecraft.nbt.NbtCompound c = i.getCompound("components");
+            int rgb = c.contains("minecraft:dyed_color", net.minecraft.nbt.NbtElement.COMPOUND_TYPE)
+                ? c.getCompound("minecraft:dyed_color").getInt("rgb") : c.getInt("minecraft:dyed_color");
+            return rgb == 0xe74c3c;
+        }), "pieces are dyed in their colour: " + items.get(0));
+        check(com.example.ai.build.ObjectService.nearby(player).stream().anyMatch(o -> o.tag.equals(tag)), "nearby finds painted objects");
+        check(!com.example.ai.script.ScriptLinter.lint("ai.placeBlock('#ff0000', 0, 0, 2)").isEmpty(), "real blocks cannot be colours");
+        check(!com.example.ai.script.ScriptLinter.lint("ai.addPart('#ff00', 0, 0, 2, 1, 1, 1)").isEmpty(), "a bad colour is reported");
+        check(com.example.ai.script.ScriptLinter.lint("ai.addPart('#ff0000/50', 0, 0, 2, 1, 1, 1)").isEmpty(), "a good colour passes");
+        context.complete();
+    }
+
     @GameTest(templateName = EMPTY_STRUCTURE)
     public void objectsCanBePlacedBigger(TestContext context) {
         ServerWorld world = context.getWorld();
