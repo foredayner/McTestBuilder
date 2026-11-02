@@ -81,7 +81,27 @@ public final class GearEffects {
         net.minecraft.util.hit.EntityHitResult aimed = net.minecraft.entity.projectile.ProjectileUtil.raycast(player, eye,
             eye.add(look.multiply(reach)), player.getBoundingBox().stretch(look.multiply(reach)).expand(1.0),
             e -> e instanceof LivingEntity && !e.isSpectator() && e.canHit(), reach * reach);
-        return play(world, player, fx.attack, aimed == null ? null : aimed.getEntity(), look, sizeFor(stack));
+        return play(world, player, fx.attack, aimed == null ? null : aimed.getEntity(), look, sizeFor(stack),
+            swingTicks(player, stack));
+    }
+
+    /**
+     * How long the swing takes (ticks): the attack effects start when it is done. The normal
+     * swing is 6 ticks (faster with Haste, slower with Mining Fatigue); an ordered sword motion
+     * finishes its strike at about the same point of its own clock.
+     */
+    public static int swingTicks(LivingEntity wielder, ItemStack stack) {
+        if (!com.example.content.GearMotions.of(stack).isEmpty()) {
+            return 6;
+        }
+        if (net.minecraft.entity.effect.StatusEffectUtil.hasHaste(wielder)) {
+            return Math.max(1, 6 - (1 + net.minecraft.entity.effect.StatusEffectUtil.getHasteAmplifier(wielder)));
+        }
+        net.minecraft.entity.effect.StatusEffectInstance fatigue = wielder.getStatusEffect(net.minecraft.entity.effect.StatusEffects.MINING_FATIGUE);
+        if (fatigue != null) {
+            return Math.min(30, 6 + (1 + fatigue.getAmplifier()) * 2);
+        }
+        return 6;
     }
 
     /** A mob hit {@code target} with an AI weapon (players get theirs when they swing). */
@@ -90,7 +110,8 @@ public final class GearEffects {
             return 0;
         }
         Spark.Effects fx = of(stack);
-        return fx.attack.isEmpty() ? 0 : play(world, attacker, fx.attack, target, attacker.getRotationVec(1.0F), sizeFor(stack));
+        return fx.attack.isEmpty() ? 0 : play(world, attacker, fx.attack, target, attacker.getRotationVec(1.0F), sizeFor(stack),
+            swingTicks(attacker, stack));
     }
 
     /** An arrow from an AI bow landed at {@code at}: the bow's attack effects play there. */
@@ -111,7 +132,8 @@ public final class GearEffects {
     }
 
     /** Where each effect starts: at the weapon, on the target, on the ground under it, above it, or on the wielder. */
-    private static int play(ServerWorld world, LivingEntity wielder, List<Spark> sparks, Entity target, Vec3d look, double scale) {
+    private static int play(ServerWorld world, LivingEntity wielder, List<Spark> sparks, Entity target, Vec3d look, double scale,
+                            int lead) {
         Vec3d eye = wielder.getEyePos();
         Vec3d flat = new Vec3d(look.x, 0, look.z);
         flat = flat.lengthSquared() < 1e-6 ? new Vec3d(0, 0, 1) : flat.normalize();
@@ -129,7 +151,12 @@ public final class GearEffects {
                 case "self" -> wielder.getPos().add(0, wielder.getHeight() * 0.5, 0);
                 default -> eye.add(0, -0.35, 0).add(look.multiply(1.2));
             };
-            send(world, o, look, s, scale, viewers);
+            Spark late = s;
+            if (lead > 0) {
+                late = Spark.fromJson(s.toJson());
+                late.lead = lead;
+            }
+            send(world, o, look, late, scale, viewers);
         }
         return sparks.size();
     }

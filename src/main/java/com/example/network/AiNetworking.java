@@ -44,12 +44,32 @@ public final class AiNetworking {
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.RemoveObjectC2SPayload.ID, AiNetworkPayloads.RemoveObjectC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.NearbyRequestC2SPayload.ID, AiNetworkPayloads.NearbyRequestC2SPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.NearbyObjectsS2CPayload.ID, AiNetworkPayloads.NearbyObjectsS2CPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.HistoryS2CPayload.ID, AiNetworkPayloads.HistoryS2CPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.HistoryDeleteC2SPayload.ID, AiNetworkPayloads.HistoryDeleteC2SPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.JournalS2CPayload.ID, AiNetworkPayloads.JournalS2CPayload.CODEC);
     }
 
     public static void registerServerReceivers() {
         // Everyone learns what the server's AI is when they join (for the web search button and the settings tab).
-        net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
-            sendServerInfo(handler.player));
+        net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            sendServerInfo(handler.player);
+            // Everyone's designs and the shared 작업 일지.
+            sendHistoryTo(handler.player);
+            com.example.ai.WorkJournal.sendAllTo(handler.player);
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.HistoryDeleteC2SPayload.ID, (payload, context) -> {
+            context.server().execute(() -> {
+                if (allowed(context.player()) && com.example.ai.build.SharedHistory.delete(context.server(), payload.id())) {
+                    byte[] id = payload.id().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    for (ServerPlayerEntity p : context.server().getPlayerManager().getPlayerList()) {
+                        if (ServerPlayNetworking.canSend(p, AiNetworkPayloads.HistoryS2CPayload.ID)) {
+                            ServerPlayNetworking.send(p, new AiNetworkPayloads.HistoryS2CPayload(AiNetworkPayloads.HistoryS2CPayload.REMOVE, id));
+                        }
+                    }
+                }
+            });
+        });
 
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.ApprovalAcceptC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> {
@@ -212,6 +232,7 @@ public final class AiNetworking {
         if (debugOnly && !AiBuilderConfig.get().debugLogEnabled) {
             return;
         }
+        com.example.ai.WorkJournal.log(player, message);
 
         runOnServerThread(player, () -> {
             if (player.networkHandler != null) {
@@ -228,12 +249,36 @@ public final class AiNetworking {
         });
     }
 
+    /**
+     * A finished design: kept with the world, sent to the player who asked for it (their own
+     * 보관함 and its "added" note) and to everyone else (the shared 보관함).
+     */
     public static void sendBuildComplete(ServerPlayerEntity player, BuildRecord record) {
         runOnServerThread(player, () -> {
+            if (record.owner == null || record.owner.isEmpty()) {
+                record.owner = player.getName().getString();
+            }
+            com.example.ai.build.SharedHistory.save(player.getServer(), record);
+            byte[] data = record.toGzip();
             if (player.networkHandler != null) {
-                ServerPlayNetworking.send(player, new AiNetworkPayloads.BuildCompleteS2CPayload(record.toGzip()));
+                ServerPlayNetworking.send(player, new AiNetworkPayloads.BuildCompleteS2CPayload(data));
+            }
+            for (ServerPlayerEntity p : player.getServer().getPlayerManager().getPlayerList()) {
+                if (p != player && ServerPlayNetworking.canSend(p, AiNetworkPayloads.HistoryS2CPayload.ID)) {
+                    ServerPlayNetworking.send(p, new AiNetworkPayloads.HistoryS2CPayload(AiNetworkPayloads.HistoryS2CPayload.ADD, data));
+                }
             }
         });
+    }
+
+    /** Joining: the kept designs, newest first. */
+    public static void sendHistoryTo(ServerPlayerEntity player) {
+        if (player == null || !ServerPlayNetworking.canSend(player, AiNetworkPayloads.HistoryS2CPayload.ID)) {
+            return;
+        }
+        for (BuildRecord record : com.example.ai.build.SharedHistory.list(player.getServer(), com.example.ai.build.SharedHistory.SYNC_LIMIT)) {
+            ServerPlayNetworking.send(player, new AiNetworkPayloads.HistoryS2CPayload(AiNetworkPayloads.HistoryS2CPayload.ADD, record.toGzip()));
+        }
     }
 
     public static void sendNearby(ServerPlayerEntity player, String json) {

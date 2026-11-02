@@ -78,7 +78,34 @@ public class AibClientGameTest implements FabricClientGameTest {
             shot(context, () -> AiPromptScreen.open("HISTORY", null), "04_history_list");
             shot(context, () -> AiPromptScreen.open("HISTORY", houseId), "05_history_house");
             shot(context, () -> AiPromptScreen.open("HISTORY", appleId), "06_history_apple");
-            shot(context, () -> AiPromptScreen.open("LOGS", null), "07_logs");
+            // The shared 보관함: a friend's designs come from the server and sit with mine, as pictures.
+            context.runOnClient(client -> {
+                for (int i = 0; i < 14; i++) {
+                    BuildRecord r = BuildRecord.fromJson(records.get(i % 2));
+                    r.id = "90" + i;
+                    r.createdAt -= 1000L * (i + 1);
+                    r.owner = i % 3 == 0 ? "Mina" : "Jo";
+                    BuildHistory.addShared(r);
+                }
+            });
+            shot(context, () -> AiPromptScreen.open("HISTORY", null), "04b_history_grid");
+
+            // The shared 작업 일지: one line per request, details on a click.
+            String jobId = game.getServer().computeOnServer(server -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayerList().get(0);
+                com.example.ai.WorkJournal.Job job = com.example.ai.WorkJournal.start(player,
+                    "작은 돌벽돌 집: 7x7, 참나무 문, 유리창 두 개", "build", "", "", "");
+                com.example.ai.WorkJournal.log(player, "[Review] 1 problem(s) found before running:\n- line 4: placeWall got 6 argument(s), needs 7.");
+                com.example.ai.WorkJournal.log(player, "[AI] Asking the AI to fix it (retry 1/2)...");
+                com.example.ai.WorkJournal.log(player, "[AI] 완성! Size: 7 x 6 x 7 (W x H x L), 9 command(s)");
+                com.example.ai.WorkJournal.start(player, "빨간 사과", "object", "", "", "");
+                com.example.ai.WorkJournal.log(player, "[AI] Error: the AI did not answer in time");
+                com.example.ai.WorkJournal.start(player, "푸른 불꽃이 도는 검", "gear:sword", "푸른 불꽃 베기", "", "slash");
+                return job.id;
+            });
+            context.waitTicks(3);
+            shot(context, () -> AiPromptScreen.openJournal(null), "07_logs");
+            shot(context, () -> AiPromptScreen.openJournal(jobId), "07b_log_detail");
             shot(context, () -> new AiSettingsScreen(null), "08_settings");
 
             // Object item: hand one to the player (its icon is the front picture), then set it on the ground.

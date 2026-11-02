@@ -44,7 +44,34 @@ public final class AiClientNetworking {
             context.client().execute(() -> AiClientState.setServerInfo(payload.provider(), payload.modelName(), payload.apiUrl(),
                 payload.webSearchDefault(), payload.canEdit())));
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->
-            client.execute(AiClientState::clearServerInfo));
+            client.execute(() -> {
+                AiClientState.clearServerInfo();
+                BuildHistory.clearShared();
+                com.example.client.WorkJournalClient.clear();
+            }));
+
+        // The shared 보관함: someone else's new design (or all of them when joining), or a deletion.
+        ClientPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.HistoryS2CPayload.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                try {
+                    if (payload.op() == AiNetworkPayloads.HistoryS2CPayload.REMOVE) {
+                        BuildHistory.removeHere(new String(payload.data(), java.nio.charset.StandardCharsets.UTF_8));
+                    } else {
+                        BuildHistory.addShared(BuildRecord.fromGzip(payload.data()));
+                    }
+                    AiClientState.refreshOpenScreen(true);
+                } catch (RuntimeException ignored) {
+                    // A bad record: skip it.
+                }
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.JournalS2CPayload.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                com.example.client.WorkJournalClient.apply(com.example.ai.WorkJournal.decode(payload.data()));
+                AiClientState.refreshOpenScreen(false);
+            });
+        });
 
         ClientPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.NearbyObjectsS2CPayload.ID, (payload, context) -> {
             context.client().execute(() -> AiClientState.setNearby(payload.json()));
@@ -55,6 +82,7 @@ public final class AiClientNetworking {
                 try {
                     BuildRecord record = BuildRecord.fromGzip(payload.data());
                     BuildHistory.save(record);
+                    AiClientState.refreshOpenScreen(true);
                     AiClientState.addLog("[History] 보관함에 추가했어요. 보관함에서 \"손에 받기\"로 꺼내 쓰세요.");
                 } catch (RuntimeException exception) {
                     AiClientState.addLog("[History] Could not save this build: " + exception.getMessage());

@@ -49,6 +49,17 @@ public class AiPromptScreen extends Screen {
     private static final int NEARBY = 3;  // objects placed around me
     private static final int GEAR = 4;
     private static int filter = BUILDS;
+    /** Where "주변" goes back to. */
+    private static int beforeNearby = OBJECTS;
+    /** 보관함 grid: square pictures. */
+    private static final int CELL = 46;
+    private static final int GAP = 4;
+    /** 작업 일지: the request open in detail (null = the list), or the old full log file view. */
+    private static String journalId = null;
+    private static boolean rawLog = false;
+    private static int journalScroll = 0;  // rows in the list, pixels in the detail
+    private static final int JROW = 16;
+    private static final SimpleDateFormat TIME = new SimpleDateFormat("MM-dd HH:mm");
     private static int chatScroll = 0;    // pixels up from the bottom
     private static int listScroll = 0;    // rows
     private static int detailScroll = 0;  // pixels
@@ -78,6 +89,10 @@ public class AiPromptScreen extends Screen {
     private int h;
     private List<String> fileLines = List.of();
     private List<String> days = List.of();
+    /** The design under the mouse in the grid (its tooltip is drawn last). */
+    private BuildRecord hoveredRecord;
+    private int hoverX;
+    private int hoverY;
 
     public AiPromptScreen() {
         super(Text.literal("AI Builder"));
@@ -91,6 +106,14 @@ public class AiPromptScreen extends Screen {
         listScroll = 0;
         detailScroll = 0;
         return new AiPromptScreen();
+    }
+
+    /** Open the 작업 일지 (the shared list, or one request's details). */
+    public static AiPromptScreen openJournal(String jobId) {
+        rawLog = false;
+        journalId = jobId;
+        journalScroll = 0;
+        return open("LOGS", null);
     }
 
     /** Open 보관함 on the 장비 tab (optionally with one open). */
@@ -433,29 +456,29 @@ public class AiPromptScreen extends Screen {
     private void buildHistory() {
         BuildRecord record = selected();
         if (record == null) {
-            // Tabs: 건축 / 소품 / 장비; in 소품, "주변" lists the objects placed around me.
+            // Tabs: 건축 / 소품 / 장비, and "주변" (the objects placed around me) on every tab.
             int tx = right() - 3 * 44 - 8;
             String[] names = { "건축", "소품", "장비" };
             int[] filters = { BUILDS, OBJECTS, GEAR };
             for (int i = 0; i < 3; i++) {
                 int target = filters[i];
-                boolean on = filter == target || (target == OBJECTS && filter == NEARBY);
                 button(names[i], tx + i * 48, top(), 44, b -> {
                     filter = target;
                     listScroll = 0;
                     rebuild();
-                }).selected(on);
+                }).selected(filter == target);
             }
-            if (filter == OBJECTS || filter == NEARBY) {
-                button("주변", tx - 48, top(), 44, b -> {
-                    filter = filter == NEARBY ? OBJECTS : NEARBY;
-                    listScroll = 0;
-                    if (filter == NEARBY) {
-                        AiClientNetworking.requestNearby();
-                    }
-                    rebuild();
-                }).selected(filter == NEARBY);
-            }
+            button("주변", tx - 48, top(), 44, b -> {
+                if (filter == NEARBY) {
+                    filter = beforeNearby;
+                } else {
+                    beforeNearby = filter;
+                    filter = NEARBY;
+                    AiClientNetworking.requestNearby();
+                }
+                listScroll = 0;
+                rebuild();
+            }).selected(filter == NEARBY);
             if (filter == NEARBY) {
                 // One "지우기" per visible row of placed objects.
                 List<com.example.ai.build.ObjectService.Nearby> list = AiClientState.getNearby();
@@ -531,51 +554,116 @@ public class AiPromptScreen extends Screen {
             renderNearby(ctx);
             return;
         }
-        ctx.drawText(this.textRenderer, ellipsize("만든 것을 꺼내 쓸 수 있어요", right() - left() - 200), left() + 2, top() + 5, INK_SOFT, false);
+        List<BuildRecord> records = filtered();
+        String head = records.isEmpty() ? "만든 것을 꺼내 쓸 수 있어요" : "모두가 만든 것 " + records.size() + "개 · 눌러서 열기";
+        ctx.drawText(this.textRenderer, ellipsize(head, right() - left() - 200), left() + 2, top() + 5, INK_SOFT, false);
         int l = left(), r = right(), t = listTop(), b = bottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);
-        List<BuildRecord> records = filtered();
         if (records.isEmpty()) {
             String empty = "아직 비어 있어요. AI 공방에서 만들면 여기에 보관됩니다.";
             ctx.drawText(this.textRenderer, empty, (l + r - this.textRenderer.getWidth(empty)) / 2, t + 20, INK_SOFT, false);
             return;
         }
-        int visible = Math.max(1, (b - t - 4) / ROW);
-        listScroll = Math.max(0, Math.min(listScroll, records.size() - visible));
-        int textX = l + ROW + 10;
-        int textW = r - textX - 8;
-        for (int i = 0; i < visible && listScroll + i < records.size(); i++) {
-            BuildRecord rec = records.get(listScroll + i);
-            int y = t + 3 + i * ROW;
-            boolean hover = mouseX >= l + 3 && mouseX < r - 3 && mouseY >= y && mouseY < y + ROW - 3;
-            ctx.fill(l + 3, y, r - 3, y + ROW - 3, hover ? 0xFFFFE9BC : PAPER);
-            ctx.fill(l + 3, y + ROW - 4, r - 3, y + ROW - 3, PARCHMENT_LINE);
-            if (hover) {
-                outline(ctx, l + 3, y, r - 3, y + ROW - 3, TAG);
-            }
-            inset(ctx, l + 6, y + 3, l + ROW + 2, y + ROW - 6, 0xFFE8C48A); // item slot
-            BuildPreview p = BuildPreview.of(rec);
-            BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, l + 8, y + 5, ROW - 10, ROW - 14);
+        int cols = gridCols();
+        int rows = gridRows();
+        int totalRows = (records.size() + cols - 1) / cols;
+        listScroll = Math.max(0, Math.min(listScroll, totalRows - rows));
+        int gx = gridLeft();
+        for (int i = 0; i < rows * cols && listScroll * cols + i < records.size(); i++) {
+            BuildRecord rec = records.get(listScroll * cols + i);
+            int cx = gx + (i % cols) * (CELL + GAP);
+            int cy = t + 4 + (i / cols) * (CELL + GAP);
+            boolean hover = mouseX >= cx && mouseX < cx + CELL && mouseY >= cy && mouseY < cy + CELL;
             boolean object = "object".equals(rec.kind);
             boolean gear = "gear".equals(rec.kind);
-            // No request text here (it is in the detail view): the picture, the kind and the size.
-            String tag = gear ? "장비 · " + com.example.content.GearKind.of(rec.gear).korean : object ? "소품" : "건물";
-            int tagW = this.textRenderer.getWidth(tag) + 6;
-            ctx.fill(textX, y + 5, textX + tagW, y + 16, gear ? 0xFF4F7FA8 : object ? LEAF : TAG);
-            ctx.drawText(this.textRenderer, tag, textX + 3, y + 7, PAPER, false);
+            inset(ctx, cx, cy, cx + CELL, cy + CELL, hover ? 0xFFFFE9BC : 0xFFE8C48A);
+            BuildPreview p = BuildPreview.of(rec);
+            BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, cx + 3, cy + 3, CELL - 6, CELL - 6);
+            // The kind at a glance: a coloured corner (건물 brown, 소품 green, 장비 blue) and, for gear, its item.
+            int kindColor = gear ? 0xFF4F7FA8 : object ? LEAF : TAG;
+            ctx.fill(cx + 1, cy + 1, cx + 6, cy + 3, kindColor);
+            ctx.fill(cx + 1, cy + 1, cx + 3, cy + 6, kindColor);
             if (gear) {
-                // Which kind of equipment, at a glance: the vanilla item in the picture's corner.
-                ctx.drawItem(new ItemStack(com.example.content.GearKind.of(rec.gear).icon), l + ROW - 15, y + ROW - 23);
+                ctx.getMatrices().push();
+                ctx.getMatrices().translate(cx + CELL - 12, cy + CELL - 12, 0);
+                ctx.getMatrices().scale(0.625f, 0.625f, 1f);
+                ctx.drawItem(new ItemStack(com.example.content.GearKind.of(rec.gear).icon), 0, 0);
+                ctx.getMatrices().pop();
             }
-            String sizeText = p.sizeX + " × " + p.sizeY + " × " + p.sizeZ + (object || gear ? " · 조각 " + p.blocks : "");
-            ctx.drawText(this.textRenderer, ellipsize(sizeText, textW - tagW - 4), textX + tagW + 4, y + 7, INK, false);
-            String info = DATE.format(new Date(rec.createdAt)) + " · " + rec.model;
-            ctx.drawText(this.textRenderer, ellipsize(info, textW), textX, y + 21, INK_SOFT, false);
+            if (hover) {
+                outline(ctx, cx, cy, cx + CELL, cy + CELL, TAG);
+                this.hoveredRecord = rec;
+                this.hoverX = mouseX;
+                this.hoverY = mouseY;
+            }
         }
-        if (records.size() > visible) {
-            String more = (listScroll + 1) + "-" + Math.min(records.size(), listScroll + visible) + " / " + records.size();
-            ctx.drawText(this.textRenderer, more, r - this.textRenderer.getWidth(more) - 6, b - 11, INK_SOFT, false);
+        if (totalRows > rows) {
+            String more = (listScroll + 1) + "-" + Math.min(totalRows, listScroll + rows) + " / " + totalRows + "줄";
+            ctx.drawText(this.textRenderer, more, r - this.textRenderer.getWidth(more) - 6, top() + 5, INK_SOFT, false);
         }
+    }
+
+    private int gridCols() {
+        return Math.max(1, (right() - left() - 8 + GAP) / (CELL + GAP));
+    }
+
+    private int gridRows() {
+        return Math.max(1, (bottom() - listTop() - 8 + GAP) / (CELL + GAP));
+    }
+
+    /** The grid is centred in the page. */
+    private int gridLeft() {
+        int cols = gridCols();
+        return left() + (right() - left() - (cols * (CELL + GAP) - GAP)) / 2;
+    }
+
+    /** The design at this point of the grid, or null. */
+    private BuildRecord gridAt(double mx, double my) {
+        int cols = gridCols();
+        int gx = gridLeft();
+        int t = listTop() + 4;
+        if (mx < gx || my < t) {
+            return null;
+        }
+        int col = (int) ((mx - gx) / (CELL + GAP));
+        int row = (int) ((my - t) / (CELL + GAP));
+        if (col >= cols || row >= gridRows() || (mx - gx) % (CELL + GAP) >= CELL || (my - t) % (CELL + GAP) >= CELL) {
+            return null;
+        }
+        List<BuildRecord> records = filtered();
+        int index = (listScroll + row) * cols + col;
+        return index < records.size() ? records.get(index) : null;
+    }
+
+    /** Hover note for a picture in the grid: what it is, who made it, when. */
+    private void renderRecordTooltip(DrawContext ctx, BuildRecord rec, int mx, int my) {
+        boolean object = "object".equals(rec.kind);
+        boolean gear = "gear".equals(rec.kind);
+        BuildPreview p = BuildPreview.of(rec);
+        List<String> lines = new ArrayList<>();
+        lines.add(ellipsize(shortTitle(rec.prompt), 180));
+        lines.add((gear ? "장비 · " + com.example.content.GearKind.of(rec.gear).korean : object ? "소품" : "건물")
+            + " · " + p.sizeX + " × " + p.sizeY + " × " + p.sizeZ);
+        if (rec.owner != null && !rec.owner.isEmpty()) {
+            lines.add("만든 사람 " + rec.owner);
+        }
+        lines.add(DATE.format(new Date(rec.createdAt)));
+        int tw = 0;
+        for (String s : lines) {
+            tw = Math.max(tw, this.textRenderer.getWidth(s));
+        }
+        int bw = tw + 10, bh = lines.size() * LINE + 6;
+        int tx = Math.min(mx + 10, this.width - bw - 4);
+        int ty = Math.max(4, Math.min(my - 6, this.height - bh - 4));
+        ctx.getMatrices().push();
+        ctx.getMatrices().translate(0, 0, 400);
+        bevel(ctx, tx, ty, tx + bw, ty + bh, PAPER, 0xFFFFFBEF, PARCHMENT_LINE, 1);
+        int y = ty + 4;
+        for (int i = 0; i < lines.size(); i++) {
+            ctx.drawText(this.textRenderer, lines.get(i), tx + 5, y, i == 0 ? INK : INK_SOFT, false);
+            y += LINE;
+        }
+        ctx.getMatrices().pop();
     }
 
     /** Objects placed around me, nearest first, each with a 지우기 button (added in buildHistory). */
@@ -672,7 +760,8 @@ public class AiPromptScreen extends Screen {
         String[] info = {
             "크기 " + p.sizeX + " × " + p.sizeY + " × " + p.sizeZ + " (가로 × 높이 × 세로) · "
                 + (object ? "조각 " + p.blocks + "개" : "블록 " + p.blocks + "개"),
-            "만든 날 " + DATE.format(new Date(r.createdAt)),
+            "만든 날 " + DATE.format(new Date(r.createdAt))
+                + (r.owner != null && !r.owner.isEmpty() ? " · 만든 사람 " + r.owner : ""),
             "AI " + r.provider + " / " + r.model
         };
         for (String s : info) {
@@ -689,6 +778,15 @@ public class AiPromptScreen extends Screen {
     // ---------------------------------------------------------------- 작업 일지
 
     private void buildLogs() {
+        if (!rawLog) {
+            buildJournal();
+            return;
+        }
+        button("← 작업 목록", right() - 70 - 4 - 80, top(), 80, b -> {
+            rawLog = false;
+            journalScroll = 0;
+            rebuild();
+        });
         this.days = LogStore.days();
         dayIndex = Math.max(0, Math.min(dayIndex, Math.max(0, this.days.size() - 1)));
         this.fileLines = this.days.isEmpty() ? List.of() : LogStore.read(this.days.get(dayIndex));
@@ -705,7 +803,143 @@ public class AiPromptScreen extends Screen {
         button("새로고침", right() - 70, top(), 70, b -> rebuild());
     }
 
-    private void renderLogs(DrawContext ctx) {
+    // The shared journal: one line per request ("Jo님이 장비(검)를 요청했어요"), details on a click.
+
+    private void buildJournal() {
+        if (journalId != null && WorkJournalClient.get(journalId) == null) {
+            journalId = null;
+        }
+        if (journalId != null) {
+            button("← 목록", left(), bottom() - 18, 70, b -> {
+                journalId = null;
+                journalScroll = 0;
+                rebuild();
+            });
+            return;
+        }
+        // My own full log files (every message, by day).
+        button("내 전체 로그", right() - 80, top(), 80, b -> {
+            rawLog = true;
+            fileScroll = 0;
+            rebuild();
+        });
+    }
+
+    private static String statusText(String status) {
+        return switch (status == null ? "" : status) {
+            case com.example.ai.WorkJournal.WORKING -> "만드는 중";
+            case com.example.ai.WorkJournal.DONE -> "완성";
+            case com.example.ai.WorkJournal.FAILED -> "실패";
+            default -> "중단";
+        };
+    }
+
+    private static int statusColor(String status) {
+        return switch (status == null ? "" : status) {
+            case com.example.ai.WorkJournal.WORKING -> 0xFFC98A1E;
+            case com.example.ai.WorkJournal.DONE -> LEAF;
+            case com.example.ai.WorkJournal.FAILED -> 0xFFB0413E;
+            default -> 0xFF8A7A66;
+        };
+    }
+
+    private int journalRows() {
+        return Math.max(1, (bottom() - (top() + 22) - 6) / JROW);
+    }
+
+    private void renderJournal(DrawContext ctx, int mouseX, int mouseY) {
+        com.example.ai.WorkJournal.Job open = WorkJournalClient.get(journalId);
+        if (open != null) {
+            renderJournalDetail(ctx, open);
+            return;
+        }
+        int l = left(), r = right();
+        List<com.example.ai.WorkJournal.Job> jobs = WorkJournalClient.list();
+        ctx.drawText(this.textRenderer, ellipsize("이 월드에서 모두가 요청한 작업 · 눌러서 자세히", r - l - 90), l + 2, top() + 5, INK_SOFT, false);
+        int t = top() + 22, b = bottom();
+        inset(ctx, l, t, r, b, PAPER);
+        if (jobs.isEmpty()) {
+            ctx.drawText(this.textRenderer, "아직 요청한 작업이 없어요.", l + 8, t + 6, INK_SOFT, false);
+            return;
+        }
+        int rows = journalRows();
+        journalScroll = Math.max(0, Math.min(journalScroll, jobs.size() - rows));
+        for (int i = 0; i < rows && journalScroll + i < jobs.size(); i++) {
+            com.example.ai.WorkJournal.Job j = jobs.get(journalScroll + i);
+            int y = t + 3 + i * JROW;
+            boolean hover = mouseX >= l + 3 && mouseX < r - 3 && mouseY >= y && mouseY < y + JROW - 1;
+            if (hover) {
+                ctx.fill(l + 3, y, r - 3, y + JROW - 1, 0xFFFFE9BC);
+            }
+            ctx.fill(l + 3, y + JROW - 1, r - 3, y + JROW, 0x30A0602A);
+            String time = TIME.format(new Date(j.time));
+            ctx.drawText(this.textRenderer, time, l + 7, y + 4, INK_SOFT, false);
+            String status = statusText(j.status);
+            int sw = this.textRenderer.getWidth(status) + 6;
+            ctx.fill(r - 7 - sw, y + 2, r - 7, y + JROW - 3, statusColor(j.status));
+            ctx.drawText(this.textRenderer, status, r - 4 - sw, y + 4, PAPER, false);
+            int sx = l + 12 + this.textRenderer.getWidth("00-00 00:00");
+            ctx.drawText(this.textRenderer, ellipsize(j.summary(), r - 14 - sw - sx), sx, y + 4, INK, false);
+        }
+        if (jobs.size() > rows) {
+            String more = (journalScroll + 1) + "-" + Math.min(jobs.size(), journalScroll + rows) + " / " + jobs.size();
+            ctx.drawText(this.textRenderer, more, r - this.textRenderer.getWidth(more) - 86, top() + 5, INK_SOFT, false);
+        }
+    }
+
+    private void renderJournalDetail(DrawContext ctx, com.example.ai.WorkJournal.Job j) {
+        int l = left(), r = right(), t = top(), b = bottom() - 24;
+        inset(ctx, l, t, r, b, PAPER);
+        int width = r - l - 16;
+        List<String> text = new ArrayList<>();
+        List<Integer> colors = new ArrayList<>();
+        java.util.function.BiConsumer<String, Integer> add = (s, c) -> {
+            text.add(s);
+            colors.add(c);
+        };
+        add.accept(j.summary() + " · " + statusText(j.status), TAG);
+        add.accept(DATE.format(new Date(j.time)), INK_SOFT);
+        add.accept("주문: " + j.prompt, INK);
+        if (j.fxHit != null && !j.fxHit.isEmpty()) {
+            add.accept(("gear".equals(j.kind) && "bow".equals(j.gear) ? "화살: " : "공격 시: ") + j.fxHit, INK);
+        }
+        if (j.motion != null && !j.motion.isEmpty()) {
+            add.accept("공격 모션: " + com.example.content.GearMotions.korean(j.motion), INK);
+        }
+        if (j.fxIdle != null && !j.fxIdle.isEmpty()) {
+            add.accept((com.example.content.GearKind.of(j.gear).worn() ? "착용 시: " : "대기 시: ") + j.fxIdle, INK);
+        }
+        add.accept("", INK);
+        for (String line : j.lines) {
+            for (String clean : AiClientState.cleanForDisplay(line)) {
+                add.accept(AiClientState.stripTag(clean).replace("(full text in the Logs tab)", "(전체 내용은 요청한 사람의 내 전체 로그에)"), INK_SOFT);
+            }
+        }
+        if (com.example.ai.WorkJournal.WORKING.equals(j.status)) {
+            add.accept("…만드는 중", INK_SOFT);
+        }
+        ctx.enableScissor(l + 1, t + 1, r - 1, b - 1);
+        int y = t + 6 - journalScroll;
+        for (int i = 0; i < text.size(); i++) {
+            if (text.get(i).isEmpty()) {
+                y += LINE / 2;
+                continue;
+            }
+            for (OrderedText line : this.textRenderer.wrapLines(Text.literal(text.get(i)), width)) {
+                ctx.drawText(this.textRenderer, line, l + 8, y, colors.get(i), false);
+                y += LINE;
+            }
+        }
+        ctx.disableScissor();
+        int contentHeight = y + journalScroll - t;
+        journalScroll = Math.max(0, Math.min(journalScroll, Math.max(0, contentHeight - (b - t) + 6)));
+    }
+
+    private void renderLogs(DrawContext ctx, int mouseX, int mouseY) {
+        if (!rawLog) {
+            renderJournal(ctx, mouseX, mouseY);
+            return;
+        }
         int l = left(), r = right();
         String day = this.days.isEmpty() ? "(기록 없음)" : this.days.get(dayIndex);
         ctx.drawText(this.textRenderer, day, l + 66 - this.textRenderer.getWidth(day) / 2, top() + 5, INK, false);
@@ -792,11 +1026,12 @@ public class AiPromptScreen extends Screen {
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         layout();
+        this.hoveredRecord = null;
         renderFrame(ctx, mouseX, mouseY);
         switch (page) {
             case CREATE -> renderCreate(ctx);
             case HISTORY -> renderHistory(ctx, mouseX, mouseY);
-            case LOGS -> renderLogs(ctx);
+            case LOGS -> renderLogs(ctx, mouseX, mouseY);
         }
         super.render(ctx, mouseX, mouseY, delta);
         for (IconAt icon : this.icons) {
@@ -817,6 +1052,9 @@ public class AiPromptScreen extends Screen {
             int tx = mouseX + 8, ty = mouseY - 14;
             bevel(ctx, tx, ty, tx + tw, ty + 14, PAPER, 0xFFFFFBEF, PARCHMENT_LINE, 1);
             ctx.drawText(this.textRenderer, name, tx + 4, ty + 3, INK, false);
+        }
+        if (this.hoveredRecord != null && page == Page.HISTORY) {
+            renderRecordTooltip(ctx, this.hoveredRecord, this.hoverX, this.hoverY);
         }
     }
 
@@ -841,15 +1079,25 @@ public class AiPromptScreen extends Screen {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        int t = listTop() + 3;
-        if (page == Page.HISTORY && selected() == null && filter != NEARBY && button == 0
-            && mouseX >= left() && mouseX < right() && mouseY >= t && mouseY < bottom()) {
-            int index = listScroll + (int) ((mouseY - t) / ROW);
-            List<BuildRecord> records = filtered();
-            if (index >= 0 && index < records.size()) {
-                selectedId = records.get(index).id;
+        if (page == Page.HISTORY && selected() == null && filter != NEARBY && button == 0) {
+            BuildRecord hit = gridAt(mouseX, mouseY);
+            if (hit != null) {
+                selectedId = hit.id;
                 detailScroll = 0;
                 this.confirmDelete = false;
+                rebuild();
+                return true;
+            }
+        }
+        int jt = top() + 22 + 3;
+        if (page == Page.LOGS && !rawLog && journalId == null && button == 0
+            && mouseX >= left() && mouseX < right() && mouseY >= jt && mouseY < bottom()) {
+            int row = (int) ((mouseY - jt) / JROW);
+            List<com.example.ai.WorkJournal.Job> jobs = WorkJournalClient.list();
+            int index = journalScroll + row;
+            if (row < journalRows() && index < jobs.size()) {
+                journalId = jobs.get(index).id;
+                journalScroll = 0;
                 rebuild();
                 return true;
             }
@@ -865,7 +1113,15 @@ public class AiPromptScreen extends Screen {
         int step = verticalAmount > 0 ? 1 : -1;
         switch (page) {
             case CREATE -> chatScroll = Math.max(0, chatScroll + step * 24);
-            case LOGS -> fileScroll = Math.max(0, fileScroll + step * 3);
+            case LOGS -> {
+                if (rawLog) {
+                    fileScroll = Math.max(0, fileScroll + step * 3);
+                } else if (journalId != null) {
+                    journalScroll = Math.max(0, journalScroll - step * 20);
+                } else {
+                    journalScroll = Math.max(0, journalScroll - step);
+                }
+            }
             case HISTORY -> {
                 if (selected() != null) {
                     detailScroll = Math.max(0, detailScroll - step * 20);

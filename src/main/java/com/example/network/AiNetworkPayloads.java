@@ -160,6 +160,50 @@ public final class AiNetworkPayloads {
         }
     }
 
+    /**
+     * Server -> client: the shared 보관함 changed. op 1: a design someone made (gzip'd BuildRecord
+     * JSON), also sent for each kept design when joining; op 2: the design with this id (UTF-8)
+     * was deleted.
+     */
+    public record HistoryS2CPayload(int op, byte[] data) implements CustomPayload {
+        public static final int ADD = 1;
+        public static final int REMOVE = 2;
+        public static final CustomPayload.Id<HistoryS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "history"));
+        public static final PacketCodec<RegistryByteBuf, HistoryS2CPayload> CODEC = PacketCodec.tuple(
+            PacketCodecs.VAR_INT, HistoryS2CPayload::op,
+            PacketCodecs.BYTE_ARRAY, HistoryS2CPayload::data,
+            HistoryS2CPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
+    /** Client -> server: delete this design from the shared 보관함 (for everyone). */
+    public record HistoryDeleteC2SPayload(String id) implements CustomPayload {
+        public static final CustomPayload.Id<HistoryDeleteC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "history_delete"));
+        public static final PacketCodec<RegistryByteBuf, HistoryDeleteC2SPayload> CODEC =
+            PacketCodec.tuple(PacketCodecs.STRING, HistoryDeleteC2SPayload::id, HistoryDeleteC2SPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
+    /** Server -> client: the 작업 일지 changed (gzip'd JSON, see WorkJournal.Update). */
+    public record JournalS2CPayload(byte[] data) implements CustomPayload {
+        public static final CustomPayload.Id<JournalS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "journal"));
+        public static final PacketCodec<RegistryByteBuf, JournalS2CPayload> CODEC =
+            PacketCodec.tuple(PacketCodecs.BYTE_ARRAY, JournalS2CPayload::data, JournalS2CPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     /** Client -> server: one part of a saved build to rebuild (client packets are size-limited). */
     public record RebuildPartC2SPayload(int id, int index, int total, int mode, int scalePercent, byte[] data) implements CustomPayload {
         public static final CustomPayload.Id<RebuildPartC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "rebuild_part"));

@@ -24,6 +24,8 @@ public final class BuildRecord {
     public String prompt = "";
     public String provider = "";
     public String model = "";
+    /** Who asked for it (the player's name); empty in records made before the shared 보관함. */
+    public String owner = "";
     public BuildPlan plan = new BuildPlan();
     /** Size it is placed at (objects only): the plan is already scaled, this is just for its name. */
     public double scale = 1;

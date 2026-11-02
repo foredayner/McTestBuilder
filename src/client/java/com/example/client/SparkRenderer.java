@@ -108,7 +108,7 @@ public final class SparkRenderer {
         double now = now(client);
         for (Spark s : Spark.listFromJson(json)) {
             // Layers may start later than the first (a flash, then a ring, then sparks).
-            Effect e = new Effect(s, at, dir, scale, now + s.delay, null, "");
+            Effect e = new Effect(s, at, dir, scale, now + s.delay + s.lead, null, "");
             e.startDue = true;
             add(e);
         }

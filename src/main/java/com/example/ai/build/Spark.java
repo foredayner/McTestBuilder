@@ -99,6 +99,8 @@ public final class Spark {
     public double pitch = 1;
     /** Ticks after the others it starts (layers: a flash, then a ring, then sparks). */
     public int delay = 0;
+    /** Set by the server, not the AI: extra ticks before it starts (weapons wait for the swing to finish). */
+    public int lead = 0;
     /** 0-1: shakes the view of whoever is right there when it starts (big hits; players can turn it off). */
     public double shake = 0;
 
@@ -226,6 +228,7 @@ public final class Spark {
         volume = clamp(volume, 0, 2);
         pitch = clamp(pitch, 0.5, 2);
         delay = (int) clamp(delay, 0, 40);
+        lead = (int) clamp(lead, 0, 30);
         shake = clamp(shake, 0, 1);
         if (points != null) {
             List<double[]> p = new ArrayList<>();

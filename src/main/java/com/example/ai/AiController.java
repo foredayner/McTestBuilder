@@ -72,6 +72,8 @@ public class AiController {
         String hitText = fxHit == null ? "" : fxHit.trim();
         String idleText = fxIdle == null ? "" : fxIdle.trim();
         boolean objectMode = !"build".equals(mode);
+        // The shared 작업 일지: one entry per request, collecting what this request reports.
+        WorkJournal.start(player, prompt, mode, hitText, idleText, com.example.content.GearMotions.normalize(motion));
         long startTime = System.currentTimeMillis();
         AiBuilderConfig config = AiBuilderConfig.get();
         boolean webSearch = config.provider.supportsWebSearch()

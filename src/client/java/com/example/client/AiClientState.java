@@ -108,7 +108,7 @@ public final class AiClientState {
     }
 
     /** "[AI] Complete!" -> "Complete!" for the cards (the log file keeps the tags). */
-    private static String stripTag(String line) {
+    static String stripTag(String line) {
         String t = line.stripLeading();
         String indent = line.substring(0, line.length() - t.length());
         for (String tag : new String[] { "[AI] ", "[Waiting...] ", "[History] ", "[Settings] ", "[Web] " }) {
@@ -388,7 +388,7 @@ public final class AiClientState {
         AiClientNetworking.sendApprovalAction(false);
     }
 
-    private static void refreshOpenScreen(boolean rebuildWidgets) {
+    public static void refreshOpenScreen(boolean rebuildWidgets) {
         AiPromptScreen screen = openScreen;
         if (screen != null) {
             screen.onStateUpdated(rebuildWidgets);

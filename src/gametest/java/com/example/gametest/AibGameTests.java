@@ -320,6 +320,50 @@ public class AibGameTests implements FabricGameTest {
         player.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, sword);
         check(com.example.ai.build.GearEffects.onSwing(player) == 1, "the swing plays the attack effect");
         check(com.example.ai.build.GearEffects.onSwing(player) == 0, "a second swing too soon is ignored");
+        // The effect waits for the swing to finish.
+        check(com.example.ai.build.GearEffects.swingTicks(player, sword) == 6, "an ordered motion strikes after 6 ticks");
+        net.minecraft.item.ItemStack plain = net.minecraft.item.Items.IRON_SWORD.getDefaultStack();
+        check(com.example.ai.build.GearEffects.swingTicks(player, plain) == 6, "a normal swing takes 6 ticks");
+        player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(net.minecraft.entity.effect.StatusEffects.HASTE, 100, 1));
+        check(com.example.ai.build.GearEffects.swingTicks(player, plain) == 4, "Haste II makes the swing shorter");
+        context.complete();
+    }
+
+    /** The shared 보관함 and 작업 일지: kept with the world, one journal entry per request. */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void sharedHistoryAndJournal(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        var server = world.getServer();
+        BuildRecord record = BuildRecord.create("shared test", "TEST", "script",
+            Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_DUCK));
+        record.id = "77" + (System.nanoTime() % 100000);
+        record.owner = "Mina";
+        com.example.ai.build.SharedHistory.save(server, record);
+        boolean found = false;
+        for (BuildRecord r : com.example.ai.build.SharedHistory.list(server, 500)) {
+            if (r.id.equals(record.id)) {
+                found = "Mina".equals(r.owner);
+            }
+        }
+        check(found, "a kept design comes back with who made it");
+        check(com.example.ai.build.SharedHistory.delete(server, record.id), "anyone can delete it");
+        check(!com.example.ai.build.SharedHistory.delete(server, record.id), "deleted once");
+        check(!com.example.ai.build.SharedHistory.validId("../x"), "ids cannot reach other files");
+
+        com.example.ai.WorkJournal.Job job = com.example.ai.WorkJournal.start(player, "푸른 검", "gear:sword", "불꽃", "", "slash");
+        check(job.summary().endsWith("님이 장비(검)를 요청했어요"), "one line per request: " + job.summary());
+        com.example.ai.WorkJournal.log(player, "[AI] Asking the AI to fix it (retry 1/2)...");
+        check(com.example.ai.WorkJournal.WORKING.equals(job.status), "still working");
+        com.example.ai.WorkJournal.log(player, "[AI] 완성! Size: 1 x 1 x 1");
+        check(com.example.ai.WorkJournal.DONE.equals(job.status) && job.lines.size() == 2, "the finish ends it, with its messages");
+        com.example.ai.WorkJournal.log(player, "[AI] later message");
+        check(job.lines.size() == 2, "messages after the end are not added");
+        com.example.ai.WorkJournal.Job failed = com.example.ai.WorkJournal.start(player, "집", "build", "", "", "");
+        com.example.ai.WorkJournal.log(player, "[AI] Error: timeout");
+        check(com.example.ai.WorkJournal.FAILED.equals(failed.status) && failed.summary().endsWith("건물을 요청했어요"), "an error ends it as failed");
+        check(com.example.ai.WorkJournal.jobs().contains(job), "kept in the journal");
         context.complete();
     }
 
