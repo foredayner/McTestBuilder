@@ -45,7 +45,8 @@ public final class AiScriptApi {
         "mark",
         "arrowStart",
         "arrowEnd",
-        "effect"
+        "effect",
+        "preset"
     );
 
     private AiScriptApi() {

@@ -33,6 +33,8 @@ public final class AiBuilderConfig {
     public int autoRetries = 2;
     /** Ollama: minutes to keep the model loaded after a request (-1 = until Ollama stops). */
     public int keepAliveMinutes = 30;
+    /** This player's own choice: big hits shake the view a little (equipment effects). */
+    public boolean screenShake = true;
     /** Last model typed for each provider, so switching provider does not lose it. */
     public java.util.Map<String, String> modelByProvider = new java.util.HashMap<>();
 
@@ -173,6 +175,7 @@ public final class AiBuilderConfig {
         );
         copy.autoRetries = autoRetries;
         copy.keepAliveMinutes = keepAliveMinutes;
+        copy.screenShake = screenShake;
         copy.modelByProvider = new java.util.HashMap<>(modelByProvider);
         return copy;
     }

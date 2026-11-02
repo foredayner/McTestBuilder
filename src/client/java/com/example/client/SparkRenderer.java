@@ -67,6 +67,10 @@ public final class SparkRenderer {
         int emitted;
         double emitAcc;
         double lastAge = -1;
+        /** Its sound (and shake) still to come: it starts after a delay. */
+        boolean startDue;
+        /** A preview: it ends at this time even though it follows and loops (0 = no end). */
+        double until;
         /** Ribbon: where it has been ({x, y, z, time}), newest last. */
         final java.util.ArrayDeque<double[]> path = new java.util.ArrayDeque<>();
 
@@ -103,8 +107,10 @@ public final class SparkRenderer {
         }
         double now = now(client);
         for (Spark s : Spark.listFromJson(json)) {
-            add(new Effect(s, at, dir, scale, now, null, ""));
-            playSound(client, s, at);
+            // Layers may start later than the first (a flash, then a ring, then sparks).
+            Effect e = new Effect(s, at, dir, scale, now + s.delay, null, "");
+            e.startDue = true;
+            add(e);
         }
     }
 
@@ -344,7 +350,21 @@ public final class SparkRenderer {
         for (Iterator<Effect> it = EFFECTS.iterator(); it.hasNext(); ) {
             Effect e = it.next();
             Spark s = e.spark;
-            double age = Math.max(0, now - e.start);
+            if (now < e.start) {
+                continue; // a layer that starts later
+            }
+            if (e.until > 0 && now > e.until) {
+                it.remove();
+                continue;
+            }
+            double age = now - e.start;
+            if (e.startDue) {
+                e.startDue = false;
+                playSound(client, s, e.origin);
+                if (s.shake > 0 && client.player != null && client.player.getPos().squaredDistanceTo(e.origin) < 36) {
+                    ScreenShake.start(s.shake);
+                }
+            }
             boolean loops = e.follow != null && !e.once;
             double t = age / s.ticks;
             if (!loops && t >= 1) {
@@ -884,6 +904,47 @@ public final class SparkRenderer {
         }
         for (Spark s : Spark.listFromJson(json)) {
             add(new Effect(s, anchorPos(entity, anchor, 1.0F), dirOf(entity, anchor, 1.0F), 1, now(client), entity, anchor));
+        }
+    }
+
+    /**
+     * Preview equipment's effects without having it: its attack layers play in front of the player as
+     * if swung (bows: as if the arrow landed ahead), and its held or worn effects follow the player for
+     * a few seconds. Only this game sees it.
+     */
+    public static void preview(Spark.Effects fx, boolean worn) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.world == null || client.player == null || fx == null) {
+            return;
+        }
+        var p = client.player;
+        Vec3d look = p.getRotationVec(1.0F);
+        Vec3d flat = new Vec3d(look.x, 0, look.z);
+        flat = flat.lengthSquared() < 1e-6 ? new Vec3d(0, 0, 1) : flat.normalize();
+        Vec3d target = p.getEyePos().add(flat.multiply(3)).add(0, -0.6, 0);
+        double now = now(client);
+        for (Spark s : fx.attack) {
+            Vec3d at = switch (s.start) {
+                case "target" -> target;
+                case "ground" -> p.getPos().add(flat.multiply(3)).add(0, 0.05, 0);
+                case "above" -> target.add(0, 1.5, 0);
+                case "self" -> p.getPos().add(0, 0.9, 0);
+                default -> p.getEyePos().add(flat.multiply(1.2)).add(0, -0.35, 0);
+            };
+            Effect e = new Effect(s, at, flat, 1, now + 10 + s.delay, null, "");
+            e.startDue = true;
+            add(e);
+        }
+        for (Spark s : fx.idle) {
+            String anchor = !s.anchor.isEmpty() ? s.anchor : worn ? "body" : "item";
+            Effect e = new Effect(s, anchorPos(p, anchor, 1.0F), dirOf(p, anchor, 1.0F), 1, now, p, anchor);
+            e.until = now + 100;
+            add(e);
+        }
+        for (Spark s : fx.trail) {
+            // A ribbon or trail drawn once from the player to where the arrow would land.
+            Effect e = new Effect(s, target, flat, 1, now + 10, null, "");
+            add(e);
         }
     }
 

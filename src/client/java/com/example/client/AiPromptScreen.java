@@ -208,11 +208,19 @@ public class AiPromptScreen extends Screen {
             com.example.content.GearKind kind = AiClientState.getGearKind();
             button("   종류: " + kind.korean, right() - 84 - 92, top(), 88, b -> AiClientState.cycleGearKind());
             this.icons.add(new IconAt(new ItemStack(kind.icon), right() - 84 - 89, top() + 1));
+            int sx = right() - 84 - 92 - 80;
             if (kind == com.example.content.GearKind.SWORD) {
                 // Swords only: how the attack swing looks.
                 button("모션: " + com.example.content.GearMotions.korean(AiClientState.getMotion()), right() - 84 - 92 - 96, top(), 92,
                     b -> AiClientState.cycleMotion());
+                sx -= 96 - 80 + 80;
             }
+            // This player's own choice: big hits shake the view.
+            button(com.example.config.AiBuilderConfig.get().screenShake ? "흔들림: 켬" : "흔들림: 끔", sx, top(), 76, b -> {
+                com.example.config.AiBuilderConfig.get().screenShake = !com.example.config.AiBuilderConfig.get().screenShake;
+                com.example.config.AiBuilderConfig.save();
+                rebuild();
+            });
         }
 
         int y = bottom() - 42;
@@ -463,7 +471,8 @@ public class AiPromptScreen extends Screen {
         }
         int y = bottom() - 18;
         boolean object = "object".equals(record.kind);
-        int slots = object ? 4 : 3;
+        boolean previewable = "gear".equals(record.kind) && record.plan != null && record.plan.fx != null && !record.plan.fx.isEmpty();
+        int slots = object || previewable ? 4 : 3;
         int quarter = (right() - left() - 4 * (slots - 1)) / slots;
         int scale = object ? SCALES[scaleIndex] : 100;
         String size = object ? " " + com.example.ai.build.RebuildService.scaleLabel(scale / 100.0) : "";
@@ -490,6 +499,14 @@ public class AiPromptScreen extends Screen {
         this.icons.add(new IconAt(new ItemStack(gear ? com.example.content.GearKind.of(record.gear).icon
             : object ? Items.ARMOR_STAND : Items.PAPER), x + 3, y + 1));
         x += quarter + 4;
+        if (previewable) {
+            // See its effects play here first (only this game sees them).
+            button("이펙트 보기", x, y, quarter, b -> {
+                SparkRenderer.preview(record.plan.fx, com.example.content.GearKind.of(record.gear).worn());
+                this.client.setScreen(null);
+            });
+            x += quarter + 4;
+        }
         this.addDrawableChild(new WoodButton(x, y, right() - x, 18,
             Text.literal(this.confirmDelete ? "정말 삭제?" : "삭제"), b -> {
                 if (!this.confirmDelete) {

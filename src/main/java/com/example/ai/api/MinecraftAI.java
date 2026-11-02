@@ -220,7 +220,32 @@ public class MinecraftAI {
         if (recorder == null) {
             return;
         }
-        Spark spark = Spark.fromMap(settings);
+        addEffect(when, Spark.fromMap(settings));
+    }
+
+    /**
+     * A ready-made effect of a few layers (see EffectPresets), optionally changed: ai.preset('attack',
+     * 'fire_slash') or ai.preset('attack', 'frost', [colors: ['#ffffff', '#ff80ff'], scale: 1.3, sound: '']).
+     */
+    public static void preset(String when, String name, java.util.Map<?, ?> changes) {
+        if (recorder == null) {
+            return;
+        }
+        String w = switch (when == null ? "" : when.trim().toLowerCase(Locale.ROOT)) {
+            case "hit", "land" -> "attack";
+            case "held", "worn" -> "idle";
+            default -> when == null ? "" : when.trim().toLowerCase(Locale.ROOT);
+        };
+        String kind = com.example.ai.build.EffectPresets.whenOf(name);
+        if (kind != null && !kind.equals(w)) {
+            throw new IllegalArgumentException("preset '" + name + "' is for '" + kind + "', not '" + when + "'");
+        }
+        for (Spark spark : com.example.ai.build.EffectPresets.build(name, changes)) {
+            addEffect(w, spark);
+        }
+    }
+
+    private static void addEffect(String when, Spark spark) {
         if (!spark.sound.isEmpty()
             && !net.minecraft.registry.Registries.SOUND_EVENT.containsId(net.minecraft.util.Identifier.ofVanilla(spark.sound))) {
             throw new IllegalArgumentException("effect: no vanilla sound '" + spark.sound + "'; use one like 'entity.blaze.shoot', "
@@ -229,12 +254,12 @@ public class MinecraftAI {
         String w = when == null ? "" : when.trim().toLowerCase(Locale.ROOT);
         switch (w) {
             case "attack", "hit", "land" -> {
-                if (recorder.fx.attack.size() < 3) {
+                if (recorder.fx.attack.size() < Spark.MAX_ATTACK) {
                     recorder.fx.attack.add(spark);
                 }
             }
             case "idle", "held", "worn" -> {
-                if (recorder.fx.idle.size() < 2) {
+                if (recorder.fx.idle.size() < Spark.MAX_IDLE) {
                     recorder.fx.idle.add(spark);
                 }
             }

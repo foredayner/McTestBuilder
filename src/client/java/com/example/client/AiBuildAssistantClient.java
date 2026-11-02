@@ -67,6 +67,7 @@ public class AiBuildAssistantClient implements ClientModInitializer {
             }
             ObjectBreaking.tick(client);
             SparkRenderer.tick(client);
+            ScreenShake.tick(client);
         });
         net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.AFTER_ENTITIES.register(SparkRenderer::render);
     }

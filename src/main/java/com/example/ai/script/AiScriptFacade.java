@@ -222,6 +222,15 @@ public final class AiScriptFacade {
         MinecraftAI.effect(when, settings);
     }
 
+    /** A ready-made layered effect: ai.preset('attack', 'fire_slash') or with changes [colors: [...], scale: 1.2, sound: '']. */
+    public void preset(String when, String name) {
+        MinecraftAI.preset(when, name, null);
+    }
+
+    public void preset(String when, String name, java.util.Map<?, ?> changes) {
+        MinecraftAI.preset(when, name, changes);
+    }
+
     public void mark(String name, Number x, Number y, Number z) {
         MinecraftAI.mark(name, x, y, z);
     }

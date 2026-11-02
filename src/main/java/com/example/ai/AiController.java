@@ -740,15 +740,21 @@ public class AiController {
     }
 
     /** API and rules for effects, added to the equipment prompts. */
-    static final String EFFECT_API = """
+    static final String EFFECT_API = effectApi();
+
+    private static String effectApi() {
+        return EFFECT_API_TEXT.replace("%PRESETS%", com.example.ai.build.EffectPresets.catalogue());
+    }
+
+    private static final String EFFECT_API_TEXT = """
             EFFECTS (use ONLY what the request's effect lines ask for; if a line says "none", make nothing for it).
             Effects are dots arranged into a shape and moved over time. Make the shape, colours, look and movement
             match the words of the request (a pink heart flying forward = a pink heart shape moving forward). Make them
             rich, not flat: give the dots a fitting look, a colour ramp, some variation and physics, and layer 2-3
             effects (a bright core + sparks flying off + a fading ring) instead of one plain shape.
               ai.effect(when, [settings])
-                when: 'attack' (weapons: when it is swung; bows: where the arrow lands; up to 3, they play together)
-                      'idle'   (while held or worn; up to 2)
+                when: 'attack' (weapons: when it is swung; bows: where the arrow lands; up to 5 layers)
+                      'idle'   (while held or worn; up to 3)
                       'trail'  (bows only: behind the arrow in flight; copies are left along its path)
                 settings (all optional):
                   shape: 'burst' (ball of dots), 'sphere' (hollow ball), 'circle', 'ring', 'heart', 'star', 'crescent',
@@ -784,6 +790,10 @@ public class AiController {
                   gravity: blocks/s^2 the dots fall (sparks 3-6, embers 1; negative floats up like smoke, -0.5)
                   drag: 0-1 (moving dots slow down and stop: bursts that puff out and hang, 0.3-0.7)
                   turbulence: 0-1 (dots drift and swirl: smoke, magic dust, embers in the air)
+                  delay: ticks after the swing this layer starts (0-40): stage the layers, e.g. a flash at 0, the
+                         ring at 2, sparks at 3, so a hit builds up instead of everything popping at once
+                  shake: 0-1 (attack only: a big hit shakes the view of whoever is right there; hammers, thunder,
+                         explosions 0.4-0.8; leave it out for ordinary swings)
                   sound: a vanilla sound when it starts, e.g. 'entity.blaze.shoot', 'entity.lightning_bolt.thunder',
                          'block.amethyst_block.chime', 'entity.player.attack.sweep', 'item.trident.riptide_1',
                          'block.fire.extinguish', 'entity.evoker.cast_spell'   volume: 0-2   pitch: 0.5-2
@@ -800,6 +810,15 @@ public class AiController {
                   ticks: how long it lives (20 = 1 second); for idle without 'every', one loop
                   every: idle and trail: ticks between new copies (0 = one copy that stays and loops, e.g. a ring
                          orbiting the item)
+            READY-MADE EFFECTS: whole layered effects made by hand; START FROM ONE when the request fits one, then
+            adjust it and/or add your own layer:
+              ai.preset(when, name)   or   ai.preset(when, name, [colors: ['#rrggbb', ...], scale: 1.3, sound: '...', shake: 0.5])
+                colors: 1-4 colours replacing the preset's (keep their light-to-dark order); scale: size x0.3-3;
+                sound: another vanilla sound, or '' for none; shake: 0-1
+            %PRESETS%            e.g. ai.preset('attack', 'frost', [colors: ['#ffffff', '#ffb0f0', '#c040c0'], scale: 1.2])  // pink ice
+                 ai.preset('idle', 'flame_aura')
+                 ai.effect('attack', [shape: 'star', look: 'star', color: '#ffe080', size: 0.6, count: 12, start: 'target',
+                                      moves: ['expand', 'fade'], delay: 5, ticks: 14])   // an extra layer of your own
             Examples:
               // a fire slash: the blade's glowing band, sparks thrown off it that fall, and real flames
               ai.effect('attack', [form: 'swipe', colors: ['#ffffff', '#ffc040', '#ff3000'], size: 1.4, arc: 170,

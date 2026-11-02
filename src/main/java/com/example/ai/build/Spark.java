@@ -29,6 +29,9 @@ public final class Spark {
     /** Where an effect while held or worn sits. */
     public static final List<String> ANCHORS = List.of("item", "head", "body", "back", "feet", "around");
     public static final int MAX_DOTS = 96;
+    /** Layers of an attack effect, and effects while held or worn. */
+    public static final int MAX_ATTACK = 5;
+    public static final int MAX_IDLE = 3;
     /**
      * What the effect is drawn as: dots (the shape's dots), or one smooth piece: swipe (the glowing
      * band a blade leaves), shockwave (a ring spreading over the ground), pillar (a column of light
@@ -94,12 +97,16 @@ public final class Spark {
     public String sound = "";
     public double volume = 1;
     public double pitch = 1;
+    /** Ticks after the others it starts (layers: a flash, then a ring, then sparks). */
+    public int delay = 0;
+    /** 0-1: shakes the view of whoever is right there when it starts (big hits; players can turn it off). */
+    public double shake = 0;
 
     /** All effects of one piece of equipment. */
     public static final class Effects {
-        /** Weapons: when swung (bows: where the arrow lands). At most 3, they play together. */
+        /** Weapons: when swung (bows: where the arrow lands). At most 5 layers, each may start later (delay). */
         public List<Spark> attack = new ArrayList<>();
-        /** While held or worn. At most 2. */
+        /** While held or worn. At most 3. */
         public List<Spark> idle = new ArrayList<>();
         /** Bows: behind the arrow in flight. At most 1. */
         public List<Spark> trail = new ArrayList<>();
@@ -118,8 +125,8 @@ public final class Spark {
                 if (set == null) {
                     return new Effects();
                 }
-                set.attack = clean(set.attack, 3);
-                set.idle = clean(set.idle, 2);
+                set.attack = clean(set.attack, MAX_ATTACK);
+                set.idle = clean(set.idle, MAX_IDLE);
                 set.trail = clean(set.trail, 1);
                 return set;
             } catch (RuntimeException exception) {
@@ -218,6 +225,8 @@ public final class Spark {
         sound = sound != null && sound.matches("[a-z0-9_.]{1,80}") ? sound : "";
         volume = clamp(volume, 0, 2);
         pitch = clamp(pitch, 0.5, 2);
+        delay = (int) clamp(delay, 0, 40);
+        shake = clamp(shake, 0, 1);
         if (points != null) {
             List<double[]> p = new ArrayList<>();
             for (double[] q : points) {
@@ -290,6 +299,8 @@ public final class Spark {
                     s.sound = snd;
                 }
                 case "volume" -> s.volume = num(v, key);
+                case "delay", "wait" -> s.delay = (int) Math.round(num(v, key));
+                case "shake" -> s.shake = num(v, key);
                 case "pitch" -> s.pitch = num(v, key);
                 case "move", "moves" -> {
                     s.moves = new ArrayList<>();
@@ -321,7 +332,7 @@ public final class Spark {
                 }
                 default -> throw new IllegalArgumentException("unknown effect setting '" + key + "'; use shape, color, color2, "
                     + "colors, size, count, dot, look, form, arc, width, particle, vary, gravity, drag, turbulence, plane, start, anchor, moves, speed, "
-                    + "ticks, every, fill, lines, points, sound, volume, pitch");
+                    + "ticks, every, fill, lines, points, sound, volume, pitch, delay, shake");
             }
         }
         if ("points".equals(s.shape) && (s.points == null || s.points.isEmpty())) {

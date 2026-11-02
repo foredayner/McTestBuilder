@@ -563,6 +563,35 @@ public class AibGameTests implements FabricGameTest {
         });
     }
 
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void readyMadeEffectsUseRealSoundsAndWorkFromAScript(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        for (var e : com.example.ai.build.EffectPresets.all().entrySet()) {
+            for (var s : com.example.ai.build.EffectPresets.build(e.getKey(), null)) {
+                check(s.sound.isEmpty() || net.minecraft.registry.Registries.SOUND_EVENT.containsId(
+                    net.minecraft.util.Identifier.ofVanilla(s.sound)), e.getKey() + ": no sound " + s.sound);
+            }
+        }
+        BuildPlan plan = Demo.plan(world, origin, player, """
+            ai.addCapsule('iron_block', 0, -0.1, 0, 0, 1.2, 0, 0.04)
+            ai.preset('attack', 'lightning')
+            ai.preset('attack', 'fire_slash', [scale: 1.2, sound: ''])
+            ai.preset('idle', 'flame_aura')
+            """, true);
+        check(plan.fx.attack.size() == com.example.ai.build.Spark.MAX_ATTACK, "layers up to the limit: " + plan.fx.attack.size());
+        check(plan.fx.idle.size() == 2, "the idle preset's two layers");
+        boolean wrong = false;
+        try {
+            Demo.plan(world, origin, player, "ai.addCapsule('iron_block', 0, -0.1, 0, 0, 1.2, 0, 0.04)\nai.preset('idle', 'holy')\n", true);
+        } catch (RuntimeException expected) {
+            wrong = true;
+        }
+        check(wrong, "an attack preset is refused for 'idle'");
+        context.complete();
+    }
+
     @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 600)
     public void anObjectStillBeingPlacedCannotBeMinedAndRemovingItStopsIt(TestContext context) {
         ServerWorld world = context.getWorld();

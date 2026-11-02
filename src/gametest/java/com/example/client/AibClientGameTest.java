@@ -297,6 +297,16 @@ public class AibClientGameTest implements FabricClientGameTest {
                 com.example.client.SparkRenderer.clearForTests();
                 client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON);
             });
+            // A ready-made layered effect played as a preview (the 보관함's "이펙트 보기"): holy light and a flame aura.
+            context.runOnClient(client -> {
+                var fx = new com.example.ai.build.Spark.Effects();
+                fx.attack.addAll(com.example.ai.build.EffectPresets.build("holy", null));
+                fx.idle.addAll(com.example.ai.build.EffectPresets.build("flame_aura", null));
+                com.example.client.SparkRenderer.preview(fx, false);
+            });
+            context.waitTicks(18);
+            context.takeScreenshot("34d_preset_preview");
+            context.runOnClient(client -> com.example.client.SparkRenderer.clearForTests());
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
 
             // A bow with its own arrow shape: in the hand, and one of its arrows hanging in the air.
