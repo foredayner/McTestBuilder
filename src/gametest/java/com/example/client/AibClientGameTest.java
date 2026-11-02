@@ -281,13 +281,13 @@ public class AibClientGameTest implements FabricClientGameTest {
                     "size", 2.4, "width", 0.3, "ticks", 40)), p.getPos().add(flat.multiply(3)), flat, 1);
                 com.example.client.SparkRenderer.play(one.apply(java.util.Map.of("form", "pillar", "colors",
                     List.of("#ffffff", "#ffe080"), "size", 0.8, "width", 0.3, "ticks", 60)),
-                    p.getPos().add(flat.multiply(4)).add(side.multiply(2)), flat, 1);
+                    p.getPos().add(flat.multiply(1.8)).add(side.multiply(1.6)), flat, 1);
                 com.example.client.SparkRenderer.play(one.apply(java.util.Map.of("form", "disc", "colors",
                     List.of("#e0b0ff", "#7020ff"), "size", 1.3, "plane", "flat", "moves", List.of("spin"), "speed", 0.2, "ticks", 60)),
                     p.getPos().add(flat.multiply(3.5)).add(side.multiply(-2)).add(0, 0.05, 0), flat, 1);
                 com.example.client.SparkRenderer.attachForTests(p, one.apply(java.util.Map.of("form", "ribbon", "colors",
-                    List.of("#ffffff", "#40c0ff"), "size", 0.35, "width", 0.6, "moves", List.of("orbit"), "speed", 0.6, "ticks", 14)),
-                    "body");
+                    List.of("#ffffff", "#40c0ff"), "size", 0.8, "width", 0.6, "moves", List.of("orbit"), "speed", 0.6, "ticks", 14)),
+                    "head");
             });
             context.waitTicks(10);
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK));
