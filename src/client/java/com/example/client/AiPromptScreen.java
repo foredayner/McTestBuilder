@@ -879,7 +879,17 @@ public class AiPromptScreen extends Screen {
             ctx.fill(r - 7 - sw, y + 2, r - 7, y + JROW - 3, statusColor(j.status));
             ctx.drawText(this.textRenderer, status, r - 4 - sw, y + 4, PAPER, false);
             int sx = l + 12 + this.textRenderer.getWidth("00-00 00:00");
-            ctx.drawText(this.textRenderer, ellipsize(j.summary(), r - 14 - sw - sx), sx, y + 4, INK, false);
+            int room = r - 14 - sw - sx;
+            String summary = ellipsize(j.summary(), room);
+            ctx.drawText(this.textRenderer, summary, sx, y + 4, INK, false);
+            if (j.model != null && !j.model.isEmpty()) {
+                // Which model did it, after the line (shortened when it is long).
+                int mx = sx + this.textRenderer.getWidth(summary) + 6;
+                int left = r - 14 - sw - mx;
+                if (left > 30) {
+                    ctx.drawText(this.textRenderer, ellipsize("· " + j.model, left), mx, y + 4, INK_SOFT, false);
+                }
+            }
         }
         if (jobs.size() > rows) {
             String more = (journalScroll + 1) + "-" + Math.min(jobs.size(), journalScroll + rows) + " / " + jobs.size();
@@ -899,6 +909,9 @@ public class AiPromptScreen extends Screen {
         };
         add.accept(j.summary() + " · " + statusText(j.status), TAG);
         add.accept(DATE.format(new Date(j.time)), INK_SOFT);
+        if (j.model != null && !j.model.isEmpty()) {
+            add.accept("AI: " + (j.provider == null || j.provider.isEmpty() ? "" : j.provider + " / ") + j.model, INK_SOFT);
+        }
         add.accept("주문: " + j.prompt, INK);
         if (j.fxHit != null && !j.fxHit.isEmpty()) {
             add.accept(("gear".equals(j.kind) && "bow".equals(j.gear) ? "화살: " : "공격 시: ") + j.fxHit, INK);

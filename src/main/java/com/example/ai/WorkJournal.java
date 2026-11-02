@@ -52,6 +52,9 @@ public final class WorkJournal {
         public String fxHit = "";
         public String fxIdle = "";
         public String motion = "";
+        /** The AI that was asked (when the request was sent); empty in older entries. */
+        public String provider = "";
+        public String model = "";
         public long time;
         public String status = WORKING;
         public List<String> lines = new ArrayList<>();
@@ -148,6 +151,9 @@ public final class WorkJournal {
         job.fxHit = cut(fxHit);
         job.fxIdle = cut(fxIdle);
         job.motion = motion == null ? "" : motion;
+        com.example.config.AiBuilderConfig config = com.example.config.AiBuilderConfig.get();
+        job.provider = config.provider == null ? "" : config.provider.getDisplayName();
+        job.model = config.modelName == null ? "" : config.modelName;
         JOBS.add(job);
         while (JOBS.size() > MAX_JOBS) {
             JOBS.remove(0);

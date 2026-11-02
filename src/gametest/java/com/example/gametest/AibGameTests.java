@@ -354,6 +354,7 @@ public class AibGameTests implements FabricGameTest {
 
         com.example.ai.WorkJournal.Job job = com.example.ai.WorkJournal.start(player, "푸른 검", "gear:sword", "불꽃", "", "slash");
         check(job.summary().endsWith("님이 장비(검)를 요청했어요"), "one line per request: " + job.summary());
+        check(job.model.equals(java.util.Objects.toString(com.example.config.AiBuilderConfig.get().modelName, "")), "it records the model that was asked");
         com.example.ai.WorkJournal.log(player, "[AI] Asking the AI to fix it (retry 1/2)...");
         check(com.example.ai.WorkJournal.WORKING.equals(job.status), "still working");
         com.example.ai.WorkJournal.log(player, "[AI] 완성! Size: 1 x 1 x 1");
