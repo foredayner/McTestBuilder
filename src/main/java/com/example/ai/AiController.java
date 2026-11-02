@@ -70,14 +70,19 @@ public class AiController {
 
     static final String PIXEL_STYLE = """
             PIXEL STYLE (this decides the quality):
-            - Draw like a resource-pack artist: a 1-pixel outline in a dark shade of the main colour (not pure black),
-              2-3 shades per material (light on the top-left, dark on the bottom-right), a few bright highlight pixels
-              and small accents (gems, runes, rivets, stitches). Clean, readable shapes; no noise.
+            - Draw like a resource-pack artist: 2-3 shades per material (light on top and the top-left, dark below and
+              on the bottom-right), a few bright highlight pixels and small accents (gems, runes, rivets, stitches).
+              Flat pictures (pixelArt) get a 1-pixel outline in a dark shade of the main colour (not pure black); 3D
+              boxes need no outline, their shades and edges show the form. Clean, readable shapes; no noise.
             - 3-6 colours, at most 16. Each run of same-coloured pixels becomes one piece: at most 400 pieces in all.
-            - Hand-held: draw it UPRIGHT (pointing up), the handle at the bottom centre, and place it with
-              ai.pixelArt(palette, rows, 0, -0.2, 0) so the hand holds the handle. 16-32 pixels tall for normal weapons
-              and tools (1-2 blocks), up to 48 for big ones; at most 24 wide. Make it bigger with pixelSize, not with
-              more pixels. A bow is held at its middle: its bottom-centre at y = -(height / 2).
+            - Build it in 3D like a Blockbench model: every part is its own ai.pixelBox with pictures on the faces that
+              show (blade, guard, grip, pommel, axe head, haft, gems and studs that stand out), sizes and places in whole
+              pixels (def u = 0.0625, then 3 * u...). A face picture has one letter per pixel of that face (a 3 x 16-pixel
+              blade face is 3 letters x 16 rows). Corners left empty ('.') round a box off. Use ai.pixelArt only for
+              really flat bits (a blade tip, a feather, a flat ornament).
+            - Hand-held: upright, the hand at (0, 0, 0) on the grip, the item going up (+Y). 16-32 pixels long for normal
+              weapons and tools (1-2 blocks), up to 48 for big ones; blades 1-2 pixels thick, handles 2 pixels square.
+              A bow is held at its middle.
             - Worn: cover the body part with ai.pixelBox a little outside it (0.03), 8 x 8 pixels per head face, 8 x 12
               for the torso front and back, 4 x 12 for its sides and for each leg face; add things that stick out (horns,
               crests, plumes, wings, feathers, ears) with ai.pixelArt, turned with yaw so they face the right way
@@ -86,24 +91,34 @@ public class AiController {
             """;
 
     public static final String EXAMPLE_PIXEL_SWORD = """
-        // pixel art knight sword: 9 x 24 pixels, upright, handle at the bottom
-        def p = [O: '#1e2430', L: '#e8eef5', S: '#b8c2cc', D: '#7f8b97', G: '#d4af37', g: '#9c7a1c', B: '#6b4423', b: '#4a2e17']
-        ai.pixelArt(p, [
-          '....O....', '...OLO...', '...OLDO..',
-          '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..',
-          '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..', '..OLSDO..',
-          'OGGGGGGGO', '.OgGGGgO.', '...OBO...', '...ObO...', '...OBO...', '...ObO...',
-          '..OGGGO..', '..OGgGO..', '...OOO...'], 0, -0.2, 0)
+        // 3D pixel art knight sword, built like a Blockbench model: each part is a pixel box with its own pictures,
+        // sizes and places in whole pixels (u = 1/16 block); the hand is at (0, 0, 0) on the grip, the blade goes up
+        def u = 0.0625
+        def p = [L: '#e8eef5', S: '#b8c2cc', D: '#7f8b97', E: '#5f6b78', G: '#d4af37', g: '#9c7a1c', B: '#6b4423', b: '#4a2e17', M: '#2ecc71']
+        def blade = ['LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD', 'LSD']
+        def edge = ['E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E']
+        ai.pixelBox(p, -1.5 * u, 4 * u, -0.5 * u, 3 * u, 16 * u, 1 * u, [front: blade, back: blade, left: edge, right: edge])  // blade, 1 pixel thick
+        ai.pixelArt(p, ['.L.', 'LSD'], 0, 20 * u, 0)                                                         // flat tip
+        ai.pixelBox(p, -4 * u, 2 * u, -1 * u, 8 * u, 2 * u, 2 * u, [front: ['GGGGGGGG', 'gggggggg'], back: ['GGGGGGGG', 'gggggggg'],
+          left: ['GG', 'gg'], right: ['GG', 'gg'], top: ['GGGGGGGG', 'GGGGGGGG'], bottom: ['gggggggg', 'gggggggg']])   // cross guard
+        ai.pixelBox(p, -0.5 * u, 2.5 * u, -1.5 * u, u, u, 0.5 * u, [front: ['M'], left: ['M'], right: ['M'], top: ['M']])  // gem standing out
+        def grip = ['Bb', 'bB', 'Bb', 'bB', 'Bb']
+        ai.pixelBox(p, -1 * u, -3 * u, -1 * u, 2 * u, 5 * u, 2 * u, [front: grip, back: grip, left: grip, right: grip])  // grip
+        ai.pixelBox(p, -1.5 * u, -5 * u, -1.5 * u, 3 * u, 2 * u, 3 * u, [front: ['GGG', 'ggg'], back: ['GGG', 'ggg'],
+          left: ['GGG', 'ggg'], right: ['GGG', 'ggg'], bottom: ['ggg', 'ggg', 'ggg']])                               // pommel
         """;
 
     public static final String EXAMPLE_PIXEL_STAFF = """
-        // pixel art magic staff: purple gem on a wooden shaft, 7 x 24 pixels, drawn a little bigger
-        def pal = [O: '#2a1a3a', P: '#9b59d0', p: '#6c3483', W: '#f5e6ff', G: '#d4af37', B: '#7a5230', b: '#5a3a20']
-        ai.pixelArt(pal, [
-          '..OOO..', '.OPWPO.', 'OPWPpPO', 'OPPppPO', '.OppPO.', '..OGO..',
-          '..OBO..', '..ObO..', '..OBO..', '..OBO..', '..ObO..', '..OBO..', '..OBO..', '..ObO..',
-          '..OBO..', '..OBO..', '..ObO..', '..OBO..', '..OBO..', '..ObO..', '..OBO..', '..OGO..',
-          '..OGO..', '...O...'], 0, -0.25, 0, 0.07)
+        // 3D pixel art magic staff: a wooden shaft, a gold ring and a purple gem head with cut corners (u = 1/16 block)
+        def u = 0.0625
+        def pal = [P: '#9b59d0', p: '#6c3483', W: '#f5e6ff', G: '#d4af37', g: '#9c7a1c', B: '#7a5230', b: '#5a3a20']
+        def shaft = ['BB', 'Bb', 'BB', 'bB', 'BB', 'Bb', 'BB', 'bB', 'BB', 'Bb', 'BB', 'bB', 'BB', 'Bb', 'BB', 'bB']
+        ai.pixelBox(pal, -1 * u, -4 * u, -1 * u, 2 * u, 16 * u, 2 * u, [front: shaft, back: shaft, left: shaft, right: shaft, bottom: ['bb', 'bb']])
+        def ring = ['GGG', 'ggg']
+        ai.pixelBox(pal, -1.5 * u, 12 * u, -1.5 * u, 3 * u, 2 * u, 3 * u, [front: ring, back: ring, left: ring, right: ring])
+        def gem = ['.PP.', 'PWpP', 'PppP', '.PP.']
+        ai.pixelBox(pal, -2 * u, 14 * u, -2 * u, 4 * u, 4 * u, 4 * u, [front: gem, back: gem, left: gem, right: gem,
+          top: ['.PP.', 'PPPP', 'PPPP', '.PP.'], bottom: ['.pp.', 'pppp', 'pppp', '.pp.']])
         """;
 
     public static final String EXAMPLE_PIXEL_HELMET = """
