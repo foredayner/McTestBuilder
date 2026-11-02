@@ -29,6 +29,13 @@ public final class Spark {
     /** Where an effect while held or worn sits. */
     public static final List<String> ANCHORS = List.of("item", "head", "body", "back", "feet", "around");
     public static final int MAX_DOTS = 96;
+    /** What each dot looks like (cells of textures/misc/looks.png). */
+    public static final List<String> LOOKS = List.of("dot", "glow", "star", "streak", "shard", "rune", "ember", "ring");
+    /** Vanilla particles an effect may use instead of its own dots ("dust" takes the effect's colours). */
+    public static final List<String> PARTICLES = List.of("flame", "soul_fire_flame", "small_flame", "end_rod", "cherry_leaves",
+        "snowflake", "electric_spark", "glow", "enchant", "smoke", "large_smoke", "cloud", "bubble", "heart", "note", "crit",
+        "enchanted_hit", "totem_of_undying", "witch", "portal", "sculk_soul", "wax_on", "scrape", "lava", "firework", "soul",
+        "ash", "white_ash", "spore_blossom_air", "poof", "dust");
 
     public String shape = "burst";
     /** Shape "points": custom points in shape units (-1..1), as [u, v] or [u, v, w]. */
@@ -56,6 +63,24 @@ public final class Spark {
     public int ticks = 14;
     /** Held/worn and trails: ticks between new copies (0 = one copy that loops in place). */
     public int every = 0;
+    /** How each dot looks (see {@link #LOOKS}). */
+    public String look = "dot";
+    /** A vanilla particle drawn instead of the dots ("" = our own dots; see {@link #PARTICLES}). */
+    public String particle = "";
+    /** Colours over its life, 2-4 stops (overrides color and color2 when set). */
+    public int[] colors;
+    /** 0-1: how much the dots differ from each other in size, life and fall (0 = all the same). */
+    public double vary = 0;
+    /** Blocks per second squared the dots fall (negative: they float up, like smoke). */
+    public double gravity = 0;
+    /** 0-1: air resistance; moving dots slow down and come to rest. */
+    public double drag = 0;
+    /** 0-1: dots drift and swirl like smoke or embers in the air. */
+    public double turbulence = 0;
+    /** A vanilla sound played when the effect starts (e.g. 'entity.blaze.shoot'), or "". */
+    public String sound = "";
+    public double volume = 1;
+    public double pitch = 1;
 
     /** All effects of one piece of equipment. */
     public static final class Effects {
@@ -157,6 +182,26 @@ public final class Spark {
         every = (int) clamp(every, 0, 40);
         color &= 0xFFFFFF;
         color2 = color2 < 0 ? -1 : color2 & 0xFFFFFF;
+        look = look != null && LOOKS.contains(look) ? look : "dot";
+        particle = particle != null && PARTICLES.contains(particle) ? particle : "";
+        if (colors != null) {
+            int n = Math.min(4, colors.length);
+            int[] c = new int[n];
+            for (int i = 0; i < n; i++) {
+                c[i] = colors[i] & 0xFFFFFF;
+            }
+            colors = n >= 2 ? c : null;
+            if (colors != null) {
+                color = colors[0];
+            }
+        }
+        vary = clamp(vary, 0, 1);
+        gravity = clamp(gravity, -3, 8);
+        drag = clamp(drag, 0, 1);
+        turbulence = clamp(turbulence, 0, 1);
+        sound = sound != null && sound.matches("[a-z0-9_.]{1,80}") ? sound : "";
+        volume = clamp(volume, 0, 2);
+        pitch = clamp(pitch, 0.5, 2);
         if (points != null) {
             List<double[]> p = new ArrayList<>();
             for (double[] q : points) {
@@ -200,6 +245,33 @@ public final class Spark {
                 case "every" -> s.every = (int) Math.round(num(v, key));
                 case "fill" -> s.fill = Boolean.TRUE.equals(v) || "true".equals(String.valueOf(v));
                 case "lines" -> s.lines = Boolean.TRUE.equals(v) || "true".equals(String.valueOf(v));
+                case "look" -> s.look = word(v, LOOKS, "look");
+                case "particle" -> {
+                    String p = String.valueOf(v).trim().toLowerCase(Locale.ROOT).replace("minecraft:", "");
+                    s.particle = word(p, PARTICLES, "particle");
+                }
+                case "colors", "colours" -> {
+                    if (!(v instanceof List<?> list) || list.size() < 2 || list.size() > 4) {
+                        throw new IllegalArgumentException("colors is a list of 2-4 colours like ['#ffffff', '#ffcc33', '#ff3300']");
+                    }
+                    s.colors = new int[list.size()];
+                    for (int i = 0; i < list.size(); i++) {
+                        s.colors[i] = color(list.get(i));
+                    }
+                }
+                case "vary" -> s.vary = num(v, key);
+                case "gravity" -> s.gravity = num(v, key);
+                case "drag" -> s.drag = num(v, key);
+                case "turbulence", "swirl" -> s.turbulence = num(v, key);
+                case "sound" -> {
+                    String snd = String.valueOf(v).trim().toLowerCase(Locale.ROOT).replace("minecraft:", "");
+                    if (!snd.matches("[a-z0-9_.]{1,80}")) {
+                        throw new IllegalArgumentException("sound is a vanilla sound id like 'entity.blaze.shoot', got '" + v + "'");
+                    }
+                    s.sound = snd;
+                }
+                case "volume" -> s.volume = num(v, key);
+                case "pitch" -> s.pitch = num(v, key);
                 case "move", "moves" -> {
                     s.moves = new ArrayList<>();
                     if (v instanceof List<?> list) {
@@ -229,7 +301,8 @@ public final class Spark {
                     s.shape = "points";
                 }
                 default -> throw new IllegalArgumentException("unknown effect setting '" + key + "'; use shape, color, color2, "
-                    + "size, count, dot, plane, start, anchor, moves, speed, ticks, every, fill, lines, points");
+                    + "colors, size, count, dot, look, particle, vary, gravity, drag, turbulence, plane, start, anchor, moves, speed, "
+                    + "ticks, every, fill, lines, points, sound, volume, pitch");
             }
         }
         if ("points".equals(s.shape) && (s.points == null || s.points.isEmpty())) {

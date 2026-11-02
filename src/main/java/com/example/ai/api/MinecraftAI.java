@@ -221,6 +221,11 @@ public class MinecraftAI {
             return;
         }
         Spark spark = Spark.fromMap(settings);
+        if (!spark.sound.isEmpty()
+            && !net.minecraft.registry.Registries.SOUND_EVENT.containsId(net.minecraft.util.Identifier.ofVanilla(spark.sound))) {
+            throw new IllegalArgumentException("effect: no vanilla sound '" + spark.sound + "'; use one like 'entity.blaze.shoot', "
+                + "'entity.lightning_bolt.thunder', 'block.amethyst_block.chime', 'entity.player.attack.sweep', 'item.trident.riptide_1'");
+        }
         String w = when == null ? "" : when.trim().toLowerCase(Locale.ROOT);
         switch (w) {
             case "attack", "hit", "land" -> {

@@ -742,8 +742,10 @@ public class AiController {
     /** API and rules for effects, added to the equipment prompts. */
     static final String EFFECT_API = """
             EFFECTS (use ONLY what the request's effect lines ask for; if a line says "none", make nothing for it).
-            Effects are glowing colour dots arranged into a shape and moved over time. Make the shape, colours and
-            movement match the words of the request (a pink heart flying forward = a pink heart shape moving forward).
+            Effects are dots arranged into a shape and moved over time. Make the shape, colours, look and movement
+            match the words of the request (a pink heart flying forward = a pink heart shape moving forward). Make them
+            rich, not flat: give the dots a fitting look, a colour ramp, some variation and physics, and layer 2-3
+            effects (a bright core + sparks flying off + a fading ring) instead of one plain shape.
               ai.effect(when, [settings])
                 when: 'attack' (weapons: when it is swung; bows: where the arrow lands; up to 3, they play together)
                       'idle'   (while held or worn; up to 2)
@@ -755,6 +757,24 @@ public class AiController {
                          'points' (your own: points: [[u, v], ...] in -1..1 units; lines: true joins them in order)
                   fill: true            (dots fill the shape instead of drawing its outline)
                   color: '#rrggbb'      color2: '#rrggbb' (colour it turns into over its life)
+                  colors: ['#ffffff', '#ffd040', '#ff4010', '#401010']  (2-4 stops over its life, e.g. fire: white -> yellow
+                         -> red -> dark; ice: white -> light blue -> blue; overrides color/color2)
+                  look: what each dot looks like: 'dot' (round), 'glow' (big soft light), 'star' (twinkling 4-point
+                         star), 'streak' (stretched along its motion: sparks, rain, speed lines), 'shard' (spinning
+                         crystal or glass chip), 'rune' (spinning magic glyph), 'ember' (bright core, faint halo), 'ring'
+                  particle: a vanilla particle instead of our dots: 'flame', 'soul_fire_flame', 'small_flame',
+                         'end_rod', 'cherry_leaves', 'snowflake', 'electric_spark', 'glow', 'enchant', 'smoke',
+                         'large_smoke', 'cloud', 'bubble', 'heart', 'note', 'crit', 'enchanted_hit', 'totem_of_undying',
+                         'witch', 'portal', 'sculk_soul', 'wax_on', 'scrape', 'lava', 'firework', 'soul', 'ash',
+                         'white_ash', 'spore_blossom_air', 'poof', 'dust' (takes the colours). Real flames, leaves and
+                         smoke look best this way; the particle keeps moving on its own after it leaves the shape.
+                  vary: 0-1 (dots differ in size, life and fall; 0.3-0.6 looks natural)
+                  gravity: blocks/s^2 the dots fall (sparks 3-6, embers 1; negative floats up like smoke, -0.5)
+                  drag: 0-1 (moving dots slow down and stop: bursts that puff out and hang, 0.3-0.7)
+                  turbulence: 0-1 (dots drift and swirl: smoke, magic dust, embers in the air)
+                  sound: a vanilla sound when it starts, e.g. 'entity.blaze.shoot', 'entity.lightning_bolt.thunder',
+                         'block.amethyst_block.chime', 'entity.player.attack.sweep', 'item.trident.riptide_1',
+                         'block.fire.extinguish', 'entity.evoker.cast_spell'   volume: 0-2   pitch: 0.5-2
                   size: blocks (radius, 0.1-4)   count: dots (4-96; outlines 24-48, filled 40-80)   dot: dot size (0.02-0.3)
                   plane: 'front' (stands up, facing the way it goes), 'flat' (lies flat: ground circles, halos),
                          'side' (stands along the way it goes: a sword arc seen from the side)
@@ -769,14 +789,26 @@ public class AiController {
                   every: idle and trail: ticks between new copies (0 = one copy that stays and loops, e.g. a ring
                          orbiting the item)
             Examples:
+              // a fire slash: a glowing arc, sparks thrown off it that fall, and real flames
+              ai.effect('attack', [shape: 'slash', look: 'glow', colors: ['#ffffff', '#ffc040', '#ff3000'], size: 1.3,
+                                   count: 48, plane: 'side', start: 'weapon', moves: ['reveal', 'fade'], ticks: 9,
+                                   sound: 'entity.blaze.shoot', volume: 0.6])
+              ai.effect('attack', [shape: 'slash', look: 'streak', colors: ['#ffffa0', '#ff6000'], size: 1.3, count: 40,
+                                   plane: 'side', start: 'weapon', moves: ['scatter', 'fade'], speed: 4, gravity: 5,
+                                   drag: 0.3, vary: 0.6, ticks: 16])
+              ai.effect('attack', [shape: 'burst', particle: 'flame', size: 0.6, count: 24, start: 'target',
+                                   moves: ['scatter'], speed: 2, ticks: 10])
               ai.effect('attack', [shape: 'heart', fill: true, color: '#ff66cc', size: 0.45, count: 60, plane: 'front',
                                    start: 'weapon', moves: ['forward', 'pulse', 'fade'], speed: 7, ticks: 16])
               ai.effect('attack', [shape: 'slash', color: '#bfe8ff', color2: '#3060ff', size: 1.3, count: 64,
                                    plane: 'side', start: 'weapon', moves: ['reveal', 'fade'], ticks: 8])
               ai.effect('attack', [shape: 'magic_circle', color: '#b44cff', size: 1.5, count: 80, plane: 'flat',
                                    start: 'ground', moves: ['spin', 'expand', 'fade'], speed: 0.5, ticks: 30])
-              ai.effect('idle', [shape: 'burst', color: '#ffe680', size: 0.3, count: 6, anchor: 'item',
-                                 moves: ['rise', 'fade'], speed: 0.6, ticks: 20, every: 6])
+              ai.effect('idle', [shape: 'burst', look: 'ember', colors: ['#fff0a0', '#ff8020', '#602010'], size: 0.3,
+                                 count: 8, anchor: 'item', moves: ['rise', 'fade'], speed: 0.6, turbulence: 0.5, vary: 0.5,
+                                 ticks: 24, every: 6])
+              ai.effect('idle', [shape: 'circle', particle: 'cherry_leaves', size: 0.5, count: 6, anchor: 'item',
+                                 ticks: 40])
               ai.effect('idle', [shape: 'ring', color: '#9ff', size: 0.35, count: 24, plane: 'flat', anchor: 'head',
                                  moves: ['spin', 'pulse'], speed: 0.4, ticks: 40])
               ai.effect('trail', [shape: 'star', color: '#ffd84a', size: 0.15, count: 12, moves: ['shrink', 'fade'],

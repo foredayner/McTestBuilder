@@ -39,7 +39,9 @@ import java.util.WeakHashMap;
  */
 public final class SparkRenderer {
 
-    private static final Identifier TEXTURE = Identifier.of(AiBuildAssistantMod.MOD_ID, "textures/misc/spark.png");
+    /** The dot looks side by side (dot, glow, star, streak, shard, rune, ember, ring). */
+    private static final Identifier TEXTURE = Identifier.of(AiBuildAssistantMod.MOD_ID, "textures/misc/looks.png");
+    private static final int LOOK_CELLS = 8;
     private static final int MAX_EFFECTS = 160;
     private static final int MAX_DOTS_PER_FRAME = 9000;
     private static final double RANGE = 48;
@@ -58,6 +60,10 @@ public final class SparkRenderer {
         /** Plays once while following (an effect given off every few ticks moves with what gave it off). */
         final boolean once;
         boolean seen = true;
+        /** Vanilla particles given off so far, the part of one still owed, and the age they were last given at. */
+        int emitted;
+        double emitAcc;
+        double lastAge = -1;
 
         Effect(Spark spark, Vec3d origin, Vec3d dir, double scale, double start, Entity follow, String anchor) {
             this(spark, origin, dir, scale, start, follow, anchor, false);
@@ -93,6 +99,7 @@ public final class SparkRenderer {
         double now = now(client);
         for (Spark s : Spark.listFromJson(json)) {
             add(new Effect(s, at, dir, scale, now, null, ""));
+            playSound(client, s, at);
         }
     }
 
@@ -180,7 +187,11 @@ public final class SparkRenderer {
             if ((time + entity.getId()) % s.every == 0) {
                 // Arrows leave theirs behind as a trail; on a wearer or a held item it moves along with them.
                 Entity follow = entity instanceof AibArrowEntity ? null : entity;
-                add(new Effect(s, anchorPos(entity, anchor, 1.0F), dirOf(entity, anchor, 1.0F), 1, now, follow, anchor, true));
+                Vec3d at = anchorPos(entity, anchor, 1.0F);
+                add(new Effect(s, at, dirOf(entity, anchor, 1.0F), 1, now, follow, anchor, true));
+                if (s.every >= 10) {
+                    playSound(MinecraftClient.getInstance(), s, at); // not for copies every few ticks: that would buzz
+                }
             }
             return;
         }
@@ -323,6 +334,7 @@ public final class SparkRenderer {
         RenderLayer layer = RenderLayer.getEntityTranslucentEmissive(TEXTURE);
         VertexConsumer buffer = immediate.getBuffer(layer);
         int budget = MAX_DOTS_PER_FRAME;
+        particlesThisFrame = 0;
         for (Iterator<Effect> it = EFFECTS.iterator(); it.hasNext(); ) {
             Effect e = it.next();
             Spark s = e.spark;
@@ -346,7 +358,10 @@ public final class SparkRenderer {
             if (loops) {
                 t = t - Math.floor(t);
             }
-            budget -= draw(buffer, e, t, age / 20.0, cam, camRight, camUp, budget);
+            if (!s.particle.isEmpty() && emitParticles(client, e, t, age / 20.0, loops)) {
+                continue;
+            }
+            budget -= draw(buffer, e, t, age / 20.0, cam, camRight, camUp, budget, loops);
             if (budget <= 0) {
                 break;
             }
@@ -354,11 +369,12 @@ public final class SparkRenderer {
         immediate.draw(layer);
     }
 
-    /** Draws one effect at life fraction t (0-1), age in seconds; returns the dots drawn. */
-    private static int draw(VertexConsumer buffer, Effect e, double t, double seconds, Vec3d cam, Vector3f camRight, Vector3f camUp,
-                            int budget) {
+    /** The axes an effect is drawn in this frame: its shape plane (u, v, w) and its direction. */
+    private record Axes(Vec3d d, Vec3d u, Vec3d v, Vec3d w, Vec3d flatRight, Vec3d flatForward) {
+    }
+
+    private static Axes axes(Effect e) {
         Spark s = e.spark;
-        List<String> m = s.moves;
         Vec3d d = e.dir.lengthSquared() < 1e-6 ? new Vec3d(0, 0, 1) : e.dir.normalize();
         Vec3d upWorld = new Vec3d(0, 1, 0);
         Vec3d right = d.crossProduct(upWorld);
@@ -367,25 +383,38 @@ public final class SparkRenderer {
         Vec3d flatForward = new Vec3d(d.x, 0, d.z);
         flatForward = flatForward.lengthSquared() < 1e-6 ? new Vec3d(0, 0, 1) : flatForward.normalize();
         Vec3d flatRight = new Vec3d(-flatForward.z, 0, flatForward.x);
-        // Shape axes in the world: u, v (the shape's plane) and w (out of it).
-        Vec3d u, v, w;
-        switch (s.plane) {
-            case "flat" -> {
-                u = flatRight;
-                v = flatForward;
-                w = upWorld;
-            }
-            case "side" -> {
-                u = d;
-                v = up;
-                w = right;
-            }
-            default -> {
-                u = right;
-                v = up;
-                w = d.multiply(-1);
-            }
-        }
+        return switch (s.plane) {
+            case "flat" -> new Axes(d, flatRight, flatForward, upWorld, flatRight, flatForward);
+            case "side" -> new Axes(d, d, up, right, flatRight, flatForward);
+            default -> new Axes(d, right, up, d.multiply(-1), flatRight, flatForward);
+        };
+    }
+
+    /** A number 0-1 for dot i, the same every frame (and for every player). */
+    private static double rand(int i, int salt) {
+        long h = i * 0x9E3779B97F4A7C15L + salt * 0xC2B2AE3D27D4EB4FL;
+        h ^= h >>> 31;
+        h *= 0xBF58476D1CE4E5B9L;
+        h ^= h >>> 29;
+        return (h >>> 11) / (double) (1L << 53);
+    }
+
+    /** How far a move along a direction has gone after some seconds (slowing down with drag). */
+    private static double travel(Spark s, double seconds) {
+        double k = s.drag * 5;
+        return k < 1e-3 ? seconds * s.speed : s.speed * (1 - Math.exp(-k * seconds)) / k;
+    }
+
+    /** How far a dot has fallen (gravity, slowed by drag like a falling ember). */
+    private static double drop(double g, double drag, double seconds) {
+        double k = drag * 5;
+        return k < 1e-3 ? 0.5 * g * seconds * seconds : g * (seconds / k - (1 - Math.exp(-k * seconds)) / (k * k));
+    }
+
+    /** Where dot i is at this time (world). */
+    private static Vec3d dotPos(Effect e, Axes ax, int i, int n, double[] p, double seconds, double t) {
+        Spark s = e.spark;
+        List<String> m = s.moves;
         double size = s.size * e.scale;
         if (m.contains("expand")) {
             size *= 1 + 1.6 * t;
@@ -399,12 +428,12 @@ public final class SparkRenderer {
         double spin = m.contains("spin") ? seconds * Math.PI * 2 * s.speed : 0;
         double cos = Math.cos(spin), sin = Math.sin(spin);
         Vec3d center = e.origin;
-        double travel = seconds * s.speed;
+        double travel = travel(s, seconds);
         if (m.contains("forward")) {
-            center = center.add(d.multiply(travel));
+            center = center.add(ax.d().multiply(travel));
         }
         if (m.contains("back")) {
-            center = center.subtract(d.multiply(travel));
+            center = center.subtract(ax.d().multiply(travel));
         }
         if (m.contains("rise")) {
             center = center.add(0, travel, 0);
@@ -414,64 +443,219 @@ public final class SparkRenderer {
         }
         if (m.contains("orbit")) {
             double a = seconds * Math.PI * 2 * Math.max(0.2, s.speed);
-            center = center.add(flatRight.multiply(Math.cos(a) * 0.6 * e.scale)).add(flatForward.multiply(Math.sin(a) * 0.6 * e.scale));
+            center = center.add(ax.flatRight().multiply(Math.cos(a) * 0.6 * e.scale)).add(ax.flatForward().multiply(Math.sin(a) * 0.6 * e.scale));
         }
-        float alpha = 1;
-        if (m.contains("fade")) {
-            alpha = (float) Math.max(0, 1 - t * t);
+        double pu = p[0] * cos - p[1] * sin;
+        double pv = p[0] * sin + p[1] * cos;
+        double pw = p[2];
+        if (m.contains("wave")) {
+            pv += 0.15 * Math.sin(p[0] * Math.PI * 2 + seconds * 6);
         }
-        int rgb = s.color;
-        if (s.color2 >= 0) {
-            rgb = lerpColor(s.color, s.color2, t);
+        double radial = 1;
+        if (m.contains("scatter")) {
+            radial += travel / Math.max(0.1, size) * (1 + s.vary * (rand(i, 4) - 0.5));
         }
-        double half = s.dot * e.scale * 0.5 * (m.contains("shrink") ? Math.max(0.3, 1 - t) : 1);
+        if (m.contains("gather")) {
+            radial *= 1 + 2.5 * (1 - t);
+        }
+        double k = size * radial;
+        Vec3d u = ax.u(), v = ax.v(), w = ax.w();
+        double x = center.x + (u.x * pu + v.x * pv + w.x * pw) * k;
+        double y = center.y + (u.y * pu + v.y * pv + w.y * pw) * k;
+        double z = center.z + (u.z * pu + v.z * pv + w.z * pw) * k;
+        if (s.gravity != 0) {
+            y -= drop(s.gravity * (1 + s.vary * (rand(i, 3) - 0.5)), s.drag, seconds);
+        }
+        if (s.turbulence > 0) {
+            // Drifting and swirling, growing over the first half second.
+            double amp = s.turbulence * 0.4 * Math.min(1, seconds * 2) * (0.6 + 0.8 * rand(i, 5)) * Math.max(0.3, size);
+            x += amp * Math.sin(seconds * 2.3 + i * 1.7);
+            y += amp * 0.6 * Math.sin(seconds * 1.9 + i * 2.9 + 1);
+            z += amp * Math.cos(seconds * 2.7 + i * 0.7);
+        }
+        return new Vec3d(x, y, z);
+    }
+
+    /** The colour at life fraction t: through the colour stops, or from color to color2. */
+    static int colorAt(Spark s, double t) {
+        if (s.colors != null && s.colors.length >= 2) {
+            double f = Math.max(0, Math.min(1, t)) * (s.colors.length - 1);
+            int k = Math.min(s.colors.length - 2, (int) Math.floor(f));
+            return lerpColor(s.colors[k], s.colors[k + 1], f - k);
+        }
+        return s.color2 >= 0 ? lerpColor(s.color, s.color2, t) : s.color;
+    }
+
+    /** Draws one effect at life fraction t (0-1), age in seconds; returns the dots drawn. */
+    private static int draw(VertexConsumer buffer, Effect e, double t, double seconds, Vec3d cam, Vector3f camRight, Vector3f camUp,
+                            int budget, boolean loops) {
+        Spark s = e.spark;
+        List<String> m = s.moves;
+        Axes ax = axes(e);
+        int cell = Math.max(0, Spark.LOOKS.indexOf(s.look));
+        float u0 = cell / (float) LOOK_CELLS, u1 = (cell + 1) / (float) LOOK_CELLS;
+        double baseHalf = s.dot * e.scale * 0.5;
         int n = Math.min(e.dots.size(), budget);
         int drawn = 0;
         for (int i = 0; i < n; i++) {
             double[] p = e.dots.get(i);
-            if (m.contains("reveal") && (i + 0.5) / n > Math.min(1, t * 2.2)) {
+            // Each dot lives a little shorter or longer than the others when the effect varies.
+            double ti = t;
+            if (!loops && s.vary > 0) {
+                ti = t / (1 - s.vary * 0.55 * rand(i, 2));
+                if (ti >= 1) {
+                    continue;
+                }
+            }
+            if (m.contains("reveal") && (i + 0.5) / n > Math.min(1, ti * 2.2)) {
                 continue;
             }
-            double pu = p[0] * cos - p[1] * sin;
-            double pv = p[0] * sin + p[1] * cos;
-            double pw = p[2];
-            if (m.contains("wave")) {
-                pv += 0.15 * Math.sin(p[0] * Math.PI * 2 + seconds * 6);
+            Vec3d at = dotPos(e, ax, i, n, p, seconds, ti);
+            float a = 1;
+            if (m.contains("fade")) {
+                a = (float) Math.max(0, 1 - ti * ti);
             }
-            double radial = 1;
-            if (m.contains("scatter")) {
-                radial += travel / Math.max(0.1, size) * 1.0;
-            }
-            if (m.contains("gather")) {
-                radial *= 1 + 2.5 * (1 - t);
-            }
-            double k = size * radial;
-            double x = center.x + (u.x * pu + v.x * pv + w.x * pw) * k;
-            double y = center.y + (u.y * pu + v.y * pv + w.y * pw) * k;
-            double z = center.z + (u.z * pu + v.z * pv + w.z * pw) * k;
-            float a = alpha;
             if (m.contains("flicker")) {
                 a *= 0.35F + 0.65F * (float) Math.abs(Math.sin(seconds * 23 + i * 1.7));
+            }
+            double half = baseHalf * (m.contains("shrink") ? Math.max(0.3, 1 - ti) : 1) * (1 + s.vary * (rand(i, 1) - 0.5) * 1.2);
+            float x = (float) (at.x - cam.x), y = (float) (at.y - cam.y), z = (float) (at.z - cam.z);
+            Vector3f ra = new Vector3f(camRight), ua = new Vector3f(camUp);
+            switch (s.look) {
+                case "glow" -> {
+                    half *= 2.2;
+                    a *= 0.75F;
+                }
+                case "ring" -> half *= 1.6;
+                case "ember" -> half *= 1.3;
+                case "star" -> {
+                    a *= 0.6F + 0.4F * (float) Math.abs(Math.sin(seconds * 15 + i * 2.1)); // twinkle
+                    turn(ra, ua, seconds * 4 + i * 0.9);
+                    half *= 1.4;
+                }
+                case "shard" -> turn(ra, ua, seconds * 3 + i * 2.4);
+                case "rune" -> {
+                    turn(ra, ua, seconds * 1.2 + i);
+                    half *= 1.3;
+                }
+                case "streak" -> {
+                    // Stretched along the way the dot moves, as seen from the camera.
+                    Vec3d before = dotPos(e, ax, i, n, p, Math.max(0, seconds - 0.05), Math.max(0, ti - 0.05 * 20 / Math.max(2, s.ticks)));
+                    Vec3d vel = at.subtract(before);
+                    Vec3d view = new Vec3d(x, y, z).normalize();
+                    Vec3d along = vel.subtract(view.multiply(vel.dotProduct(view)));
+                    if (along.lengthSquared() > 1e-8) {
+                        double len = Math.min(6, 1.4 + along.length() / 0.05 * 0.15);
+                        Vec3d dirA = along.normalize();
+                        Vec3d dirB = view.crossProduct(dirA).normalize();
+                        ra.set((float) (dirA.x * len), (float) (dirA.y * len), (float) (dirA.z * len));
+                        ua.set((float) (dirB.x * 0.7), (float) (dirB.y * 0.7), (float) (dirB.z * 0.7));
+                    }
+                }
+                default -> {
+                }
             }
             if (a <= 0.02F) {
                 continue;
             }
-            int argb = ((int) (a * 255) << 24) | rgb;
-            quad(buffer, (float) (x - cam.x), (float) (y - cam.y), (float) (z - cam.z), (float) half, camRight, camUp, argb);
+            int argb = ((int) (Math.min(1, a) * 255) << 24) | colorAt(s, ti);
+            quad(buffer, x, y, z, (float) half, ra, ua, argb, u0, u1);
             drawn++;
         }
         return drawn;
     }
 
-    private static void quad(VertexConsumer b, float x, float y, float z, float h, Vector3f r, Vector3f u, int argb) {
+    /** Turn the two quad axes by an angle (for spinning stars, shards and runes). */
+    private static void turn(Vector3f r, Vector3f u, double angle) {
+        float c = (float) Math.cos(angle), sn = (float) Math.sin(angle);
+        Vector3f nr = new Vector3f(r).mul(c).add(new Vector3f(u).mul(sn));
+        Vector3f nu = new Vector3f(u).mul(c).sub(new Vector3f(r).mul(sn));
+        r.set(nr);
+        u.set(nu);
+    }
+
+    // ------------------------------------------------------------------ vanilla particles
+
+    private static final Map<String, net.minecraft.particle.ParticleEffect> PARTICLE_TYPES = new HashMap<>();
+    private static final int MAX_PARTICLES_PER_FRAME = 160;
+    private static int particlesThisFrame;
+
+    /** The vanilla particle of an effect (dust takes its colours), or null to draw our own dots. */
+    private static net.minecraft.particle.ParticleEffect particleOf(Spark s) {
+        if (s.particle.isEmpty()) {
+            return null;
+        }
+        if ("dust".equals(s.particle)) {
+            float scale = (float) Math.max(0.3, Math.min(4, s.dot * 12));
+            int from = colorAt(s, 0), to = colorAt(s, 1);
+            return from == to ? new net.minecraft.particle.DustParticleEffect(from, scale)
+                : new net.minecraft.particle.DustColorTransitionParticleEffect(from, to, scale);
+        }
+        return PARTICLE_TYPES.computeIfAbsent(s.particle, id -> {
+            var type = net.minecraft.registry.Registries.PARTICLE_TYPE.get(Identifier.ofVanilla(id));
+            return type instanceof net.minecraft.particle.SimpleParticleType simple ? simple : null;
+        });
+    }
+
+    /**
+     * Vanilla particles at the shape's dots: a one-off effect gives them all off at once, moving
+     * the way its dots move; a looping one keeps giving them off along its animated shape.
+     */
+    private static boolean emitParticles(MinecraftClient client, Effect e, double t, double seconds, boolean loops) {
+        Spark s = e.spark;
+        net.minecraft.particle.ParticleEffect type = particleOf(s);
+        if (type == null) {
+            return false;
+        }
+        Axes ax = axes(e);
+        int n = e.dots.size();
+        double ageTicks = seconds * 20;
+        int want;
+        if (!loops) {
+            want = e.emitted == 0 ? n : 0;
+        } else {
+            e.emitAcc += Math.max(0, ageTicks - Math.max(0, e.lastAge)) * n / Math.max(2.0, s.ticks);
+            want = (int) Math.floor(e.emitAcc);
+            e.emitAcc -= want;
+        }
+        e.lastAge = ageTicks;
+        for (int k = 0; k < want && particlesThisFrame < MAX_PARTICLES_PER_FRAME; k++) {
+            int i = loops ? e.emitted % n : k;
+            double[] p = e.dots.get(i);
+            Vec3d at = dotPos(e, ax, i, n, p, seconds, t);
+            Vec3d before = dotPos(e, ax, i, n, p, Math.max(0, seconds - 0.05), t);
+            Vec3d vel = at.subtract(before).multiply(1 / 0.05 / 20.0); // blocks per tick
+            double jitter = 0.02 * s.vary;
+            vel = vel.add((rand(i, 7) - 0.5) * jitter, (rand(i, 8) - 0.5) * jitter, (rand(i, 9) - 0.5) * jitter);
+            client.particleManager.addParticle(type, at.x, at.y, at.z, vel.x, vel.y, vel.z);
+            e.emitted++;
+            particlesThisFrame++;
+        }
+        return true;
+    }
+
+    // ------------------------------------------------------------------ sound
+
+    /** The effect's sound, where it starts. */
+    private static void playSound(MinecraftClient client, Spark s, Vec3d at) {
+        if (s.sound.isEmpty() || client.world == null) {
+            return;
+        }
+        var sound = net.minecraft.registry.Registries.SOUND_EVENT.get(Identifier.ofVanilla(s.sound));
+        if (sound != null) {
+            client.world.playSound(at.x, at.y, at.z, sound, net.minecraft.sound.SoundCategory.PLAYERS, (float) s.volume, (float) s.pitch, false);
+        }
+    }
+
+    private static void quad(VertexConsumer b, float x, float y, float z, float h, Vector3f r, Vector3f u, int argb, float u0, float u1) {
         float rx = r.x * h, ry = r.y * h, rz = r.z * h, ux = u.x * h, uy = u.y * h, uz = u.z * h;
-        b.vertex(x - rx - ux, y - ry - uy, z - rz - uz).color(argb).texture(0, 1).overlay(OverlayTexture.DEFAULT_UV).light(0xF000F0)
+        b.vertex(x - rx - ux, y - ry - uy, z - rz - uz).color(argb).texture(u0, 1).overlay(OverlayTexture.DEFAULT_UV).light(0xF000F0)
             .normal(0, 1, 0);
-        b.vertex(x + rx - ux, y + ry - uy, z + rz - uz).color(argb).texture(1, 1).overlay(OverlayTexture.DEFAULT_UV).light(0xF000F0)
+        b.vertex(x + rx - ux, y + ry - uy, z + rz - uz).color(argb).texture(u1, 1).overlay(OverlayTexture.DEFAULT_UV).light(0xF000F0)
             .normal(0, 1, 0);
-        b.vertex(x + rx + ux, y + ry + uy, z + rz + uz).color(argb).texture(1, 0).overlay(OverlayTexture.DEFAULT_UV).light(0xF000F0)
+        b.vertex(x + rx + ux, y + ry + uy, z + rz + uz).color(argb).texture(u1, 0).overlay(OverlayTexture.DEFAULT_UV).light(0xF000F0)
             .normal(0, 1, 0);
-        b.vertex(x - rx + ux, y - ry + uy, z - rz + uz).color(argb).texture(0, 0).overlay(OverlayTexture.DEFAULT_UV).light(0xF000F0)
+        b.vertex(x - rx + ux, y - ry + uy, z - rz + uz).color(argb).texture(u0, 0).overlay(OverlayTexture.DEFAULT_UV).light(0xF000F0)
             .normal(0, 1, 0);
     }
 

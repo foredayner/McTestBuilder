@@ -233,6 +233,38 @@ public class AibClientGameTest implements FabricClientGameTest {
             });
             context.waitTicks(10);
             context.takeScreenshot("34_spark_heart_and_circle");
+            // Richer effects: a glowing fire arc with a colour ramp, falling spark streaks, real flames, twinkling
+            // stars and a ring of runes.
+            context.runOnClient(client -> {
+                var p = client.player;
+                var look = p.getRotationVec(1.0F);
+                var flat = new net.minecraft.util.math.Vec3d(look.x, 0, look.z).normalize();
+                var at = p.getEyePos().add(flat.multiply(2.2)).add(0, -0.4, 0);
+                java.util.function.Function<java.util.Map<String, Object>, String> one = m ->
+                    "[" + com.example.ai.build.Spark.fromMap(m).toJson() + "]";
+                com.example.client.SparkRenderer.play(one.apply(java.util.Map.ofEntries(java.util.Map.entry("shape", "crescent"),
+                    java.util.Map.entry("look", "glow"), java.util.Map.entry("colors", List.of("#ffffff", "#ffc040", "#ff3000")),
+                    java.util.Map.entry("size", 1.1), java.util.Map.entry("count", 48), java.util.Map.entry("ticks", 60))), at, flat, 1);
+                com.example.client.SparkRenderer.play(one.apply(java.util.Map.ofEntries(java.util.Map.entry("shape", "burst"),
+                    java.util.Map.entry("look", "streak"), java.util.Map.entry("colors", List.of("#ffffa0", "#ff6000")),
+                    java.util.Map.entry("size", 0.5), java.util.Map.entry("count", 40), java.util.Map.entry("moves", List.of("scatter")),
+                    java.util.Map.entry("speed", 3), java.util.Map.entry("gravity", 4), java.util.Map.entry("drag", 0.3),
+                    java.util.Map.entry("vary", 0.6), java.util.Map.entry("ticks", 60))), at, flat, 1);
+                com.example.client.SparkRenderer.play(one.apply(java.util.Map.ofEntries(java.util.Map.entry("shape", "circle"),
+                    java.util.Map.entry("particle", "flame"), java.util.Map.entry("size", 0.7), java.util.Map.entry("count", 30),
+                    java.util.Map.entry("plane", "flat"), java.util.Map.entry("ticks", 20))), p.getPos().add(flat.multiply(2.2)), flat, 1);
+                com.example.client.SparkRenderer.play(one.apply(java.util.Map.ofEntries(java.util.Map.entry("shape", "ring"),
+                    java.util.Map.entry("look", "star"), java.util.Map.entry("color", "#a0e8ff"), java.util.Map.entry("size", 0.9),
+                    java.util.Map.entry("count", 14), java.util.Map.entry("dot", 0.2), java.util.Map.entry("ticks", 60))),
+                    at.add(-1.6, 0.6, 0), flat, 1);
+                com.example.client.SparkRenderer.play(one.apply(java.util.Map.ofEntries(java.util.Map.entry("shape", "circle"),
+                    java.util.Map.entry("look", "rune"), java.util.Map.entry("colors", List.of("#d080ff", "#6020c0")),
+                    java.util.Map.entry("size", 1.0), java.util.Map.entry("count", 10), java.util.Map.entry("dot", 0.3),
+                    java.util.Map.entry("plane", "flat"), java.util.Map.entry("moves", List.of("spin")), java.util.Map.entry("speed", 0.2),
+                    java.util.Map.entry("ticks", 60))), p.getPos().add(flat.multiply(3.5)).add(1.5, 0.05, 0), flat, 1);
+            });
+            context.waitTicks(8);
+            context.takeScreenshot("34b_spark_looks");
             context.runOnClient(client -> client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON));
 
             // A bow with its own arrow shape: in the hand, and one of its arrows hanging in the air.
