@@ -1139,7 +1139,7 @@ public class MinecraftAI {
             hasHitboxes = !hitboxes.isEmpty();
             BuildTaskQueue.enqueue(owner, () -> hitboxes.forEach(runner));
         }
-        for (BuildPlan.Op op : plan.ops) {
+        for (BuildPlan.Op op : com.example.ai.build.DoubleBlocks.complete(plan.ops)) { // doors, beds and tall plants whole
             int[] a = BuildPlan.rotate(op.x1, op.z1, turns);
             int[] b = BuildPlan.rotate(op.x2, op.z2, turns);
             String block = rotateBlockState(op.block, turns);
