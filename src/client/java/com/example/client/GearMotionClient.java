@@ -136,8 +136,8 @@ public final class GearMotionClient {
     // Poses also turn the whole item round the view's axes at the hand: {.., view roll (in the picture, + turns the
     // tip toward the left), view pitch (+ tips it back toward the eye, - forward and down)}.
     // Slash: the blade turned level (tip to the left) and swept from the right of the view across to the left.
-    private static final Key[] FP_SLASH = motion(p(0.34F, 0.06F, 0.05F, 0, 0, 0, 82, -10), p(-0.22F, 0.04F, -0.08F, 0, 0, 0, 86, -18),
-        p(-0.42F, 0.02F, -0.02F, 0, 0, 0, 90, -22), null);
+    private static final Key[] FP_SLASH = motion(p(0.34F, 0.16F, 0.05F, 0, 0, 0, 82, -10), p(-0.22F, 0.15F, -0.08F, 0, 0, 0, 86, -18),
+        p(-0.42F, 0.13F, -0.02F, 0, 0, 0, 90, -22), null);
     // Smash: the arm alone brings the weapon down from overhead (tipped back) to the front (tipped forward and down).
     private static final Key[] FP_SMASH = motion(p(0.02F, 0.26F, 0.06F, 0, 0, 0, 0, 18), p(-0.02F, -0.1F, -0.15F, 0, 0, 0, 0, -70),
         p(-0.03F, -0.18F, -0.1F, 0, 0, 0, 0, -95), null);
