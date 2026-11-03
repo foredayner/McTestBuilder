@@ -552,11 +552,11 @@ public final class SparkRenderer {
         int frame = (int) Math.floor(seconds * 10); // a new zigzag every 2 ticks
         int seed = (int) (e.start * 31) ^ (int) Math.floor(hit.x * 7) ^ (int) Math.floor(hit.z * 13) * 17;
         // Strobing: bright, dim, bright, as real strikes do.
-        float strobe = (frame % 3 == 1) ? 0.35F : 1.0F;
+        float strobe = (frame % 3 == 1) ? 0.55F : 1.0F;
         float a = alpha * strobe;
         double height = 14 + size * 10;
         double spread = 0.6 + size * 1.2;
-        double half = Math.max(0.04, s.width * size * 0.35);
+        double half = Math.max(0.08, s.width * size * 0.5);
         int segments = 14;
         Vec3d[] main = new Vec3d[segments + 1];
         for (int i = 0; i <= segments; i++) {
@@ -565,8 +565,8 @@ public final class SparkRenderer {
             double jz = i == segments ? 0 : (rand(i, seed + frame * 101 + 7) - 0.5) * spread * (1 - f * 0.7);
             main[i] = hit.add(jx, height * (1 - f), jz);
         }
-        // The bolt grows down from the sky in the first moment.
-        int shown = (int) Math.ceil(segments * Math.min(1, t * 6));
+        // The bolt grows down from the sky in the first two ticks, however long it lasts.
+        int shown = (int) Math.ceil(segments * Math.min(1, seconds * 10));
         for (int i = 0; i < shown; i++) {
             beam(b, cam, main[i], main[i + 1], half * 2.2, half * 2.2, argb(a * 0.45F, rgb), argb(a * 0.45F, rgb));
             beam(b, cam, main[i], main[i + 1], half * 0.6, half * 0.6, argb(a, 0xFFFFFF), argb(a, 0xFFFFFF));
@@ -591,7 +591,7 @@ public final class SparkRenderer {
         }
         // The flash where it strikes: a bright disc on the ground that dies quickly.
         if (shown >= segments) {
-            float flash = alpha * (float) Math.max(0, 1 - t * 2.5);
+            float flash = alpha * (float) Math.max(0, 1 - seconds * 4); // a quarter of a second
             Vec3d x = new Vec3d(1, 0, 0), z = new Vec3d(0, 0, 1);
             ring(b, cam, hit.add(0, 0.05, 0), x, z, 0, 0.6 + size * 1.6, 1, rgb, flash);
             beam(b, cam, hit, hit.add(0, 0.8 + size, 0), 0.5 + size, 0.1, argb(flash, 0xFFFFFF), argb(0, 0xFFFFFF));

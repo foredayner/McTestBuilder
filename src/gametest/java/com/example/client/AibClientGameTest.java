@@ -345,13 +345,13 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> {
                 var p = client.player;
                 p.setYaw(p.getYaw() + 180); // away from the house, over open grass
-                p.setPitch(-10);
+                p.setPitch(-15);
                 var look = p.getRotationVec(1.0F);
                 var flat = new net.minecraft.util.math.Vec3d(look.x, 0, look.z).normalize();
                 var side = new net.minecraft.util.math.Vec3d(-flat.z, 0, flat.x);
                 var bolt = com.example.ai.build.Spark.fromMap(java.util.Map.of("form", "bolt", "colors", List.of("#ffffff", "#a0d0ff"),
                     "size", 1.0, "width", 0.3, "ticks", 60));
-                com.example.client.SparkRenderer.play("[" + bolt.toJson() + "]", p.getPos().add(flat.multiply(7)).add(side.multiply(-1.5)), flat, 1);
+                com.example.client.SparkRenderer.play("[" + bolt.toJson() + "]", p.getPos().add(flat.multiply(14)).add(side.multiply(-3)), flat, 1);
                 var shot = com.example.ai.build.Spark.Shot.fromMap(java.util.Map.of("kind", "beam", "color", "#ff4040", "color2", "#ffc0c0",
                     "width", 0.25, "ticks", 20));
                 var from = p.getEyePos().add(0, -0.18, 0).add(flat.multiply(0.6));
@@ -360,7 +360,7 @@ public class AibClientGameTest implements FabricClientGameTest {
                 beam.ticks = 60;
                 com.example.client.SparkRenderer.play("[" + beam.toJson() + "]", from, to.subtract(from), 1);
             });
-            context.waitTicks(6);
+            context.waitTicks(3);
             context.takeScreenshot("34d_lightning_bolt_and_beam");
             context.runOnClient(client -> {
                 com.example.client.SparkRenderer.clearForTests();
