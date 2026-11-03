@@ -1015,6 +1015,8 @@ public class AiController {
             검기, 날아가는 참격, 마법탄, 불꽃 구슬...): ai.shot([extra: [[count: 1, path: 'trail']], facing: 'spin',
               hit: 'vanish', gravity: false, size: 0.8]) - the extras leave with the swing and pass the one it hits
               directly. Their shape: pieces between ai.arrowStart(n)/arrowEnd() (pointing up, +Y) or text: '...'.
+              가로 (horizontal) means lying flat: tilt 0 for a shot, plane 'flat' for an effect; 세로 (vertical) means standing:
+              tilt 90, plane 'front'. Do not draw a flying wave with effect dots: use the shot below.
               A sword wave (검기): ai.shot([extra: [[count: 1, path: 'trail']], model: 'crescent', gravity: false,
                 hit: 'vanish', size: 1.6, color: '#80d0ff', color2: '#ffffff'])  (tilt: 90 for an upright one)
               Thrown shurikens in a fan: ai.shot([extra: [[count: 3, path: 'spread', angle: 20]], model: 'shuriken',
@@ -1092,7 +1094,8 @@ public class AiController {
                          'block.amethyst_block.chime', 'entity.player.attack.sweep', 'item.trident.riptide_1',
                          'block.fire.extinguish', 'entity.evoker.cast_spell'   volume: 0-2   pitch: 0.5-2
                   size: blocks (radius, 0.1-4)   count: dots (4-96; outlines 24-48, filled 40-80)   dot: dot size (0.02-0.3)
-                  plane: 'front' (stands up, facing the way it goes), 'flat' (lies flat: ground circles, halos),
+                  plane: 'front' (stands UP like a wall facing the way it goes: a VERTICAL wave), 'flat' (lies flat: a
+                         HORIZONTAL / 가로 wave, ground circles, halos),
                          'side' (stands along the way it goes: a sword arc seen from the side)
                   start (attack): 'weapon' (just in front of the wielder), 'target' (on what is hit), 'ground' (on the
                          ground under it), 'above' (over it), 'self' (around the wielder)

@@ -277,6 +277,8 @@ public class AibClientGameTest implements FabricClientGameTest {
             });
 
             // Swords ordered with attack motions, frozen at the wind-up and at the strike, in third and first person.
+            // Facing the open field, so nothing stands between the camera and the player.
+            context.runOnClient(client -> client.player.setYaw(client.player.getYaw() + 180));
             for (String motion : List.of("thrust", "slash", "smash", "spin")) {
                 game.getServer().runOnServer(server -> {
                     ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
@@ -285,7 +287,7 @@ public class AibClientGameTest implements FabricClientGameTest {
                     p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(r));
                 });
                 context.waitTicks(motion.equals("thrust") ? 40 : 5);
-                for (float[] at : new float[][] { { 0.28F }, { 0.42F }, { 0.56F } }) {
+                for (float[] at : new float[][] { { 0.22F }, { 0.38F }, { 0.65F } }) {
                     String phase = at[0] < 0.3F ? "wind" : at[0] < 0.5F ? "strike" : "follow";
                     context.runOnClient(client -> {
                         com.example.client.GearMotionClient.forceProgress = at[0];
@@ -300,6 +302,7 @@ public class AibClientGameTest implements FabricClientGameTest {
             }
             context.runOnClient(client -> {
                 com.example.client.GearMotionClient.forceProgress = -1;
+                client.player.setYaw(client.player.getYaw() - 180);
                 client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT);
             });
 

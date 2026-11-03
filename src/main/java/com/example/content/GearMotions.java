@@ -41,7 +41,7 @@ public final class GearMotions {
 
     /** The motion stored on a stack, or "". */
     /** Where in a motion the blade strikes (0-1): its effects start there. */
-    public static final float STRIKE = 0.44F;
+    public static final float STRIKE = 0.42F;
 
     /**
      * How long a motion takes (ticks), by the weapon's weight: short blades are quick, hammers and
@@ -49,12 +49,12 @@ public final class GearMotions {
      */
     public static float ticks(GearKind kind, double length) {
         if (kind == GearKind.HAMMER || length >= 2.0) {
-            return 16;
+            return 18;
         }
         if (length > 0 && length < 1.0) {
-            return 9;
+            return 11;
         }
-        return 12;
+        return 14;
     }
 
     /** The ticks from the start of the swing to the strike. */

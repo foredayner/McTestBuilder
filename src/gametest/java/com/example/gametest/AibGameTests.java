@@ -354,7 +354,7 @@ public class AibGameTests implements FabricGameTest {
         check(com.example.ai.build.GearEffects.onSwing(player) == 0, "a second swing too soon is ignored");
         // The effect waits for the swing to finish.
         int strike = com.example.ai.build.GearEffects.swingTicks(player, sword);
-        check(strike >= 4 && strike <= 7, "an ordered motion strikes when its blade comes down (" + strike + " ticks)");
+        check(strike >= 4 && strike <= 8, "an ordered motion strikes when its blade comes down (" + strike + " ticks)");
         check(com.example.content.GearMotions.strikeTicks(com.example.content.GearKind.HAMMER, 1.5)
             > com.example.content.GearMotions.strikeTicks(com.example.content.GearKind.SWORD, 0.8), "a hammer strikes later than a dagger");
         net.minecraft.item.ItemStack plain = net.minecraft.item.Items.IRON_SWORD.getDefaultStack();

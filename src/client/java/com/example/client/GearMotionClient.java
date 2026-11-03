@@ -24,7 +24,7 @@ import java.util.WeakHashMap;
 public final class GearMotionClient {
 
     /** How long a normal motion takes (ticks); light and heavy weapons differ (GearMotions.ticks). */
-    public static final float MOTION_TICKS = 12.0F;
+    public static final float MOTION_TICKS = 14.0F;
     /** Tests: show the motion frozen at this point (0-1); negative = off. */
     public static float forceProgress = -1;
 
@@ -75,6 +75,7 @@ public final class GearMotionClient {
     private static final int SMOOTH = 0;  // starts and ends slowly
     private static final int IN = 1;      // speeds up: into a strike
     private static final int OUT = 2;     // starts fast and slows: the follow-through, a wind-up settling
+    private static final int SWING = 3;   // the swing itself: picks up speed, sweeps, and is still fast at its end
 
     /** One key: when (0-1), the pose there, and how the stretch leading to it is timed. */
     private record Key(float t, float[] pose, int ease) {
@@ -88,6 +89,7 @@ public final class GearMotionClient {
         return switch (kind) {
             case IN -> x * x * x;
             case OUT -> 1 - (1 - x) * (1 - x) * (1 - x);
+            case SWING -> x * x;
             default -> x * x * (3 - 2 * x);
         };
     }
@@ -117,31 +119,31 @@ public final class GearMotionClient {
 
     // First person poses: {x, y, z, yaw, pitch, roll} (blocks, degrees), mirrored for the left hand. Turns are
     // made in a frame turned 45 degrees like the vanilla swing (along the blade's diagonal); small moves keep
-    // the weapon in view (moving it toward the camera hides it). Each motion: wind up, a fast strike that
-    // crosses the view, a follow-through past it, settling, and back to rest.
-    private static final Key[] FP_SLASH = {
-        key(0.28F, OUT, 0.24F, 0.12F, 0.04F, 75, -30, -55),
-        key(0.44F, IN, -0.16F, 0.0F, -0.14F, -55, -40, -55),
-        key(0.56F, OUT, -0.34F, -0.08F, -0.08F, -105, -46, -62),
-        key(0.76F, SMOOTH, -0.12F, -0.04F, 0, -35, -16, -22),
-        key(1.0F, SMOOTH, 0, 0, 0, 0, 0, 0) };
-    private static final Key[] FP_SMASH = {
-        key(0.30F, OUT, 0.03F, 0.22F, 0.06F, 0, 45, 0),
-        key(0.44F, IN, -0.03F, -0.08F, -0.2F, 0, -80, 0),
-        key(0.52F, OUT, -0.04F, -0.2F, -0.14F, 0, -112, 0),
-        key(0.76F, SMOOTH, 0, -0.08F, -0.04F, 0, -40, 0),
-        key(1.0F, SMOOTH, 0, 0, 0, 0, 0, 0) };
-    private static final Key[] FP_THRUST = {
-        key(0.30F, OUT, 0.16F, -0.1F, 0.14F, 20, -65, -80),
-        key(0.42F, IN, -0.06F, 0.02F, -0.55F, 0, -75, -80),
-        key(0.52F, OUT, -0.07F, 0.02F, -0.62F, -2, -76, -80),
-        key(0.74F, SMOOTH, 0, 0, -0.2F, 5, -38, -40),
-        key(1.0F, SMOOTH, 0, 0, 0, 0, 0, 0) };
-    private static final Key[] FP_SPIN = {
-        key(0.24F, OUT, 0.2F, 0.05F, 0.0F, 50, -35, -55),
-        key(0.50F, IN, -0.1F, 0.04F, -0.12F, -240, -35, -55),
-        key(0.64F, OUT, -0.12F, 0.0F, -0.08F, -330, -30, -50),
-        key(1.0F, SMOOTH, 0, 0, 0, -360, 0, 0) };
+    // the weapon in view (moving it toward the camera hides it). Every motion: wind up (to 0.22), a long,
+    // visible swing (to 0.45), a little past it (0.55), held there a while (to 0.8), then back to rest.
+    private static final float W = 0.22F, S = 0.45F, F = 0.55F, H = 0.8F;
+
+    /** wind, strike, follow-through (held), then back to rest (or to {@code end}). */
+    private static Key[] motion(float[] wind, float[] strike, float[] follow, float[] end) {
+        return new Key[] { new Key(W, wind, OUT), new Key(S, strike, SWING), new Key(F, follow, OUT), new Key(H, follow, SMOOTH),
+            new Key(1.0F, end == null ? new float[wind.length] : end, SMOOTH) };
+    }
+
+    private static float[] p(float... v) {
+        return v;
+    }
+
+    // Slash: the blade laid flat (pointing ahead) and swept from right to left across the view.
+    private static final Key[] FP_SLASH = motion(p(0.28F, 0.0F, 0.02F, 75, -88, 0), p(-0.18F, -0.02F, -0.12F, -55, -88, 0),
+        p(-0.34F, -0.04F, -0.06F, -95, -88, 0), null);
+    // Smash: the arm alone brings the weapon down from overhead.
+    private static final Key[] FP_SMASH = motion(p(0.03F, 0.22F, 0.06F, 0, 45, 0), p(-0.03F, -0.1F, -0.2F, 0, -80, 0),
+        p(-0.04F, -0.2F, -0.14F, 0, -110, 0), null);
+    // Thrust: the arm drops back and low, then drives forward and up.
+    private static final Key[] FP_THRUST = motion(p(0.12F, -0.26F, 0.18F, 15, 20, -40), p(-0.05F, 0.06F, -0.55F, 0, -80, -80),
+        p(-0.06F, 0.12F, -0.62F, 0, -90, -80), null);
+    private static final Key[] FP_SPIN = motion(p(0.2F, 0.05F, 0.0F, 50, -35, -55), p(-0.1F, 0.04F, -0.12F, -240, -35, -55),
+        p(-0.12F, 0.0F, -0.08F, -330, -30, -50), p(0, 0, 0, -360, 0, 0));
 
     /** First person: in place of the normal swing turn, around the hand. */
     public static void firstPerson(MatrixStack matrices, Arm arm, String motion, float t) {
@@ -168,30 +170,19 @@ public final class GearMotionClient {
     }
 
     // Third person poses: {arm pitch, arm yaw, arm roll, body yaw, body pitch, other arm pitch, other arm yaw,
-    // other arm roll} (radians). The body turns and leans into the strike; the free arm balances it.
-    private static final Key[] TP_SLASH = {
-        key(0.28F, OUT, -1.55F, 1.25F, 0.35F, 0.7F, -0.06F, -0.55F, 0.35F, -0.2F),
-        key(0.44F, IN, -1.45F, -0.85F, -0.2F, -0.5F, 0.14F, 0.3F, 0.15F, 0.1F),
-        key(0.56F, OUT, -1.05F, -1.45F, -0.45F, -0.85F, 0.18F, 0.5F, 0.1F, 0.25F),
-        key(0.76F, SMOOTH, -0.6F, -0.75F, -0.15F, -0.35F, 0.07F, 0.15F, 0, 0.05F),
-        key(1.0F, SMOOTH, 0, 0, 0, 0, 0, 0, 0, 0) };
-    private static final Key[] TP_SMASH = {
-        key(0.30F, OUT, -3.1F, 0.1F, 0, 0.15F, -0.3F, -2.9F, 0.1F, 0),
-        key(0.44F, IN, -0.95F, 0, 0, 0, 0.42F, -0.85F, 0, 0),
-        key(0.52F, OUT, -0.45F, 0, 0, 0, 0.6F, -0.42F, 0, 0),
-        key(0.76F, SMOOTH, -0.4F, 0, 0, 0, 0.28F, -0.3F, 0, 0),
-        key(1.0F, SMOOTH, 0, 0, 0, 0, 0, 0, 0, 0) };
-    private static final Key[] TP_THRUST = {
-        key(0.30F, OUT, -0.2F, 0.5F, 0, 0.75F, -0.06F, -1.0F, -0.6F, 0),
-        key(0.42F, IN, -1.55F, -0.05F, 0, -0.5F, 0.25F, 0.5F, 0.2F, 0.1F),
-        key(0.52F, OUT, -1.6F, -0.1F, 0, -0.62F, 0.3F, 0.6F, 0.2F, 0.15F),
-        key(0.74F, SMOOTH, -0.9F, 0, 0, -0.2F, 0.1F, 0.2F, 0, 0),
-        key(1.0F, SMOOTH, 0, 0, 0, 0, 0, 0, 0, 0) };
-    private static final Key[] TP_SPIN = {
-        key(0.24F, OUT, -1.5F, 0.6F, 0.3F, 0.9F, 0, -0.3F, 0, -0.3F),
-        key(0.50F, IN, -1.5F, -0.4F, 0.3F, -4.6F, 0.05F, -0.3F, 0, -0.3F),
-        key(0.64F, OUT, -1.2F, -0.6F, 0.2F, -5.9F, 0.05F, -0.2F, 0, -0.2F),
-        key(1.0F, SMOOTH, 0, 0, 0, -MathHelper.TAU, 0, 0, 0, 0) };
+    // other arm roll} (radians).
+    // Slash: the arm held out ahead and turned so the blade lies flat, swept from the right side across to the left.
+    private static final Key[] TP_SLASH = motion(p(-1.45F, 1.15F, 1.35F, 0.5F, 0, -0.4F, 0.3F, -0.2F),
+        p(-1.45F, -0.9F, 1.35F, -0.45F, 0.08F, 0.3F, 0.15F, 0.1F), p(-1.3F, -1.4F, 1.25F, -0.7F, 0.1F, 0.4F, 0.1F, 0.2F), null);
+    // Smash: only the weapon arm, from straight up down to the front.
+    private static final Key[] TP_SMASH = motion(p(-2.95F, 0.1F, 0, 0, 0, 0, 0, 0), p(-0.65F, 0, 0, 0, 0, 0, 0, 0),
+        p(-0.35F, 0, 0, 0, 0, 0, 0, 0), null);
+    // Thrust: the opposite of the smash: the arm swings back and low, then forward and up; the body stays.
+    private static final Key[] TP_THRUST = motion(p(0.75F, 0.1F, 0, 0, 0, 0, 0, 0), p(-1.9F, 0, 0, 0, 0, 0, 0, 0),
+        p(-2.15F, 0, 0, 0, 0, 0, 0, 0), null);
+    private static final Key[] TP_SPIN = motion(p(-1.5F, 0.6F, 0.3F, 0.9F, 0, -0.3F, 0, -0.3F),
+        p(-1.5F, -0.4F, 0.3F, -4.6F, 0.05F, -0.3F, 0, -0.3F), p(-1.2F, -0.6F, 0.2F, -5.9F, 0.05F, -0.2F, 0, -0.2F),
+        p(0, 0, 0, -MathHelper.TAU, 0, 0, 0, 0));
 
     /**
      * Third person: arms and body for the motion, starting from the pose they are in (walking,
