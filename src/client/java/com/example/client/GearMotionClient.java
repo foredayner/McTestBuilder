@@ -133,17 +133,19 @@ public final class GearMotionClient {
         return v;
     }
 
-    // Slash: the blade laid flat (pointing ahead) and swept from right to left across the view.
-    private static final Key[] FP_SLASH = motion(p(0.28F, 0.0F, 0.02F, 75, -88, 0), p(-0.18F, -0.02F, -0.12F, -55, -88, 0),
-        p(-0.34F, -0.04F, -0.06F, -95, -88, 0), null);
-    // Smash: the arm alone brings the weapon down from overhead.
-    private static final Key[] FP_SMASH = motion(p(0.03F, 0.22F, 0.06F, 0, 45, 0), p(-0.03F, -0.1F, -0.2F, 0, -80, 0),
-        p(-0.04F, -0.2F, -0.14F, 0, -110, 0), null);
-    // Thrust: the arm drops back and low, then drives forward and up.
-    private static final Key[] FP_THRUST = motion(p(0.12F, -0.26F, 0.18F, 15, 20, -40), p(-0.05F, 0.06F, -0.55F, 0, -80, -80),
-        p(-0.06F, 0.12F, -0.62F, 0, -90, -80), null);
-    private static final Key[] FP_SPIN = motion(p(0.2F, 0.05F, 0.0F, 50, -35, -55), p(-0.1F, 0.04F, -0.12F, -240, -35, -55),
-        p(-0.12F, 0.0F, -0.08F, -330, -30, -50), p(0, 0, 0, -360, 0, 0));
+    // Poses also turn the whole item round the view's axes at the hand: {.., view roll (in the picture, + turns the
+    // tip toward the left), view pitch (+ tips it back toward the eye, - forward and down)}.
+    // Slash: the blade turned level (tip to the left) and swept from the right of the view across to the left.
+    private static final Key[] FP_SLASH = motion(p(0.32F, 0.02F, 0.05F, 0, 0, 0, 48, 0), p(-0.2F, 0.0F, -0.05F, 0, 0, 0, 45, -10),
+        p(-0.4F, -0.03F, 0.0F, 0, 0, 0, 52, -16), null);
+    // Smash: the arm alone brings the weapon down from overhead (tipped back) to the front (tipped forward and down).
+    private static final Key[] FP_SMASH = motion(p(0.02F, 0.2F, 0.08F, 0, 0, 0, 0, 42), p(-0.02F, -0.12F, -0.15F, 0, 0, 0, 0, -70),
+        p(-0.03F, -0.18F, -0.1F, 0, 0, 0, 0, -95), null);
+    // Thrust: the arm drops back and low (tip back), then drives forward and up (tip ahead).
+    private static final Key[] FP_THRUST = motion(p(0.1F, -0.28F, 0.15F, 0, 0, 0, -15, 25), p(-0.04F, 0.06F, -0.5F, 0, 0, 0, 30, -75),
+        p(-0.05F, 0.1F, -0.58F, 0, 0, 0, 30, -85), null);
+    private static final Key[] FP_SPIN = motion(p(0.2F, 0.05F, 0.0F, 50, -35, -55, 0, 0), p(-0.1F, 0.04F, -0.12F, -240, -35, -55, 0, 0),
+        p(-0.12F, 0.0F, -0.08F, -330, -30, -50, 0, 0), p(0, 0, 0, -360, 0, 0, 0, 0));
 
     /** First person: in place of the normal swing turn, around the hand. */
     public static void firstPerson(MatrixStack matrices, Arm arm, String motion, float t) {
@@ -163,6 +165,8 @@ public final class GearMotionClient {
         }
         float[] p = at(keys, t);
         matrices.translate(side * p[0], p[1], p[2]);
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(p[7]));
+        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(side * p[6]));
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(side * 45.0F));
         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(side * p[5]));
         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(p[4]));
