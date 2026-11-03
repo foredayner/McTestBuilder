@@ -344,6 +344,8 @@ public class AibClientGameTest implements FabricClientGameTest {
             // A lightning bolt striking ahead (the 'lightning' preset's bolt) and a bow's beam shot reaching past it.
             context.runOnClient(client -> {
                 var p = client.player;
+                p.setYaw(p.getYaw() + 180); // away from the house, over open grass
+                p.setPitch(-10);
                 var look = p.getRotationVec(1.0F);
                 var flat = new net.minecraft.util.math.Vec3d(look.x, 0, look.z).normalize();
                 var side = new net.minecraft.util.math.Vec3d(-flat.z, 0, flat.x);
@@ -360,7 +362,11 @@ public class AibClientGameTest implements FabricClientGameTest {
             });
             context.waitTicks(6);
             context.takeScreenshot("34d_lightning_bolt_and_beam");
-            context.runOnClient(client -> com.example.client.SparkRenderer.clearForTests());
+            context.runOnClient(client -> {
+                com.example.client.SparkRenderer.clearForTests();
+                client.player.setYaw(client.player.getYaw() - 180);
+                client.player.setPitch(0);
+            });
             // A ready-made layered effect played as a preview (the 보관함's "이펙트 보기"): holy light and a flame aura.
             context.runOnClient(client -> {
                 var fx = new com.example.ai.build.Spark.Effects();
