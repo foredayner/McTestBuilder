@@ -108,6 +108,8 @@ public final class Spark {
     public boolean lightning;
     /** Set by the server, not the AI: a beam this long (blocks) instead of one sized by size (a bow's beam shot). */
     public double reach = 0;
+    /** Set by the server, not the AI: how visible a bow's beam is (0 = not at all, 1 = fully). */
+    public double opacity = 1;
 
     /** All effects of one piece of equipment. */
     public static final class Effects {
@@ -236,6 +238,7 @@ public final class Spark {
         volume = clamp(volume, 0, 2);
         pitch = clamp(pitch, 0.5, 2);
         reach = clamp(reach, 0, 80);
+        opacity = clamp(opacity, 0, 1);
         delay = (int) clamp(delay, 0, 40);
         lead = (int) clamp(lead, 0, 30);
         shake = clamp(shake, 0, 1);
@@ -382,6 +385,8 @@ public final class Spark {
         public int color2 = -1;
         public double width = 0.25;
         public int ticks = 8;
+        /** Beam: how visible it is, 0 (invisible: only what it hits shows) to 1. */
+        public double opacity = 1;
 
         public boolean beam() {
             return "beam".equals(kind);
@@ -405,6 +410,7 @@ public final class Spark {
             color2 = color2 < 0 ? -1 : color2 & 0xFFFFFF;
             width = clamp(width, 0.05, 1);
             ticks = (int) clamp(ticks, 4, 20);
+            opacity = clamp(opacity, 0, 1);
             return this;
         }
 
@@ -425,8 +431,9 @@ public final class Spark {
                         case "color2", "colour2" -> s.color2 = color(v);
                         case "width" -> s.width = num(v, key);
                         case "ticks", "time" -> s.ticks = (int) Math.round(num(v, key));
+                        case "opacity", "alpha" -> s.opacity = num(v, key);
                         default -> throw new IllegalArgumentException("unknown shot setting '" + key
-                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks");
+                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks, opacity");
                     }
                 }
             }

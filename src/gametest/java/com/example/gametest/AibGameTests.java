@@ -513,6 +513,16 @@ public class AibGameTests implements FabricGameTest {
         com.example.content.GearBowItem.fireBeam(world, player, bow, new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), 1.0F, shot);
         check(near.getHealth() < near.getMaxHealth(), "the first golem is hurt");
         check(far.getHealth() == far.getMaxHealth(), "the one behind it is not (no piercing)");
+        // An invisible beam hits just the same.
+        net.minecraft.item.ItemStack hidden = bowWith(context, player, origin, "ai.shot([kind: 'beam', opacity: 0])\n");
+        com.example.ai.build.Spark.Shot invisible = com.example.ai.build.GearEffects.of(hidden).shot;
+        check(invisible.opacity == 0, "an invisible beam is kept");
+        float before = near.getHealth();
+        near.timeUntilRegen = 0;
+        com.example.content.GearBowItem.fireBeam(world, player, hidden, new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), 1.0F,
+            invisible);
+        check(near.getHealth() < before || near.isDead(), "the invisible beam hurts too");
+        check(far.getHealth() == far.getMaxHealth(), "and stops at the first golem too");
         context.complete();
     }
 

@@ -89,6 +89,9 @@ class SparkTest {
         assertEquals(0xFF4040, s.color);
         assertEquals(1, s.width, 1e-9, "width is capped");
         assertEquals(4, s.ticks, "ticks are at least 4");
+        assertEquals(1, s.opacity, 1e-9, "a beam is seen unless told otherwise");
+        assertEquals(0, Spark.Shot.fromMap(Map.of("kind", "beam", "opacity", -3)).opacity, 1e-9, "0 = invisible");
+        assertEquals(1, Spark.Shot.fromMap(Map.of("alpha", 7)).opacity, 1e-9);
         Spark.Shot bubble = Spark.Shot.fromMap(Map.of("facing", "fixed", "hit", "vanish", "gravity", false, "size", 9));
         assertEquals("fixed", bubble.facing);
         assertTrue(bubble.vanishes());

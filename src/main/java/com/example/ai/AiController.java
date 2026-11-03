@@ -869,8 +869,11 @@ public class AiController {
                 size: drawn length in blocks, 0.25-2 (a head-sized bubble 0.6-0.8, a huge fireball 1.5); leave it
                       out to draw the shape as designed. Bigger shots also hit a little easier.
                 color, color2, width (0.05-1), ticks (4-20, how long the beam shows): the beam, or the vanish burst
+                opacity: beam only, 0-1 (1 the default; 0.2-0.4 a faint beam; 0 an INVISIBLE beam: nothing is seen
+                         until the landing effects play where it hits; use 0 for "투명한/보이지 않는" beams)
               The arrow line's look (trail, landing effects) still comes from ai.effect('trail'/'attack').
               e.g. a laser gun: ai.shot([kind: 'beam', color: '#ff4040', color2: '#ffc0c0', width: 0.15, ticks: 6])
+                   an invisible ray that strikes lightning: ai.shot([kind: 'beam', opacity: 0]) + ai.preset('attack', 'lightning')
                    a bubble wand: ai.shot([facing: 'fixed', hit: 'vanish', gravity: false, size: 0.7, color: '#c0f0ff'])
                    a shuriken: ai.shot([facing: 'spin', size: 0.5])
             """;

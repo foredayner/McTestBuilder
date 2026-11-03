@@ -498,6 +498,7 @@ public final class SparkRenderer {
                     // A bow's beam shot: from the bow to where it stopped, there at once, then fading.
                     Vec3d end = c.add(ax.d().multiply(s.reach));
                     double half = s.width * 0.5;
+                    alpha *= (float) s.opacity;
                     beam(b, cam, c, end, half, half, argb(alpha * 0.55F, rgb), argb(alpha * 0.55F, rgb));
                     beam(b, cam, c, end, half * 0.35, half * 0.35, argb(alpha, 0xFFFFFF), argb(alpha, 0xFFFFFF));
                 } else {
@@ -1015,7 +1016,7 @@ public final class SparkRenderer {
             Effect e = new Effect(s, target, flat, 1, now + 10, null, "");
             add(e);
         }
-        if (fx.shot != null && fx.shot.beam()) {
+        if (fx.shot != null && fx.shot.beam() && fx.shot.opacity > 0) {
             // The beam shot, from the bow to where the landing effects play.
             Vec3d from = p.getEyePos().add(0, -0.18, 0).add(look.multiply(0.6));
             add(new Effect(GearEffects.beamSpark(fx.shot, from.distanceTo(target)), from, target.subtract(from), 1, now + 10, null, ""));

@@ -172,8 +172,8 @@ public final class GearEffects {
     /** The light of a beam shot, from the bow to where it stopped, seen by everyone near either end. */
     public static void beam(ServerWorld world, LivingEntity shooter, Vec3d from, Vec3d to, Spark.Shot settings) {
         Vec3d d = to.subtract(from);
-        if (d.lengthSquared() < 1e-6) {
-            return;
+        if (d.lengthSquared() < 1e-6 || settings.opacity <= 0) {
+            return; // an invisible beam: only what it hits shows
         }
         List<ServerPlayerEntity> viewers = new ArrayList<>(PlayerLookup.around(world, from, 96));
         for (ServerPlayerEntity p : PlayerLookup.around(world, to, 64)) {
@@ -192,6 +192,7 @@ public final class GearEffects {
         s.width = settings.width;
         s.ticks = settings.ticks;
         s.reach = length;
+        s.opacity = settings.opacity;
         s.moves = new ArrayList<>(List.of("fade"));
         return s.clamped();
     }
