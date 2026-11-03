@@ -131,6 +131,7 @@ public class AibArrowEntity extends PersistentProjectileEntity {
     /** Spiral: the line's velocity now; ticks steered. */
     private Vec3d base;
     private int steered;
+    private boolean arrived;
     /** Server: the one a melee weapon hit directly (its extras pass through it). */
     private java.util.UUID passThrough;
 
@@ -220,12 +221,19 @@ public class AibArrowEntity extends PersistentProjectileEntity {
                     }
                 }
                 Vec3d to = goal.subtract(getPos());
-                if (to.lengthSquared() < 1e-4) {
+                double speed = Math.max(0.6, getVelocity().length());
+                double dist = to.length();
+                if (arrived || dist < 1e-3) {
                     return;
                 }
-                double speed = Math.max(0.6, getVelocity().length());
-                double k = "homing".equals(m.path) ? 0.25 : Math.min(1, 0.06 + steered * 0.025);
-                setVelocity(getVelocity().multiply(1 - k).add(to.normalize().multiply(speed * k)));
+                if ("arc".equals(m.path) && dist < Math.max(1.5, speed)) {
+                    arrived = true; // at the spot: fly on straight (past it if the target moved)
+                }
+                // Curving in: gently from afar, firmly when close, so it reaches the spot.
+                double k = "homing".equals(m.path) ? Math.max(0.25, speed * 1.2 / dist)
+                    : Math.max(0.08 + steered * 0.04, speed * 1.2 / dist);
+                k = Math.min(1, k);
+                setVelocity(getVelocity().multiply(1 - k).add(to.multiply(speed * k / dist)));
             }
             default -> {
             }
@@ -323,6 +331,10 @@ public class AibArrowEntity extends PersistentProjectileEntity {
     protected void onEntityHit(EntityHitResult hit) {
         Vec3d at = hit.getEntity().getPos(); // effects are placed from the feet of what was hit
         hitDirect = hit.getEntity();
+        if (isExtra() && !getWorld().isClient) {
+            // Extras land together with the main shot: each one counts (no short invulnerability after a hit).
+            hit.getEntity().timeUntilRegen = 0;
+        }
         super.onEntityHit(hit);
         land(at);
     }
@@ -343,10 +355,11 @@ public class AibArrowEntity extends PersistentProjectileEntity {
         landed = true;
         Spark.Shot s = shot();
         if (isExtra()) {
+            // Extras never stay: they cannot be picked up, and a stuck one would only hang there.
             if (s != null && s.vanishes() && !s.beam()) {
                 GearEffects.vanish(world, this, getPos(), s);
-                discard();
             }
+            discard();
             return;
         }
         GearEffects.arrowImpact(world, this, at, hitDirect);

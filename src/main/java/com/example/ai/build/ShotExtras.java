@@ -41,20 +41,22 @@ public final class ShotExtras {
         Object[] aim = aim(world, shooter);
         EffectDamage.later(0, () -> {
             if (main.getVelocity().lengthSquared() > 1e-6) {
+                // Each extra hurts half as much as this arrow.
                 launch(world, shooter, main.bow(), main.getPos(), main.getVelocity(), shot, (Vec3d) aim[0], (Entity) aim[1],
-                    main.variant(), 1.0, null, 0);
+                    main.variant(), main.getVelocity().length() * 2.0 * Spark.MAX_DAMAGE, null, 0);
             }
         });
     }
 
     /** A beam shot: the extras fly from the bow toward where the beam stopped. */
-    public static void afterBeam(ServerWorld world, LivingEntity shooter, ItemStack bow, Vec3d muzzle, Vec3d velocity, Spark.Shot shot,
-                                 HitResult hit) {
+    public static void afterBeam(ServerWorld world, LivingEntity shooter, ItemStack bow, Vec3d muzzle, Vec3d look, float pull,
+                                 Spark.Shot shot, HitResult hit) {
         if (shot == null || !shot.hasExtras()) {
             return;
         }
-        launch(world, shooter, bow, muzzle, velocity, shot, hit.getPos(), hit instanceof EntityHitResult e ? e.getEntity() : null, 0, 1.0,
-            null, 0);
+        // Slower than the beam, so they are seen; each hurts half as much as the beam (an arrow with the same draw).
+        launch(world, shooter, bow, muzzle, look.normalize().multiply(1.5), shot, hit.getPos(),
+            hit instanceof EntityHitResult e ? e.getEntity() : null, 0, pull * 3.0 * 2.0 * Spark.MAX_DAMAGE, null, 0);
     }
 
     /** A melee weapon was swung: its extras leave when the swing is done, and pass the one it hit. */
@@ -62,8 +64,7 @@ public final class ShotExtras {
         Object[] aim = aim(world, wielder);
         Vec3d look = wielder.getRotationVec(1.0F);
         Vec3d from = wielder.getEyePos().add(0, -0.2, 0).add(look.multiply(0.6));
-        // Arrow damage is its speed times this: half the weapon's damage at SWING_SPEED.
-        double damage = EffectDamage.weaponDamage(wielder) * Spark.MAX_DAMAGE / SWING_SPEED;
+        double damage = EffectDamage.weaponDamage(wielder) * Spark.MAX_DAMAGE;
         launch(world, wielder, weapon, from, look.multiply(SWING_SPEED), shot, (Vec3d) aim[0], (Entity) aim[1], 0, damage, hit, lead);
     }
 
@@ -82,7 +83,8 @@ public final class ShotExtras {
                 for (int i = 0; i < e.count; i++) {
                     double around = 2 * Math.PI * i / e.count;
                     Vec3d dir = new Vec3d(Math.cos(around) * Math.sin(spread), Math.cos(spread), Math.sin(around) * Math.sin(spread));
-                    spawn(world, owner, main.bow(), at, dir.multiply(0.9), plain("split", e), variantOf(main.variant(), e), 1.0, null);
+                    spawn(world, owner, main.bow(), at, dir.multiply(0.9), plain("split", e), variantOf(main.variant(), e),
+                        GearEffects.ARROW_DAMAGE * Spark.MAX_DAMAGE, null);
                 }
             });
         }
@@ -162,9 +164,10 @@ public final class ShotExtras {
                 yield new Vec3d[] { from, turn(d, v, a).multiply(speed) };
             }
             case "ring", "arc", "homing" -> {
-                // Out from the aim, evenly all round; arcs and homing ones go wider and curve back in.
+                // Out from the aim: a ring evenly all round; arcs and homing ones over the top and to the sides
+                // (never down into the ground), wider, and curving back in.
                 double out = Math.toRadians(e.angleOr("ring".equals(e.path) ? 10 : "arc".equals(e.path) ? 40 : 25));
-                double around = 2 * Math.PI * i / n;
+                double around = "ring".equals(e.path) ? 2 * Math.PI * i / n : -Math.PI / 2 + Math.PI * (i + 0.5) / n;
                 Vec3d axis = u.multiply(Math.cos(around)).add(v.multiply(Math.sin(around)));
                 yield new Vec3d[] { from, turn(d, axis, out).multiply(speed) };
             }
@@ -184,6 +187,7 @@ public final class ShotExtras {
             .add(k.multiply(k.dotProduct(d) * (1 - Math.cos(angle))));
     }
 
+    /** damage: how much it hurts when it hits (an arrow's damage is its speed times its damage setting). */
     private static void spawn(ServerWorld world, LivingEntity shooter, ItemStack weapon, Vec3d at, Vec3d velocity, AibArrowEntity.Motion m,
                               int variant, double damage, Entity skip) {
         if (shooter.isRemoved() || shooter.getWorld() != world) {
@@ -193,7 +197,7 @@ public final class ShotExtras {
         arrow.makeExtra(m, skip, variant);
         arrow.setPosition(at);
         arrow.setVelocity(velocity);
-        arrow.setDamage(damage);
+        arrow.setDamage(damage / Math.max(0.1, velocity.length()));
         world.spawnEntity(arrow);
     }
 }
