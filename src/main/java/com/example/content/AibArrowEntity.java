@@ -30,6 +30,10 @@ import java.util.Optional;
 public class AibArrowEntity extends PersistentProjectileEntity {
 
     private static final TrackedData<ItemStack> BOW = DataTracker.registerData(AibArrowEntity.class, TrackedDataHandlerRegistry.ITEM_STACK);
+    /** Which of the bow's arrow shapes, or which letter of its text, this one is. */
+    private static final TrackedData<Integer> VARIANT = DataTracker.registerData(AibArrowEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    /** Shots taken in turn ("cycle"): the last one per shooter. */
+    private static final java.util.Map<java.util.UUID, Integer> TURNS = new java.util.HashMap<>();
     private boolean landed;
     /** The bow's shot settings, read once per bow stack. */
     private ItemStack shotOf;
@@ -50,6 +54,7 @@ public class AibArrowEntity extends PersistentProjectileEntity {
     protected void initDataTracker(DataTracker.Builder builder) {
         super.initDataTracker(builder);
         builder.add(BOW, ItemStack.EMPTY);
+        builder.add(VARIANT, 0);
     }
 
     /** True once it has hit a block or an entity (its landing effect has played). */
@@ -60,6 +65,40 @@ public class AibArrowEntity extends PersistentProjectileEntity {
     /** The bow this arrow was shot from (empty if unknown). */
     public ItemStack bow() {
         return this.dataTracker.get(BOW);
+    }
+
+    /** Which arrow shape or letter it is (0 = the first). */
+    public int variant() {
+        return this.dataTracker.get(VARIANT);
+    }
+
+    /** How many shapes or letters the bow shoots from. */
+    public static int choices(ItemStack bow) {
+        Spark.Shot s = bow.isEmpty() ? null : GearEffects.of(bow).shot;
+        if (s != null && s.letters().length > 0) {
+            return s.letters().length;
+        }
+        com.example.ai.build.BuildPlan model = com.example.ai.build.GearItems.modelOf(bow);
+        return model == null ? 1 : Math.max(1, model.arrowShapes());
+    }
+
+    /** Pick this shot's shape or letter: at random, or the next one in turn for this shooter. */
+    public void pickVariant(LivingEntity shooter) {
+        int n = choices(bow());
+        if (n <= 1) {
+            return;
+        }
+        Spark.Shot s = shot();
+        int v;
+        if (s != null && "cycle".equals(s.order) && shooter != null) {
+            synchronized (TURNS) {
+                v = (TURNS.getOrDefault(shooter.getUuid(), -1) + 1) % n;
+                TURNS.put(shooter.getUuid(), v);
+            }
+        } else {
+            v = this.random.nextInt(n);
+        }
+        this.dataTracker.set(VARIANT, v);
     }
 
     /** How it flies (from the bow; null = like a normal arrow). */
@@ -183,6 +222,7 @@ public class AibArrowEntity extends PersistentProjectileEntity {
             nbt.put("aib_bow", bow().toNbt(getWorld().getRegistryManager()));
         }
         nbt.putBoolean("aib_landed", landed);
+        nbt.putInt("aib_variant", variant());
     }
 
     @Override
@@ -192,5 +232,6 @@ public class AibArrowEntity extends PersistentProjectileEntity {
             ItemStack.fromNbt(getWorld().getRegistryManager(), nbt.get("aib_bow")).ifPresent(s -> this.dataTracker.set(BOW, s));
         }
         landed = nbt.getBoolean("aib_landed");
+        this.dataTracker.set(VARIANT, nbt.getInt("aib_variant"));
     }
 }

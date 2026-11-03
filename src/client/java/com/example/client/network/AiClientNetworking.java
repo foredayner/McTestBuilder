@@ -117,6 +117,29 @@ public final class AiClientNetworking {
         }
     }
 
+    /** Client packets stay under this (the game's limit is 32767 bytes). */
+    private static final int ORDER_LIMIT = 30000;
+
+    /**
+     * An order from the order screen. A long earlier script that would not fit is left out: the
+     * server then uses its own copy of the record (baseId).
+     */
+    public static boolean sendOrder(com.example.ai.AiOrder order) {
+        if (!ClientPlayNetworking.canSend(AiNetworkPayloads.OrderC2SPayload.ID)) {
+            return false;
+        }
+        byte[] data = order.toGzip();
+        if (data.length > ORDER_LIMIT && order.isRevision()) {
+            order.baseScript = "";
+            data = order.toGzip();
+        }
+        if (data.length > ORDER_LIMIT) {
+            return false;
+        }
+        ClientPlayNetworking.send(new AiNetworkPayloads.OrderC2SPayload(data));
+        return true;
+    }
+
     public static void sendUndo() {
         ClientPlayNetworking.send(new AiNetworkPayloads.UndoC2SPayload());
     }

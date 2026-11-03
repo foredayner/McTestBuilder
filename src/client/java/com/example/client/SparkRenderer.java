@@ -319,6 +319,18 @@ public final class SparkRenderer {
                 along = Math.max(0.2, Math.min(1.6, model.length() * 0.5));
             }
         }
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (entity == mc.getCameraEntity() && mc.options.getPerspective().isFirstPerson()) {
+            // In first person the item is drawn at the side of the view, not where the body's arm would be:
+            // put the effect there (lower right for the main hand), a little up along the item.
+            Vec3d eye = entity.getCameraPosVec(delta);
+            Vec3d look = entity.getRotationVec(delta);
+            Vec3d r = look.crossProduct(up);
+            r = r.lengthSquared() < 1e-6 ? right.multiply(-1) : r.normalize();
+            Vec3d u = r.crossProduct(look).normalize();
+            double side = rightSide ? 1 : -1;
+            return eye.add(look.multiply(0.8)).add(r.multiply(0.45 * side)).add(u.multiply(-0.38 + Math.min(0.35, along * 0.25)));
+        }
         // The arm hangs down at pitch 0 and turns forward as the pitch goes negative.
         Vec3d arm = up.multiply(-Math.cos(pitch)).add(forward.multiply(-Math.sin(pitch)));
         Vec3d hand = shoulder.add(arm.multiply(0.62));

@@ -31,6 +31,31 @@ public class AiController {
                                 String fxHit, String fxIdle, String motion) {
     }
 
+    /** 고쳐서 주문: what the AI is told after the usual order, with the earlier script. */
+    static final String REVISE_NOTE = """
+
+            THIS ORDER CHANGES AN EARLIER DESIGN. The order above is how it was first asked for; this is the script that made it:
+            ```groovy
+            %SCRIPT%
+            ```
+            THE CHANGE ASKED FOR: %CHANGE%
+
+            Write the whole script again with ONLY that change: keep every other piece, size, position, colour, group,
+            animation and effect exactly as it is (copy those lines unchanged). If the change is about an effect or the
+            projectile, change only those calls. Answer with the complete new script.""";
+
+    private static String cutPrompt(String text) {
+        return text.length() > AiOrder.MAX_PROMPT * 3 ? text.substring(0, AiOrder.MAX_PROMPT * 3) : text;
+    }
+
+    /** The prompt for a change of an earlier design: the usual one with its script and the change. */
+    public static AiPrompt revisePrompt(AiPrompt base, String script, String change) {
+        String note = REVISE_NOTE.replace("%CHANGE%", change.trim()).replace("%SCRIPT%", script.trim());
+        int at = base.user().lastIndexOf("\nWrite the Groovy script");
+        String user = at < 0 ? base.user() + note : base.user().substring(0, at) + note + base.user().substring(at);
+        return new AiPrompt(base.system(), user);
+    }
+
     /** Request modes: "build", "object", or "gear:<kind>" (sword, axe, ...). */
     public static String modeOf(boolean objectMode) {
         return objectMode ? "object" : "build";
@@ -175,11 +200,46 @@ public class AiController {
         requestBuild(player, prompt, useWebSearch, mode, fxHit, fxIdle, "");
     }
 
-    /** motion: the sword's attack motion picked in the order (see GearMotions), or empty for the normal swing. */
+    /** motion: the weapon's attack motion picked in the order (see GearMotions), or empty for the normal swing. */
     public static void requestBuild(ServerPlayerEntity player, String prompt, boolean useWebSearch, String mode,
                                     String fxHit, String fxIdle, String motion) {
-        String hitText = fxHit == null ? "" : fxHit.trim();
-        String idleText = fxIdle == null ? "" : fxIdle.trim();
+        AiOrder order = new AiOrder();
+        order.prompt = prompt;
+        order.web = useWebSearch;
+        order.mode = mode;
+        order.fxHit = fxHit;
+        order.fxIdle = fxIdle;
+        order.motion = motion;
+        requestOrder(player, order);
+    }
+
+    /**
+     * An order (from the order screen's packet or /aibuild). For 고쳐서 주문 (baseScript or a kept
+     * record's id), the AI gets the earlier script and the change, and the new design keeps the rest.
+     */
+    public static void requestOrder(ServerPlayerEntity player, AiOrder order) {
+        order.cleaned();
+        if (!order.baseId.isEmpty() && player.getServer() != null) {
+            // The world's own copy of the record is the one trusted, when it has it.
+            com.example.ai.build.BuildRecord kept = com.example.ai.build.SharedHistory.get(player.getServer(), order.baseId);
+            if (kept != null && kept.revisable()) {
+                order.baseScript = kept.script;
+                order.basePrompt = kept.prompt;
+            }
+        }
+        if (!order.baseId.isEmpty() && !order.isRevision()) {
+            AiNetworking.sendLog(player, "[AI] Error: 이 기록에는 AI 스크립트가 없어서 고쳐서 주문할 수 없어요. 다시 주문을 써 주세요.");
+            return;
+        }
+        boolean revision = order.isRevision();
+        String prompt = revision ? cutPrompt(order.basePrompt + " (수정: " + order.prompt + ")") : order.prompt;
+        // The AI is asked with the first description; the change comes with the script.
+        String described = revision ? order.basePrompt : order.prompt;
+        boolean useWebSearch = order.web;
+        String mode = order.mode;
+        String motion = order.motion;
+        String hitText = order.fxHit;
+        String idleText = order.fxIdle;
         boolean objectMode = !"build".equals(mode);
         // The shared 작업 일지: one entry per request, collecting what this request reports.
         WorkJournal.start(player, prompt, mode, hitText, idleText, com.example.content.GearMotions.normalize(motion));
@@ -216,8 +276,12 @@ public class AiController {
 
             debug("[DEBUG] Building prompt...");
             AiPrompt promptText = withWebNote(gearOf(mode) != null
-                ? gearPrompt(prompt, gearOf(mode), hitText, idleText, pixelOf(mode))
-                : objectMode ? objectPrompt(prompt) : buildingPrompt(prompt, worldInfo, webSearch), webSearch);
+                ? gearPrompt(described, gearOf(mode), hitText, idleText, pixelOf(mode))
+                : objectMode ? objectPrompt(described) : buildingPrompt(described, worldInfo, webSearch), webSearch);
+            if (revision) {
+                promptText = revisePrompt(promptText, order.baseScript, order.prompt);
+                AiNetworking.sendLog(player, "[AI] 이전 설계를 고치는 중이에요: " + order.prompt);
+            }
 
             debug("[DEBUG] Sending to AI provider...");
             AiNetworking.sendDebugLog(player, "[AI] Requesting from AI model (" + config.provider.getDisplayName() + ")...");
@@ -318,11 +382,17 @@ public class AiController {
             AiBuilderConfig config = AiBuilderConfig.get();
             String description = generateDescription(aiCode, origin) + "\n" + plan.summary();
             BuildRecord record = BuildRecord.create(req.userPrompt(), config.provider.name(), config.modelName, plan);
+            // Kept with the design: the order (다시 주문) and the script (고쳐서 주문).
+            record.script = aiCode;
+            record.fxHit = req.fxHit();
+            record.fxIdle = req.fxIdle();
             if (gear != null) {
                 record.kind = "gear";
                 record.gear = gear.id();
+                record.pixel = pixelOf(req.mode());
                 applyEffectRequest(plan, gear, req.fxHit(), req.fxIdle());
-                plan.motion = gear == GearKind.SWORD ? req.motion() : "";
+                plan.motion = com.example.content.GearMotions.applies(gear) ? req.motion() : "";
+                record.motion = plan.motion;
             }
             BuildApproval.requestApproval(player, record, description, origin);
             debug("[TIMER] ===== PENDING USER APPROVAL =====");
@@ -839,7 +909,7 @@ public class AiController {
         List<String> problems = new java.util.ArrayList<>();
         Spark.Effects fx = plan.fx == null ? new Spark.Effects() : plan.fx;
         if (kind == GearKind.BOW && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty() && fx.trail.isEmpty()
-            && (fx.shot == null || !fx.shot.beam())) {
+            && (fx.shot == null || !fx.shot.beam() && fx.shot.letters().length == 0) && plan.arrowShapes() == 0) {
             problems.add("the order asks for an arrow effect (\"" + fxHit.trim() + "\") but the script makes none: "
                 + "call ai.effect('trail', [...]) for the flight and/or ai.effect('attack', [...]) for where it lands.");
         } else if (kind != GearKind.BOW && !kind.worn() && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty()) {
@@ -871,11 +941,19 @@ public class AiController {
                 color, color2, width (0.05-1), ticks (4-20, how long the beam shows): the beam, or the vanish burst
                 opacity: beam only, 0-1 (1 the default; 0.2-0.4 a faint beam; 0 an INVISIBLE beam: nothing is seen
                          until the landing effects play where it hits; use 0 for "투명한/보이지 않는" beams)
+                text: LETTERS instead of a modelled shape: each shot is one character of it, drawn in the game's font
+                      with some thickness (color = its colour, size = its height). For letters, numbers, notes, symbols:
+                      'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '0123456789', '♪♫♬', '★☆', '가나다라마바사'. Then make NO arrow shape.
+                order: with several shapes or letters, 'random' (the default) or 'cycle' (in turn: 'HELLO' spells it out)
+              SEVERAL SHAPES: when the order wants different things to fly (a heart, a star and a note), make up to 8
+                shapes, each between ai.arrowStart(n) and ai.arrowEnd() with n = 1, 2, 3...; each shot is one of them.
               The arrow line's look (trail, landing effects) still comes from ai.effect('trail'/'attack').
               e.g. a laser gun: ai.shot([kind: 'beam', color: '#ff4040', color2: '#ffc0c0', width: 0.15, ticks: 6])
                    an invisible ray that strikes lightning: ai.shot([kind: 'beam', opacity: 0]) + ai.preset('attack', 'lightning')
                    a bubble wand: ai.shot([facing: 'fixed', hit: 'vanish', gravity: false, size: 0.7, color: '#c0f0ff'])
                    a shuriken: ai.shot([facing: 'spin', size: 0.5])
+                   a keyboard shooting random letters: ai.shot([text: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', facing: 'fixed',
+                                                                gravity: false, hit: 'vanish', size: 0.7, color: '#80ffea'])
             """;
 
     /** API and rules for effects, added to the equipment prompts. */
@@ -1004,6 +1082,12 @@ public class AiController {
                 type 'pulse' : grows and shrinks, amount = fraction (0.05-0.2), speed = cycles/s
                 axis: 'x', 'y' or 'z'. A group made with mirrorOn() gets a mirrored twin that moves as its mirror image.
               ai.glow('name')                               // the group glows in the dark (gems, flames, runes)
+              ai.colorWave('name', ['#rrggbb', ...], speed, flow, bands)   // THE ITEM'S OWN COLOUR CHANGES, like LEDs:
+                the pieces of the group ('all' = the whole item) run through 2-6 colours and shine; flow 'down' (colours
+                pour from the top to the bottom), 'up', or 'all' (all together); speed = cycles per second (0.3-2);
+                bands = colour stripes along it at once (1 = one gradient over its length). Use THIS for gradients,
+                rainbow, LED, neon or colour-changing items - not dots: an idle dot effect floats beside the item
+                and does not change its colour. e.g. ai.colorWave('blade', ['#ff3030', '#ffd030', '#30ff60', '#3080ff'], 0.8, 'down')
               ai.aura('#rrggbb', strength)                  // a soft, shining halo of light around the whole item while held
                                                             // or worn (strength 0.2-1): holy, cursed, magical, legendary items
             """;

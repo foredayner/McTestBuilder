@@ -119,6 +119,20 @@ class SparkTest {
     }
 
     @Test
+    void lettersAndOrderOfShots() {
+        Spark.Shot s = Spark.Shot.fromMap(Map.of("text", "A B\tC가♪", "order", "cycle"));
+        assertArrayEquals(new int[] { 'A', 'B', 'C', '가', '♪' }, s.letters(), "one letter per shot, spaces skipped");
+        assertEquals("cycle", s.order);
+        assertEquals("random", new Spark.Shot().order);
+        assertEquals(0, new Spark.Shot().letters().length);
+        assertEquals(Spark.Shot.MAX_TEXT, Spark.Shot.fromMap(Map.of("text", "x".repeat(500))).letters().length, "text is capped");
+        assertThrows(IllegalArgumentException.class, () -> Spark.Shot.fromMap(Map.of("order", "sometimes")));
+        Spark.Shot bad = Spark.Effects.fromJson("{\"shot\":{\"text\":\"\\u0007AB\",\"order\":\"x\"}}").shot;
+        assertEquals("AB", bad.text, "control characters are dropped");
+        assertEquals("random", bad.order);
+    }
+
+    @Test
     void boltIsAFormAndLightningIsAnOption() {
         Spark s = Spark.fromMap(Map.of("form", "bolt", "lightning", true));
         assertEquals("bolt", s.form);

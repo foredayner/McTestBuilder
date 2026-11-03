@@ -80,7 +80,7 @@ public class MinecraftAI {
 
     /** The group mirrored pieces of the current group go into. */
     private static int mirrorGroup() {
-        if (group == 0 || group == BuildPlan.ARROW_GROUP) {
+        if (group == 0 || BuildPlan.isArrow(group)) {
             return group;
         }
         for (Map.Entry<String, Integer> e : groupIds.entrySet()) {
@@ -106,6 +106,15 @@ public class MinecraftAI {
     /** Bows: pieces made until arrowEnd() are the shape of the arrows it shoots (not drawn on the bow). */
     public static void arrowStart() {
         group = BuildPlan.ARROW_GROUP;
+    }
+
+    /** Bows with several arrow shapes: ai.arrowStart(1) ... ai.arrowStart(8); each shot takes one (ai.shot order). */
+    public static void arrowStart(Number which) {
+        int n = which == null ? 1 : which.intValue();
+        if (n < 1 || n > BuildPlan.MAX_ARROWS) {
+            throw new IllegalArgumentException("arrowStart takes a shape number 1-" + BuildPlan.MAX_ARROWS + ", got " + which);
+        }
+        group = BuildPlan.ARROW_GROUP + n - 1;
     }
 
     public static void arrowEnd() {
@@ -192,6 +201,56 @@ public class MinecraftAI {
         Integer twin = groupIds.get(name.trim() + "~m");
         if (twin != null) {
             recorder.anims.add(new BuildPlan.Anim(twin, "glow", 0, 0, 0, "y", 1, 0));
+        }
+    }
+
+    /**
+     * The colour of a group (or 'all') runs through colours like LEDs: down (from the top to the
+     * bottom), up, or all together; speed = cycles per second; bands = how many colour stripes fit
+     * along its length at once (0.5-4). The pieces shine while they change.
+     */
+    public static void colorWave(String name, java.util.List<?> colors, Number speed, String flow, Number bands) {
+        if (recorder == null) {
+            return;
+        }
+        String key = name == null ? "" : name.trim();
+        boolean all = key.isEmpty() || key.equals("all");
+        if (!all && !groupIds.containsKey(key)) {
+            throw new IllegalArgumentException("colorWave: no group '" + name + "' (make it with ai.groupStart('" + name
+                + "') first, or use 'all' for the whole item)");
+        }
+        if (colors == null || colors.size() < 2 || colors.size() > 6) {
+            throw new IllegalArgumentException("colorWave needs 2-6 colours like ['#ff0000', '#00ff00', '#0000ff']");
+        }
+        int[] rgb = new int[colors.size()];
+        for (int i = 0; i < rgb.length; i++) {
+            String c = String.valueOf(colors.get(i)).trim().replace("#", "");
+            try {
+                rgb[i] = Integer.parseInt(c, 16) & 0xFFFFFF;
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("colorWave colour must look like '#ff66cc', got '" + colors.get(i) + "'");
+            }
+        }
+        String f = flow == null ? "down" : flow.trim().toLowerCase(Locale.ROOT);
+        if (!f.equals("down") && !f.equals("up") && !f.equals("all")) {
+            throw new IllegalArgumentException("colorWave flow must be 'down', 'up' or 'all', got '" + flow + "'");
+        }
+        double s = Math.max(0.05, Math.min(4, Math.abs(toDouble(speed))));
+        double b = bands == null ? 1 : Math.max(0.5, Math.min(4, Math.abs(toDouble(bands))));
+        java.util.List<Integer> groups = new java.util.ArrayList<>();
+        if (all) {
+            groups.add(BuildPlan.Anim.ALL);
+        } else {
+            groups.add(groupIds.get(key));
+            if (groupIds.containsKey(key + "~m")) {
+                groups.add(groupIds.get(key + "~m"));
+            }
+        }
+        for (int g : groups) {
+            BuildPlan.Anim a = new BuildPlan.Anim(g, "color", 0, 0, 0, "y", s, b);
+            a.colors = rgb;
+            a.flow = f;
+            recorder.anims.add(a);
         }
     }
 

@@ -248,7 +248,7 @@ public final class GearEffects {
         }
         double low = Double.MAX_VALUE, high = -Double.MAX_VALUE;
         for (BuildPlan.Part p : model.parts) {
-            if (p.group != BuildPlan.ARROW_GROUP) {
+            if (!BuildPlan.isArrow(p.group)) {
                 low = Math.min(low, p.y - p.sy / 2);
                 high = Math.max(high, p.y + p.sy / 2);
             }

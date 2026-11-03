@@ -215,7 +215,7 @@ public class AiPromptScreen extends Screen {
         TextFieldWidget field = new TextFieldWidget(this.textRenderer, x + 5, y + 5, width - 10, 12, Text.literal(""));
         field.setDrawsBackground(false);
         field.setEditableColor(PAPER);
-        field.setMaxLength(45);
+        field.setMaxLength(com.example.ai.AiOrder.MAX_EFFECT);
         field.setPlaceholder(Text.literal(placeholder));
         field.setText(text);
         this.addSelectableChild(field);
@@ -232,11 +232,9 @@ public class AiPromptScreen extends Screen {
             int bx = right() - 84 - 4 - 88;
             button("   종류: " + kind.korean, bx, top(), 88, b -> AiClientState.cycleGearKind());
             this.icons.add(new IconAt(new ItemStack(kind.icon), bx + 3, top() + 1));
-            // Pixel art (like a resource pack) or pieces of blocks and colours.
-            bx -= 4 + 72;
-            button(AiClientState.isPixel() ? "모양: 픽셀" : "모양: 블록", bx, top(), 72, b -> AiClientState.togglePixel());
-            if (kind == com.example.content.GearKind.SWORD) {
-                // Swords only: how the attack swing looks.
+            // (The 모양: 블록/픽셀 choice is hidden: orders are always blocks. Pixel art stays in the code.)
+            if (com.example.content.GearMotions.applies(kind)) {
+                // Held weapons and tools: how the attack swing looks.
                 bx -= 4 + 88;
                 button("모션: " + com.example.content.GearMotions.korean(AiClientState.getMotion()), bx, top(), 88,
                     b -> AiClientState.cycleMotion());
@@ -276,18 +274,28 @@ public class AiPromptScreen extends Screen {
         }
 
         int fy = bottom() - 20;
-        this.promptField = new TextFieldWidget(this.textRenderer, left() + 5, fy + 6, right() - left() - 78, 12, Text.literal(""));
+        boolean editing = AiClientState.getEditing() != null;
+        this.promptField = new TextFieldWidget(this.textRenderer, left() + 5, fy + 6, right() - left() - 78 - (editing ? 48 : 0), 12,
+            Text.literal(""));
         this.promptField.setDrawsBackground(false);
         this.promptField.setEditableColor(PAPER);
         // The chat command that carries the order is limited to 256 characters.
         this.promptField.setMaxLength(gear ? 150 : 220);
-        this.promptField.setPlaceholder(Text.literal(gear ? "어떤 " + AiClientState.getGearKind().korean + "인지 적어 주세요…"
+        this.promptField.setPlaceholder(Text.literal(editing ? "무엇을 고칠지 적어 주세요… (예: 칼날을 빨갛게)"
+            : gear ? "어떤 " + AiClientState.getGearKind().korean + "인지 적어 주세요…"
             : object ? "만들 소품을 적어 주세요…" : "지을 건물을 적어 주세요…"));
         this.promptField.setText(this.draftPrompt);
         this.promptField.setFocused(true);
         this.addSelectableChild(this.promptField);
         this.setFocused(this.promptField);
         button("   보내기", right() - 64, fy, 64, b -> sendBuild());
+        if (editing) {
+            // 고쳐서 주문 in progress: back to a new order.
+            button("취소", right() - 64 - 48, fy, 44, b -> {
+                AiClientState.cancelEditing();
+                AiClientState.addLog("[고쳐서 주문] 취소했어요. 새 주문이에요.");
+            });
+        }
         this.icons.add(new IconAt(new ItemStack(Items.FEATHER), right() - 61, fy + 1));
     }
 
@@ -313,7 +321,7 @@ public class AiPromptScreen extends Screen {
             if (!hit.isEmpty()) {
                 AiClientState.addLog("[Request] " + (AiClientState.getGearKind() == com.example.content.GearKind.BOW ? "화살: " : "공격 시: ") + hit);
             }
-            if (AiClientState.getGearKind() == com.example.content.GearKind.SWORD && !AiClientState.getMotion().isEmpty()) {
+            if (com.example.content.GearMotions.applies(AiClientState.getGearKind()) && !AiClientState.getMotion().isEmpty()) {
                 AiClientState.addLog("[Request] 공격 모션: " + com.example.content.GearMotions.korean(AiClientState.getMotion()));
             }
             if (!idle.isEmpty()) {
@@ -549,6 +557,29 @@ public class AiPromptScreen extends Screen {
                 this.confirmDelete = false;
                 rebuild();
             }, this.confirmDelete));
+        // Order it again: as it was (to change anything, then send), or a change of this very design.
+        int bw = 72;
+        button("다시 주문", right() - 2 * bw - 10, top() + 3, bw, b -> reorder(record, false));
+        WoodButton fix = button("고쳐서 주문", right() - bw - 6, top() + 3, bw, b -> reorder(record, true));
+        if (!record.revisable()) {
+            fix.active = false;
+            fix.setTooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal(
+                "예전 기록이라 AI 스크립트가 없어서 고칠 수 없어요. 다시 주문을 써 주세요.")));
+        }
+    }
+
+    /** 다시 주문 / 고쳐서 주문: fill the order screen from a kept design. */
+    private void reorder(BuildRecord record, boolean revise) {
+        AiClientState.loadOrder(record, revise);
+        this.draftPrompt = revise ? "" : record.prompt;
+        if (revise) {
+            AiClientState.addLog("[고쳐서 주문] \"" + shortTitle(record.prompt) + "\"을(를) 고쳐요. 바꿀 점만 적어 보내 주세요 "
+                + "(예: 칼날을 빨갛게, 이펙트를 번개로). 나머지는 그대로 둬요.");
+        } else {
+            AiClientState.addLog("[다시 주문] \"" + shortTitle(record.prompt) + "\"의 주문을 불러왔어요. 고쳐서 보내면 새로 만들어요.");
+        }
+        selectedId = null;
+        switchPage(Page.CREATE);
     }
 
     private void renderHistory(DrawContext ctx, int mouseX, int mouseY) {
@@ -764,13 +795,25 @@ public class AiPromptScreen extends Screen {
         BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, x + 3, y + 3, img - 6, img - 6);
         BuildPreview.draw(ctx, p.top, p.topW, p.topH, x + img + 11, y + 3, img - 6, img - 6);
         y += img + 8;
-        String[] info = {
+        java.util.List<String> info = new java.util.ArrayList<>(java.util.List.of(
             "크기 " + p.sizeX + " × " + p.sizeY + " × " + p.sizeZ + " (가로 × 높이 × 세로) · "
                 + (object ? "조각 " + p.blocks + "개" : "블록 " + p.blocks + "개"),
             "만든 날 " + DATE.format(new Date(r.createdAt))
                 + (r.owner != null && !r.owner.isEmpty() ? " · 만든 사람 " + r.owner : ""),
-            "AI " + r.provider + " / " + r.model
-        };
+            "AI " + r.provider + " / " + r.model));
+        // What the order's other fields said (records made since 다시 주문 keep them).
+        if (gear) {
+            boolean bow = "bow".equals(r.gear);
+            if (r.fxHit != null && !r.fxHit.isEmpty()) {
+                info.add((bow ? "화살: " : "공격 시: ") + r.fxHit);
+            }
+            if (r.fxIdle != null && !r.fxIdle.isEmpty()) {
+                info.add((com.example.content.GearKind.of(r.gear).worn() ? "착용 시: " : "대기 시: ") + r.fxIdle);
+            }
+            if (r.motion != null && !r.motion.isEmpty()) {
+                info.add("공격 모션: " + com.example.content.GearMotions.korean(r.motion));
+            }
+        }
         for (String s : info) {
             for (OrderedText line : this.textRenderer.wrapLines(Text.literal(s), width)) {
                 ctx.drawText(this.textRenderer, line, x, y, INK_SOFT, false);

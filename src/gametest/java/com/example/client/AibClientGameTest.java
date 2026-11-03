@@ -200,6 +200,52 @@ public class AibClientGameTest implements FabricClientGameTest {
             context.waitTicks(5);
             context.takeScreenshot("20q_painted_first_person");
 
+            // An LED blade (ai.colorWave): its colours pour down from the tip.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                BuildRecord led = BuildRecord.create("LED 검", "TEST", "script",
+                    Demo.plan(p.getServerWorld(), p.getBlockPos(), p, com.example.gametest.Demo.LED_SWORD, true));
+                led.kind = "gear";
+                led.gear = "sword";
+                p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(led));
+            });
+            context.waitTicks(10);
+            context.takeScreenshot("20r_led_sword_first_person");
+            // Letters shot from a keyboard bow (shot text), taken in turn: A, B, C hanging in front.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                var world = p.getServerWorld();
+                BuildRecord keys = BuildRecord.create("키보드 활", "TEST", "script", Demo.plan(world, p.getBlockPos(), p,
+                    com.example.gametest.Demo.BOW + "ai.shot([text: 'ABC', order: 'cycle', facing: 'fixed', gravity: false, "
+                        + "size: 0.8, color: '#80ffea'])\n", true));
+                keys.kind = "gear";
+                keys.gear = "bow";
+                net.minecraft.item.ItemStack bow = com.example.ai.build.GearItems.stackFor(keys);
+                var look = p.getRotationVec(1.0F);
+                var flat = new net.minecraft.util.math.Vec3d(look.x, 0, look.z).normalize();
+                var side = new net.minecraft.util.math.Vec3d(-flat.z, 0, flat.x);
+                for (int i = 0; i < 3; i++) {
+                    var arrow = (com.example.content.AibArrowEntity) ((com.example.content.GearBowItem) bow.getItem())
+                        .createArrowEntity(world, p, bow, new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), false);
+                    var at = p.getEyePos().add(flat.multiply(3)).add(side.multiply(i - 1)).add(0, -0.6, 0);
+                    arrow.refreshPositionAndAngles(at.x, at.y, at.z, p.getYaw(), 0);
+                    arrow.setVelocity(flat.multiply(0.001));
+                    world.spawnEntity(arrow);
+                }
+            });
+            context.waitTicks(5);
+            context.takeScreenshot("20s_letter_arrows");
+            game.getServer().runOnServer(server -> {
+                var world = server.getPlayerManager().getPlayerList().get(0).getServerWorld();
+                java.util.List<net.minecraft.entity.Entity> arrows = new java.util.ArrayList<>();
+                for (var e : world.iterateEntities()) {
+                    if (e instanceof com.example.content.AibArrowEntity) {
+                        arrows.add(e);
+                    }
+                }
+                arrows.forEach(net.minecraft.entity.Entity::discard);
+            });
+
             // Swords ordered with attack motions, frozen at the wind-up and at the strike, in third and first person.
             for (String motion : List.of("thrust", "slash", "smash")) {
                 game.getServer().runOnServer(server -> {

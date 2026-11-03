@@ -193,6 +193,18 @@ public final class AiNetworkPayloads {
     }
 
     /** Server -> client: the 작업 일지 changed (gzip'd JSON, see WorkJournal.Update). */
+    /** Client -> server: an order from the order screen (AiOrder, gzip JSON). */
+    public record OrderC2SPayload(byte[] data) implements CustomPayload {
+        public static final CustomPayload.Id<OrderC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "order"));
+        public static final PacketCodec<RegistryByteBuf, OrderC2SPayload> CODEC =
+            PacketCodec.tuple(PacketCodecs.BYTE_ARRAY, OrderC2SPayload::data, OrderC2SPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     public record JournalS2CPayload(byte[] data) implements CustomPayload {
         public static final CustomPayload.Id<JournalS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "journal"));
         public static final PacketCodec<RegistryByteBuf, JournalS2CPayload> CODEC =

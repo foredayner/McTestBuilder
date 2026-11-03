@@ -373,6 +373,8 @@ public final class Spark {
         public static final List<String> KINDS = List.of("arrow", "beam");
         public static final List<String> FACINGS = List.of("flight", "spin", "fixed");
         public static final List<String> HITS = List.of("stick", "vanish");
+        public static final List<String> ORDERS = List.of("random", "cycle");
+        public static final int MAX_TEXT = 64;
         public static final double RANGE = 64;
         public String kind = "arrow";
         public String facing = "flight";
@@ -387,6 +389,15 @@ public final class Spark {
         public int ticks = 8;
         /** Beam: how visible it is, 0 (invisible: only what it hits shows) to 1. */
         public double opacity = 1;
+        /** Letters shot instead of an arrow shape: each shot is one character of this (drawn in the game's font). */
+        public String text = "";
+        /** With several arrow shapes or letters: 'random' or 'cycle' (in turn). */
+        public String order = "random";
+
+        /** The characters of text, one per shot. */
+        public int[] letters() {
+            return text == null ? new int[0] : text.codePoints().filter(c -> !Character.isWhitespace(c)).toArray();
+        }
 
         public boolean beam() {
             return "beam".equals(kind);
@@ -411,6 +422,14 @@ public final class Spark {
             width = clamp(width, 0.05, 1);
             ticks = (int) clamp(ticks, 4, 20);
             opacity = clamp(opacity, 0, 1);
+            order = ORDERS.contains(order) ? order : "random";
+            if (text == null) {
+                text = "";
+            }
+            // Printable characters only, at most MAX_TEXT.
+            StringBuilder t = new StringBuilder();
+            text.codePoints().filter(c -> !Character.isISOControl(c)).limit(MAX_TEXT).forEach(t::appendCodePoint);
+            text = t.toString();
             return this;
         }
 
@@ -432,8 +451,10 @@ public final class Spark {
                         case "width" -> s.width = num(v, key);
                         case "ticks", "time" -> s.ticks = (int) Math.round(num(v, key));
                         case "opacity", "alpha" -> s.opacity = num(v, key);
+                        case "text", "letters" -> s.text = String.valueOf(v);
+                        case "order" -> s.order = word(v, ORDERS, "shot order");
                         default -> throw new IllegalArgumentException("unknown shot setting '" + key
-                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks, opacity");
+                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks, opacity, text, order");
                     }
                 }
             }

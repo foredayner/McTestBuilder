@@ -235,6 +235,19 @@ public final class AiScriptFacade {
         MinecraftAI.glow(group);
     }
 
+    /** LED-like colours running over a group ('all' = the whole item): ai.colorWave('blade', ['#ff0000', '#0000ff'], 1). */
+    public void colorWave(String group, java.util.List<?> colors, Number speed) {
+        MinecraftAI.colorWave(group, colors, speed, "down", 1);
+    }
+
+    public void colorWave(String group, java.util.List<?> colors, Number speed, String flow) {
+        MinecraftAI.colorWave(group, colors, speed, flow, 1);
+    }
+
+    public void colorWave(String group, java.util.List<?> colors, Number speed, String flow, Number bands) {
+        MinecraftAI.colorWave(group, colors, speed, flow, bands);
+    }
+
     public void aura(String color, Number strength) {
         MinecraftAI.aura(color, strength);
     }
@@ -268,6 +281,10 @@ public final class AiScriptFacade {
 
     public void arrowStart() {
         MinecraftAI.arrowStart();
+    }
+
+    public void arrowStart(Number which) {
+        MinecraftAI.arrowStart(which);
     }
 
     public void arrowEnd() {

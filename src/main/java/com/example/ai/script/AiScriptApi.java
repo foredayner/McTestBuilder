@@ -40,6 +40,7 @@ public final class AiScriptApi {
         "groupEnd",
         "animate",
         "glow",
+        "colorWave",
         "aura",
         "oversize",
         "mark",

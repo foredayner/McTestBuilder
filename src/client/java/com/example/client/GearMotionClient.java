@@ -32,9 +32,9 @@ public final class GearMotionClient {
     private GearMotionClient() {
     }
 
-    /** The ordered motion of a sword stack, or "". */
+    /** The ordered motion of a held weapon or tool, or "". */
     public static String motionOf(ItemStack stack) {
-        if (stack == null || !(stack.getItem() instanceof GearItem gear) || gear.kind() != GearKind.SWORD) {
+        if (stack == null || !(stack.getItem() instanceof GearItem gear) || !GearMotions.applies(gear.kind())) {
             return "";
         }
         return GearMotions.of(stack);

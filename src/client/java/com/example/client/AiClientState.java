@@ -166,6 +166,7 @@ public final class AiClientState {
 
     /** 건물 -> 소품 -> 장비 -> 건물. */
     public static void cycleMode() {
+        editing = null;
         mode = (mode + 1) % 3;
         refreshOpenScreen(true);
     }
@@ -204,6 +205,7 @@ public final class AiClientState {
     }
 
     public static void cycleGearKind() {
+        editing = null;
         com.example.content.GearKind[] all = com.example.content.GearKind.values();
         gearKind = all[(gearKind.ordinal() + 1) % all.length];
         refreshOpenScreen(true);
@@ -352,20 +354,79 @@ public final class AiClientState {
             return;
         }
 
-        String flag = mode == 1 ? "--object " : mode == 2 ? "--gear=" + gearKind.id() + " " : "";
-        if (mode == 2 && pixel) {
-            flag += "--pixel ";
+        // The order goes as one packet (no 256-character limit of a chat command).
+        com.example.ai.AiOrder order = new com.example.ai.AiOrder();
+        order.prompt = trimmed;
+        order.web = willUseWebSearch();
+        // Orders are always blocks now (the pixel art choice is hidden; its code stays).
+        order.mode = mode == 1 ? "object" : mode == 2 ? "gear:" + gearKind.id() : "build";
+        if (mode == 2) {
+            order.fxHit = gearKind.worn() ? "" : clean(fxHit);
+            order.fxIdle = clean(fxIdle);
+            order.motion = com.example.content.GearMotions.applies(gearKind) ? motion : "";
         }
-        if (mode == 2 && gearKind == com.example.content.GearKind.SWORD && !motion.isEmpty()) {
-            flag += "--motion=" + motion + " ";
+        if (editing != null) {
+            order.baseId = editing.id;
+            order.baseScript = editing.script == null ? "" : editing.script;
+            order.basePrompt = editing.prompt;
+        }
+        order.cleaned();
+        if (AiClientNetworking.sendOrder(order)) {
+            editing = null;
+            return;
+        }
+        if (editing != null) {
+            addLog("[AI] Error: 고쳐서 주문을 보낼 수 없어요 (서버의 모드가 이전 버전이거나 스크립트가 너무 커요).");
+            return;
+        }
+        // A server with an older version of the mod: the chat command, as before.
+        String flag = mode == 1 ? "--object " : mode == 2 ? "--gear=" + gearKind.id() + " " : "";
+        if (mode == 2 && !order.motion.isEmpty()) {
+            flag += "--motion=" + order.motion + " ";
         }
         String effects = "";
         if (mode == 2) {
-            String hit = clean(fxHit);
-            String idle = clean(fxIdle);
-            effects = (!gearKind.worn() && !hit.isEmpty() ? "||hit:" + hit : "") + (idle.isEmpty() ? "" : "||idle:" + idle);
+            effects = (!order.fxHit.isEmpty() ? "||hit:" + order.fxHit : "") + (order.fxIdle.isEmpty() ? "" : "||idle:" + order.fxIdle);
         }
-        ClientAiBuildNetworking.sendAiBuildRequest(trimmed.replace("||", "|") + effects, willUseWebSearch(), flag);
+        String command = trimmed.replace("||", "|") + effects;
+        ClientAiBuildNetworking.sendAiBuildRequest(command.length() > 200 ? command.substring(0, 200) : command, willUseWebSearch(), flag);
+    }
+
+    /** 고쳐서 주문: the kept design being changed (null = a new order). */
+    private static com.example.ai.build.BuildRecord editing;
+
+    public static com.example.ai.build.BuildRecord getEditing() {
+        return editing;
+    }
+
+    public static void cancelEditing() {
+        editing = null;
+        refreshOpenScreen(true);
+    }
+
+    /** Fill the order with a kept design's order (다시 주문), or start changing it (고쳐서 주문). */
+    public static void loadOrder(com.example.ai.build.BuildRecord record, boolean revise) {
+        if ("gear".equals(record.kind)) {
+            mode = 2;
+            gearKind = com.example.content.GearKind.of(record.gear);
+            motion = com.example.content.GearMotions.normalize(record.motion);
+            fxHit = record.fxHit == null ? "" : record.fxHit;
+            fxIdle = record.fxIdle == null ? "" : record.fxIdle;
+            if (fxHit.isEmpty() && fxIdle.isEmpty() && record.script.isEmpty()) {
+                // An older record keeps no effect fields: the 작업 일지 may still have the request.
+                for (com.example.ai.WorkJournal.Job job : WorkJournalClient.list()) {
+                    if (job.prompt.equals(record.prompt) && record.gear != null && record.gear.equals(job.gear)) {
+                        fxHit = job.fxHit;
+                        fxIdle = job.fxIdle;
+                        motion = com.example.content.GearMotions.normalize(job.motion);
+                        break;
+                    }
+                }
+            }
+        } else {
+            mode = "object".equals(record.kind) ? 1 : 0;
+        }
+        editing = revise && record.revisable() ? record : null;
     }
 
     /** Effect fields of the equipment order (empty = no such effect). */

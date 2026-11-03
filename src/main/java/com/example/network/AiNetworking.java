@@ -46,6 +46,7 @@ public final class AiNetworking {
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.NearbyObjectsS2CPayload.ID, AiNetworkPayloads.NearbyObjectsS2CPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.HistoryS2CPayload.ID, AiNetworkPayloads.HistoryS2CPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.HistoryDeleteC2SPayload.ID, AiNetworkPayloads.HistoryDeleteC2SPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.OrderC2SPayload.ID, AiNetworkPayloads.OrderC2SPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.JournalS2CPayload.ID, AiNetworkPayloads.JournalS2CPayload.CODEC);
     }
 
@@ -138,6 +139,20 @@ public final class AiNetworking {
             });
         });
 
+        // An order from the order screen: the same check as /aibuild (operators only), then the same request.
+        ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.OrderC2SPayload.ID, (payload, context) -> {
+            context.server().execute(() -> {
+                if (!allowed(context.player())) {
+                    return;
+                }
+                com.example.ai.AiOrder order = com.example.ai.AiOrder.fromGzip(payload.data());
+                if (order == null || order.prompt.isBlank()) {
+                    sendLog(context.player(), "[AI] Error: 주문을 읽지 못했어요.");
+                    return;
+                }
+                com.example.ai.AiController.requestOrder(context.player(), order);
+            });
+        });
         ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.RebuildPartC2SPayload.ID, (payload, context) -> {
             context.server().execute(() -> {
                 if (allowed(context.player())) {

@@ -86,7 +86,7 @@ public final class BuildPlan {
     /** A looping movement of one group of parts (equipment only), around a pivot point. */
     public static final class Anim {
         public int group;
-        /** spin, swing, bob, pulse or glow. */
+        /** spin, swing, bob, pulse, glow or color. */
         public String type;
         public double px;
         public double py;
@@ -95,8 +95,14 @@ public final class BuildPlan {
         public String axis;
         /** spin: turns per second; swing / bob / pulse: cycles per second. */
         public double speed;
-        /** swing: degrees; bob: blocks; pulse: fraction of the size. */
+        /** swing: degrees; bob: blocks; pulse: fraction of the size; color: bands of colour along the item. */
         public double amount;
+        /** color (a colour wave, like LEDs): the colours it runs through, and which way: down, up or all (together). */
+        public int[] colors;
+        public String flow;
+
+        /** The group that covers every piece of the item (for a colour wave over all of it). */
+        public static final int ALL = -1;
 
         public Anim() {
         }
@@ -130,6 +136,24 @@ public final class BuildPlan {
     public static final int MAX_PARTS = 400;
     /** Bows: the group of the pieces that make the arrow's shape. */
     public static final int ARROW_GROUP = 999;
+    /** Bows may have several arrow shapes (groups ARROW_GROUP .. ARROW_GROUP + MAX_ARROWS - 1), shot in turn or at random. */
+    public static final int MAX_ARROWS = 8;
+
+    /** Whether a group is one of a bow's arrow shapes. */
+    public static boolean isArrow(int group) {
+        return group >= ARROW_GROUP && group < ARROW_GROUP + MAX_ARROWS;
+    }
+
+    /** How many arrow shapes a bow has (the highest one made). */
+    public int arrowShapes() {
+        int n = 0;
+        for (Part p : parts) {
+            if (isArrow(p.group)) {
+                n = Math.max(n, p.group - ARROW_GROUP + 1);
+            }
+        }
+        return n;
+    }
     public static final double MAX_PART_SIZE = 16;
     public static final double MAX_PART_OFFSET = 64;
 

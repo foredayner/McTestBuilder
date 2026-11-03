@@ -42,7 +42,16 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     /** A decoded model: parts with their textures, and its outline after the sword tilt. */
     public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn,
                         Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura, float reach, boolean bow, Model arrow,
-                        float length, int[] colors, boolean[] clear) {
+                        float length, int[] colors, boolean[] clear, List<Model> arrows) {
+
+        /** A bow's arrow shape number i (shapes shot in turn or at random); the first if there is no such one. */
+        public Model arrow(int i) {
+            if (arrows == null || arrows.isEmpty()) {
+                return arrow;
+            }
+            Model m = arrows.get(Math.floorMod(i, arrows.size()));
+            return m != null ? m : arrow;
+        }
     }
 
     /** First person, long weapons: extra tilt (degrees) and how far up the shaft it looks held (per block). */
@@ -153,25 +162,38 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     }
 
     private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null, 0, false, null, 0,
-        new int[0], new boolean[0]);
+        new int[0], new boolean[0], List.of());
 
     private static Model decode(BuildPlan plan, boolean worn, boolean bow) {
         // A bow's arrow pieces are not part of the bow: they are the shape of the arrows it shoots.
+        // Several shapes are shot in turn or at random (ai.arrowStart(1..8)).
         List<BuildPlan.Part> arrowParts = new ArrayList<>();
+        List<List<BuildPlan.Part>> shapes = new ArrayList<>();
         List<BuildPlan.Part> own = new ArrayList<>();
         for (BuildPlan.Part p : plan.parts) {
-            (p.group == BuildPlan.ARROW_GROUP ? arrowParts : own).add(p);
+            if (BuildPlan.isArrow(p.group)) {
+                arrowParts.add(p);
+                int i = p.group - BuildPlan.ARROW_GROUP;
+                while (shapes.size() <= i) {
+                    shapes.add(new ArrayList<>());
+                }
+                shapes.get(i).add(p);
+            } else {
+                own.add(p);
+            }
         }
         Model arrow = null;
+        List<Model> arrows = new ArrayList<>();
         if (bow && !arrowParts.isEmpty()) {
-            List<Sprite> arrowSprites = new ArrayList<>();
-            float reach = 0;
-            for (BuildPlan.Part p : arrowParts) {
-                arrowSprites.add(spriteOf(p.block));
-                reach = (float) Math.max(reach, p.y + p.sy / 2);
+            for (List<BuildPlan.Part> shape : shapes) {
+                arrows.add(shape.isEmpty() ? null : arrowModel(shape));
             }
-            arrow = new Model(arrowParts, arrowSprites, new float[4], false, Map.of(), null, reach, false, null, reach,
-                colorsOf(arrowParts), clearOf(arrowParts));
+            for (Model m : arrows) {
+                if (m != null) {
+                    arrow = m;
+                    break;
+                }
+            }
         }
         if (own.isEmpty()) {
             own = arrowParts; // only an arrow: show it
@@ -204,7 +226,18 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             }
         }
         return new Model(plan.parts, sprites, new float[] { minX, minY, maxX, maxY }, worn, anims, plan.aura, reach, bow, arrow,
-            plan.parts.isEmpty() ? 0 : highY - lowY, colorsOf(plan.parts), clearOf(plan.parts));
+            plan.parts.isEmpty() ? 0 : highY - lowY, colorsOf(plan.parts), clearOf(plan.parts), arrows);
+    }
+
+    private static Model arrowModel(List<BuildPlan.Part> parts) {
+        List<Sprite> sprites = new ArrayList<>();
+        float reach = 0;
+        for (BuildPlan.Part p : parts) {
+            sprites.add(spriteOf(p.block));
+            reach = (float) Math.max(reach, p.y + p.sy / 2);
+        }
+        return new Model(parts, sprites, new float[4], false, Map.of(), null, reach, false, null, reach,
+            colorsOf(parts), clearOf(parts), List.of());
     }
 
     private static BuildPlan copyWithParts(BuildPlan plan, List<BuildPlan.Part> parts) {
@@ -392,14 +425,17 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
 
     private static void draw(MatrixStack matrices, VertexConsumer buffer, Model model, int light, int overlay, boolean clear) {
         double seconds = seconds();
+        Waves waves = Waves.of(model);
         for (int i = 0; i < model.parts().size(); i++) {
             if (model.clear()[i] != clear) {
                 continue;
             }
             BuildPlan.Part part = model.parts().get(i);
+            BuildPlan.Anim wave = waves == null ? null : waves.of(part.group);
             List<BuildPlan.Anim> anims = part.group == 0 ? null : model.anims().get(part.group);
             if (anims == null) {
-                box(matrices, buffer, part, model.sprites().get(i), model.colors()[i], light, overlay);
+                box(matrices, buffer, part, model.sprites().get(i), model.colors()[i], wave == null ? light : 0xF000F0, overlay,
+                    wave, waves, seconds);
                 continue;
             }
             matrices.push();
@@ -407,9 +443,86 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             for (BuildPlan.Anim a : anims) {
                 partLight = animate(matrices, a, seconds, partLight);
             }
-            box(matrices, buffer, part, model.sprites().get(i), model.colors()[i], partLight, overlay);
+            box(matrices, buffer, part, model.sprites().get(i), model.colors()[i], wave == null ? partLight : 0xF000F0, overlay,
+                wave, waves, seconds);
             matrices.pop();
         }
+    }
+
+    /** Colour waves (ai.colorWave) of a model: which group runs through which colours, over what height. */
+    static final class Waves {
+        final Map<Integer, BuildPlan.Anim> byGroup = new java.util.HashMap<>();
+        final Map<Integer, float[]> range = new java.util.HashMap<>();
+
+        /** Null when the model has none (the usual case: nothing more to do). */
+        static Waves of(Model model) {
+            Waves w = null;
+            for (List<BuildPlan.Anim> list : model.anims().values()) {
+                for (BuildPlan.Anim a : list) {
+                    if ("color".equals(a.type) && a.colors != null && a.colors.length >= 2) {
+                        if (w == null) {
+                            w = new Waves();
+                        }
+                        w.byGroup.put(a.group, a);
+                    }
+                }
+            }
+            if (w == null) {
+                return null;
+            }
+            // How high each waving group (and the whole item) reaches: its colours run over that.
+            for (BuildPlan.Part p : model.parts()) {
+                float low = (float) (p.y - p.sy / 2), high = (float) (p.y + p.sy / 2);
+                for (int g : new int[] { p.group, BuildPlan.Anim.ALL }) {
+                    if (w.byGroup.containsKey(g)) {
+                        float[] r = w.range.computeIfAbsent(g, k -> new float[] { Float.MAX_VALUE, -Float.MAX_VALUE });
+                        r[0] = Math.min(r[0], low);
+                        r[1] = Math.max(r[1], high);
+                    }
+                }
+            }
+            return w;
+        }
+
+        BuildPlan.Anim of(int group) {
+            BuildPlan.Anim a = group == 0 ? null : byGroup.get(group);
+            return a != null ? a : byGroup.get(BuildPlan.Anim.ALL);
+        }
+
+        /** The wave's colour at a height of the item at this time. */
+        int colorAt(BuildPlan.Anim a, float y, double seconds) {
+            float[] r = range.get(byGroup.get(a.group) == a ? a.group : BuildPlan.Anim.ALL);
+            double pos = r == null || r[1] - r[0] < 1e-4 ? 0 : (y - r[0]) / (r[1] - r[0]); // 0 bottom - 1 top
+            return waveColor(a, pos, seconds);
+        }
+    }
+
+    /** A colour wave's colour at a place (0 = bottom, 1 = top) and time: the colours pour down, up, or all change together. */
+    static int waveColor(BuildPlan.Anim a, double pos, double seconds) {
+        double along = switch (a.flow == null ? "down" : a.flow) {
+            case "up" -> -pos * a.amount;
+            case "all" -> 0;
+            default -> pos * a.amount;
+        };
+        double x = a.speed * seconds + along;
+        x -= Math.floor(x);
+        int n = a.colors.length;
+        double f = x * n;
+        int i = (int) Math.floor(f) % n;
+        double k = f - Math.floor(f);
+        int c0 = a.colors[i], c1 = a.colors[(i + 1) % n];
+        int r = (int) Math.round(((c0 >> 16) & 255) * (1 - k) + ((c1 >> 16) & 255) * k);
+        int g = (int) Math.round(((c0 >> 8) & 255) * (1 - k) + ((c1 >> 8) & 255) * k);
+        int b = (int) Math.round((c0 & 255) * (1 - k) + (c1 & 255) * k);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    /** A piece's colour (with its opacity) tinted by a wave colour. */
+    private static int tint(int argb, int rgb) {
+        int r = ((argb >> 16) & 255) * ((rgb >> 16) & 255) / 255;
+        int g = ((argb >> 8) & 255) * ((rgb >> 8) & 255) / 255;
+        int b = (argb & 255) * (rgb & 255) / 255;
+        return (argb & 0xFF000000) | (r << 16) | (g << 8) | b;
     }
 
     /** Game time in seconds (smooth between ticks), so every player sees the same movement. */
@@ -471,17 +584,29 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
 
     private static void box(MatrixStack matrices, VertexConsumer buffer, BuildPlan.Part p, Sprite sprite, int color, int light,
                             int overlay) {
+        box(matrices, buffer, p, sprite, color, light, overlay, null, null, 0);
+    }
+
+    private static void box(MatrixStack matrices, VertexConsumer buffer, BuildPlan.Part p, Sprite sprite, int color, int light,
+                            int overlay, BuildPlan.Anim wave, Waves waves, double seconds) {
         matrices.push();
         matrices.translate((float) p.x, (float) p.y, (float) p.z);
-        matrices.multiply(new Quaternionf()
+        Quaternionf turn = new Quaternionf()
             .rotateY((float) Math.toRadians(p.yaw))
             .rotateX((float) Math.toRadians(p.pitch))
-            .rotateZ((float) Math.toRadians(p.roll)));
+            .rotateZ((float) Math.toRadians(p.roll));
+        matrices.multiply(turn);
         MatrixStack.Entry e = matrices.peek();
         float hx = (float) p.sx / 2, hy = (float) p.sy / 2, hz = (float) p.sz / 2;
         Vector3f[] corner = new Vector3f[8];
         for (int i = 0; i < 8; i++) {
             corner[i] = new Vector3f((i & 1) == 0 ? -hx : hx, (i & 2) == 0 ? -hy : hy, (i & 4) == 0 ? -hz : hz);
+        }
+        // A colour wave: each corner takes the colour at its height, so a long blade shows the gradient.
+        int[] cornerColor = new int[8];
+        for (int i = 0; i < 8; i++) {
+            cornerColor[i] = wave == null ? color
+                : tint(color, waves.colorAt(wave, (float) p.y + turn.transform(new Vector3f(corner[i])).y, seconds));
         }
         for (int[] f : FACES) {
             // Texture: one block's texture per block of size, cut to the face (bigger faces stretch).
@@ -494,7 +619,7 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             float v1 = v0 + (sprite.getMaxV() - v0) * Math.min(1, h);
             float[][] uv = { { u0, v1 }, { u1, v1 }, { u1, v0 }, { u0, v0 } };
             for (int k = 0; k < 4; k++) {
-                buffer.vertex(e, corner[f[k]]).color(color).texture(uv[k][0], uv[k][1]).overlay(overlay).light(light)
+                buffer.vertex(e, corner[f[k]]).color(cornerColor[f[k]]).texture(uv[k][0], uv[k][1]).overlay(overlay).light(light)
                     .normal(e, f[4], f[5], f[6]);
             }
         }

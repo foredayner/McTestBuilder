@@ -7,7 +7,7 @@ import net.minecraft.item.ItemStack;
 import java.util.List;
 
 /**
- * Attack motions a sword can be ordered with (공격 모션). Only the look of the swing changes
+ * Attack motions a held weapon or tool (not a bow) can be ordered with (공격 모션). Only the look of the swing changes
  * (drawn by the client, in first and third person); damage, reach and attack speed stay vanilla.
  */
 public final class GearMotions {
@@ -19,6 +19,11 @@ public final class GearMotions {
     private static final List<String> KOREAN = List.of("기본", "가로베기", "내려찍기", "찌르기", "회전베기");
 
     private GearMotions() {
+    }
+
+    /** Which equipment takes an ordered attack motion: every held weapon and tool except bows. */
+    public static boolean applies(GearKind kind) {
+        return kind != null && !kind.worn() && kind != GearKind.BOW;
     }
 
     public static String normalize(String motion) {

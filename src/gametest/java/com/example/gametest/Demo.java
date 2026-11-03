@@ -47,6 +47,16 @@ public final class Demo {
         ai.addPart('#9fe3ff/50', -0.06, 0.17, -0.02, 0.12, 1.1, 0.04)
         """;
 
+    /** A white blade whose colours pour down from the tip like LEDs. */
+    public static final String LED_SWORD = """
+        ai.addPart('#5a3a22', -0.04, -0.2, -0.04, 0.08, 0.3, 0.08)
+        ai.addRoundBox('#d4af37', -0.18, 0.1, -0.05, 0.36, 0.07, 0.1, 0.03)
+        ai.groupStart('blade')
+        ai.addPart('#ffffff', -0.06, 0.17, -0.02, 0.12, 1.1, 0.04)
+        ai.groupEnd()
+        ai.colorWave('blade', ['#ff3030', '#ffd030', '#30ff60', '#3080ff'], 0.8, 'down')
+        """;
+
     public static final String APPLE =
         "def cx = 1.5\n"
             + "def cz = 2.5\n"

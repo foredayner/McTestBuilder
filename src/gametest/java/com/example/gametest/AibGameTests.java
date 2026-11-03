@@ -468,6 +468,94 @@ public class AibGameTests implements FabricGameTest {
         return com.example.ai.build.GearItems.stackFor(record);
     }
 
+    /** Orders travel as a packet: cut to safe lengths, checked like /aibuild, and kept with the design for 다시/고쳐서 주문. */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void ordersAreCheckedAndKeptForReordering(TestContext context) {
+        com.example.ai.AiOrder order = new com.example.ai.AiOrder();
+        order.prompt = "검".repeat(500);
+        order.fxHit = "불".repeat(200);
+        order.fxIdle = "  빛나는 칼날  ";
+        order.mode = "gear:hammer:pixel";
+        order.motion = "smash";
+        order.baseScript = "ai.addPart('#ffffff', 0, 0, 0, 1, 1, 1)";
+        com.example.ai.AiOrder back = com.example.ai.AiOrder.fromGzip(order.toGzip());
+        check(back != null, "an order survives the packet");
+        check(back.prompt.length() == com.example.ai.AiOrder.MAX_PROMPT, "the description is cut to " + com.example.ai.AiOrder.MAX_PROMPT);
+        check(back.fxHit.length() == 60 && "빛나는 칼날".equals(back.fxIdle), "effect fields are cut to 60 and trimmed");
+        check("gear:hammer:pixel".equals(back.mode) && "smash".equals(back.motion), "mode and motion are kept");
+        check(back.isRevision(), "with a script it is a change of an earlier design");
+        com.example.ai.AiOrder bad = new com.example.ai.AiOrder();
+        bad.mode = "../../x";
+        bad.motion = "explode";
+        bad.cleaned();
+        check("build".equals(bad.mode) && bad.motion.isEmpty(), "unknown modes and motions are made safe");
+        check(com.example.ai.AiOrder.fromGzip(new byte[] { 1, 2, 3 }) == null, "junk is not an order");
+
+        // Only operators may order (the same check as /aibuild).
+        ServerPlayerEntity guest = context.createMockCreativeServerPlayerInWorld();
+        check(!com.example.network.AiNetworking.allowed(guest), "a player who is not an operator may not order");
+        ServerPlayerEntity player = opPlayer(context, context.getAbsolutePos(new BlockPos(1, 1, 1)), 0f);
+        check(com.example.network.AiNetworking.allowed(player), "an operator may");
+
+        // 고쳐서 주문: the AI gets the old script and only the change.
+        com.example.ai.AiPrompt base = com.example.ai.AiController.gearPrompt("푸른 검", com.example.content.GearKind.SWORD);
+        com.example.ai.AiPrompt revise = com.example.ai.AiController.revisePrompt(base, "ai.addPart('#0000ff', 0, 0, 0, 1, 1, 1) // 100%",
+            "칼날을 빨갛게");
+        check(revise.user().contains("ai.addPart('#0000ff', 0, 0, 0, 1, 1, 1) // 100%") && revise.user().contains("칼날을 빨갛게"),
+            "the old script and the change are in the request");
+        check(revise.user().indexOf("CHANGES AN EARLIER DESIGN") < revise.user().lastIndexOf("Write the Groovy script"),
+            "before the closing instruction");
+
+        // A kept design keeps its order and script, and the world can give it back by id.
+        BuildPlan plan = Demo.plan(context.getWorld(), player.getBlockPos(), player, Demo.LED_SWORD, true);
+        BuildRecord record = BuildRecord.create("LED 검", "TEST", "script", plan);
+        record.kind = "gear";
+        record.gear = "sword";
+        record.fxIdle = "LED처럼 색이 흐름";
+        record.motion = "slash";
+        record.script = Demo.LED_SWORD;
+        com.example.ai.build.SharedHistory.save(context.getWorld().getServer(), record);
+        BuildRecord kept = com.example.ai.build.SharedHistory.get(context.getWorld().getServer(), record.id);
+        check(kept != null && kept.revisable() && "slash".equals(kept.motion) && "LED처럼 색이 흐름".equals(kept.fxIdle),
+            "the kept record has its order and script");
+        check(!BuildRecord.fromJson("{\"plan\":{\"ops\":[]}}").revisable(), "older records cannot be revised");
+        com.example.ai.build.SharedHistory.delete(context.getWorld().getServer(), record.id);
+
+        // Colour waves are recorded on the item; every held weapon and tool takes a motion (not bows or worn gear).
+        BuildPlan.Anim wave = plan.anims.stream().filter(a -> "color".equals(a.type)).findFirst().orElse(null);
+        check(wave != null && wave.colors.length == 4 && "down".equals(wave.flow), "the colour wave is recorded");
+        check(com.example.content.GearMotions.applies(com.example.content.GearKind.SPEAR)
+            && com.example.content.GearMotions.applies(com.example.content.GearKind.PICKAXE)
+            && !com.example.content.GearMotions.applies(com.example.content.GearKind.BOW)
+            && !com.example.content.GearMotions.applies(com.example.content.GearKind.HELMET), "motions for held weapons and tools");
+        context.complete();
+    }
+
+    /** A keyboard bow: letters (shot text) taken in turn, and a bow with two shapes shooting both. */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void bowShootsLettersAndSeveralShapes(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        net.minecraft.item.ItemStack keys = bowWith(context, player, origin,
+            "ai.shot([text: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', order: 'cycle', facing: 'fixed'])\n");
+        check(com.example.content.AibArrowEntity.choices(keys) == 26, "26 letters to shoot");
+        StringBuilder spelled = new StringBuilder();
+        for (int i = 0; i < 3; i++) {
+            var a = (com.example.content.AibArrowEntity) ((com.example.content.GearBowItem) keys.getItem()).createArrowEntity(world, player,
+                keys, new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), false);
+            spelled.append((char) ('A' + a.variant()));
+        }
+        check("ABC".equals(spelled.toString()), "in turn: " + spelled);
+        BuildPlan two = Demo.plan(world, origin, player, "ai.addPart('oak_planks', -0.05, -0.6, -0.05, 0.1, 1.2, 0.1)\n"
+            + "ai.arrowStart(1)\nai.addSphere('#ff4080', 0, 0.3, 0, 0.2)\nai.arrowEnd()\n"
+            + "ai.arrowStart(2)\nai.addPart('#ffd030', -0.15, 0.15, -0.15, 0.3, 0.3, 0.3)\nai.arrowEnd()\n", true);
+        check(two.arrowShapes() == 2, "two arrow shapes, got " + two.arrowShapes());
+        check(com.example.ai.AiController.effectProblem(two, com.example.content.GearKind.BOW, "하트와 별", "") == null,
+            "shapes alone answer the arrow line");
+        context.complete();
+    }
+
     /** A bubble wand: a big shot that flies straight (no gravity) and pops where it hits. */
     @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 200)
     public void bowBubbleFliesStraightAndPops(TestContext context) {

@@ -31,6 +31,18 @@ public final class BuildRecord {
     public double scale = 1;
     /** Objects: 16 x 16 ARGB front picture for the item icon (made by the client), or null. */
     public int[] icon;
+    /** The order as it was given (for 다시 주문): effect fields, motion, pixel art. Empty in older records. */
+    public String fxHit = "";
+    public String fxIdle = "";
+    public String motion = "";
+    public boolean pixel;
+    /** The script the AI wrote (for 고쳐서 주문). Empty in older records. */
+    public String script = "";
+
+    /** Can be changed with 고쳐서 주문 (it keeps the AI's script). */
+    public boolean revisable() {
+        return script != null && !script.isBlank();
+    }
 
     public static BuildRecord create(String prompt, String provider, String model, BuildPlan plan) {
         BuildRecord record = new BuildRecord();

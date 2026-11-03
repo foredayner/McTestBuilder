@@ -80,6 +80,19 @@ public final class SharedHistory {
         return "0".repeat(Math.max(0, 20 - id.length())) + id;
     }
 
+    /** One kept design, or null. */
+    public static synchronized BuildRecord get(MinecraftServer server, String id) {
+        if (server == null || !validId(id)) {
+            return null;
+        }
+        Path file = dir(server).resolve(id + ".json");
+        try {
+            return Files.isRegularFile(file) ? BuildRecord.fromJson(Files.readString(file, StandardCharsets.UTF_8)) : null;
+        } catch (IOException | RuntimeException exception) {
+            return null;
+        }
+    }
+
     /** True when it was there. */
     public static synchronized boolean delete(MinecraftServer server, String id) {
         if (server == null || !validId(id)) {

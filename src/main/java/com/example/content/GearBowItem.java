@@ -47,6 +47,7 @@ public class GearBowItem extends BowItem implements GearItem {
             return super.createArrowEntity(world, shooter, weaponStack, projectileStack, critical); // tipped, spectral
         }
         AibArrowEntity arrow = new AibArrowEntity(world, shooter, projectileStack.copyWithCount(1), weaponStack);
+        arrow.pickVariant(shooter);
         if (critical) {
             arrow.setCritical(true);
         }
