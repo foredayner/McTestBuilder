@@ -58,7 +58,7 @@ public class AiBuildAssistantClient implements ClientModInitializer {
                 }
                 AiClientState.clearConversation();
                 AiClientState.setEffects("", ""); // a new order starts with empty effect fields
-                client.setScreen(new AiPromptScreen());
+                client.setScreen(AiPromptScreen.openDefault());
             }
             while (REMOVE_OBJECT_KEY.wasPressed()) {
                 if (isOperator(client)) {

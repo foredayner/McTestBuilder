@@ -106,6 +106,13 @@ public final class Spark {
     public double shake = 0;
     /** Also a real (harmless) vanilla lightning strike where it starts: no fire, no damage. */
     public boolean lightning;
+    /**
+     * 0-0.5: what it touches is hurt by this part of the weapon's damage (a shockwave, a beam, a
+     * falling bolt...). Never the one hit directly, and at most half the weapon's damage per swing.
+     */
+    public double damage = 0;
+    /** The most a swing's (or a landing's) effects may hurt one target, as part of the weapon's damage. */
+    public static final double MAX_DAMAGE = 0.5;
     /** Set by the server, not the AI: a beam this long (blocks) instead of one sized by size (a bow's beam shot). */
     public double reach = 0;
     /** Set by the server, not the AI: how visible a bow's beam is (0 = not at all, 1 = fully). */
@@ -238,6 +245,7 @@ public final class Spark {
         volume = clamp(volume, 0, 2);
         pitch = clamp(pitch, 0.5, 2);
         reach = clamp(reach, 0, 80);
+        damage = clamp(damage, 0, MAX_DAMAGE);
         opacity = clamp(opacity, 0, 1);
         delay = (int) clamp(delay, 0, 40);
         lead = (int) clamp(lead, 0, 30);
@@ -317,6 +325,7 @@ public final class Spark {
                 case "delay", "wait" -> s.delay = (int) Math.round(num(v, key));
                 case "shake" -> s.shake = num(v, key);
                 case "lightning", "realLightning", "real_lightning" -> s.lightning = bool(v);
+                case "damage", "hurt" -> s.damage = num(v, key);
                 case "pitch" -> s.pitch = num(v, key);
                 case "move", "moves" -> {
                     s.moves = new ArrayList<>();
@@ -348,7 +357,7 @@ public final class Spark {
                 }
                 default -> throw new IllegalArgumentException("unknown effect setting '" + key + "'; use shape, color, color2, "
                     + "colors, size, count, dot, look, form, arc, width, particle, vary, gravity, drag, turbulence, plane, start, anchor, moves, speed, "
-                    + "ticks, every, fill, lines, points, sound, volume, pitch, delay, shake, lightning");
+                    + "ticks, every, fill, lines, points, sound, volume, pitch, delay, shake, lightning, damage");
             }
         }
         if ("points".equals(s.shape) && (s.points == null || s.points.isEmpty())) {
@@ -393,6 +402,23 @@ public final class Spark {
         public String text = "";
         /** With several arrow shapes or letters: 'random' or 'cycle' (in turn). */
         public String order = "random";
+        /** More projectiles with each shot (or each swing of a melee weapon), each hurting half as much. */
+        public List<Extra> extras = new ArrayList<>();
+
+        /** All extra projectiles of one shot, at most MAX_EXTRAS. */
+        public int extraCount() {
+            int n = 0;
+            if (extras != null) {
+                for (Extra e : extras) {
+                    n += e.count;
+                }
+            }
+            return n;
+        }
+
+        public boolean hasExtras() {
+            return extras != null && !extras.isEmpty();
+        }
 
         /** The characters of text, one per shot. */
         public int[] letters() {
@@ -430,6 +456,21 @@ public final class Spark {
             StringBuilder t = new StringBuilder();
             text.codePoints().filter(c -> !Character.isISOControl(c)).limit(MAX_TEXT).forEach(t::appendCodePoint);
             text = t.toString();
+            // At most MAX_EXTRA_GROUPS groups and MAX_EXTRAS projectiles in all.
+            List<Extra> kept = new ArrayList<>();
+            int left = MAX_EXTRAS;
+            if (extras != null) {
+                for (Extra e : extras) {
+                    if (e == null || kept.size() >= MAX_EXTRA_GROUPS || left <= 0) {
+                        continue;
+                    }
+                    e.clamped();
+                    e.count = Math.min(e.count, left);
+                    left -= e.count;
+                    kept.add(e);
+                }
+            }
+            extras = kept;
             return this;
         }
 
@@ -453,12 +494,97 @@ public final class Spark {
                         case "opacity", "alpha" -> s.opacity = num(v, key);
                         case "text", "letters" -> s.text = String.valueOf(v);
                         case "order" -> s.order = word(v, ORDERS, "shot order");
+                        case "extra", "extras" -> {
+                            List<?> list = v instanceof List<?> l ? l : List.of(v);
+                            if (!list.isEmpty() && !(list.get(0) instanceof Map<?, ?>)) {
+                                list = List.of(v); // one group written without the outer list
+                            }
+                            for (Object o : list) {
+                                if (!(o instanceof Map<?, ?> m)) {
+                                    throw new IllegalArgumentException("extra is a list of groups like [[count: 2, path: 'spiral']]");
+                                }
+                                s.extras.add(Extra.fromMap(m));
+                            }
+                        }
                         default -> throw new IllegalArgumentException("unknown shot setting '" + key
-                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks, opacity, text, order");
+                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks, opacity, text, order, extra");
                     }
                 }
             }
             return s.clamped();
+        }
+    }
+
+    public static final int MAX_EXTRAS = 12;
+    public static final int MAX_EXTRA_GROUPS = 4;
+
+    /**
+     * A group of extra projectiles: how many and which way they go. spread: a fan; ring: a cone
+     * all round; spiral: turning round the main shot as it flies; trail: one after another behind
+     * it; arc: curving out and back into where it is aimed; homing: after what it is aimed at;
+     * rain: falling from the sky onto where it is aimed; split: bursting out where the main shot
+     * lands. Each hurts half as much as the main shot.
+     */
+    public static final class Extra {
+        public static final List<String> PATHS = List.of("spread", "ring", "spiral", "trail", "arc", "homing", "rain", "split");
+        public int count = 2;
+        public String path = "spread";
+        /** spread / ring / arc: degrees out from the aim; split: how wide the burst is. 0 = the path's own default. */
+        public double angle = 0;
+        /** spiral: how far from the main shot; rain: how wide the area. 0 = default. */
+        public double radius = 0;
+        /** spiral: turns per second. 0 = default. */
+        public double turns = 0;
+        /** Ticks after the shot before they go. */
+        public int delay = 0;
+        /** Which arrow shape (1-8) or 0 = the same as the main shot. */
+        public int shape = 0;
+        /** Drawn size (0 = as the main shot). */
+        public double size = 0;
+
+        public Extra clamped() {
+            count = (int) clamp(count, 1, 8);
+            path = PATHS.contains(path) ? path : "spread";
+            angle = angle <= 0 || Double.isNaN(angle) ? 0 : clamp(angle, 2, 90);
+            radius = radius <= 0 || Double.isNaN(radius) ? 0 : clamp(radius, 0.2, 4);
+            turns = turns <= 0 || Double.isNaN(turns) ? 0 : clamp(turns, 0.2, 5);
+            delay = (int) clamp(delay, 0, 40);
+            shape = (int) clamp(shape, 0, 8);
+            size = size <= 0 || Double.isNaN(size) ? 0 : clamp(size, 0.25, 2);
+            return this;
+        }
+
+        public double angleOr(double fallback) {
+            return angle > 0 ? angle : fallback;
+        }
+
+        public double radiusOr(double fallback) {
+            return radius > 0 ? radius : fallback;
+        }
+
+        public double turnsOr(double fallback) {
+            return turns > 0 ? turns : fallback;
+        }
+
+        public static Extra fromMap(Map<?, ?> map) {
+            Extra x = new Extra();
+            for (Map.Entry<?, ?> e : map.entrySet()) {
+                String key = String.valueOf(e.getKey()).trim();
+                Object v = e.getValue();
+                switch (key) {
+                    case "count", "n" -> x.count = (int) Math.round(num(v, key));
+                    case "path", "way" -> x.path = word(v, PATHS, "extra path");
+                    case "angle" -> x.angle = num(v, key);
+                    case "radius" -> x.radius = num(v, key);
+                    case "turns", "speed" -> x.turns = num(v, key);
+                    case "delay" -> x.delay = (int) Math.round(num(v, key));
+                    case "shape" -> x.shape = (int) Math.round(num(v, key));
+                    case "size" -> x.size = num(v, key);
+                    default -> throw new IllegalArgumentException("unknown extra setting '" + key
+                        + "'; use count, path, angle, radius, turns, delay, shape, size");
+                }
+            }
+            return x.clamped();
         }
     }
 

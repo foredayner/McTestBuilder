@@ -22,6 +22,7 @@ public class AiBuildAssistantMod implements ModInitializer {
         AiBuilderConfig.load();
         com.example.content.AibContent.register();
         com.example.ai.build.HitEffects.register();
+        com.example.ai.build.EffectDamage.register();
         BuildTaskQueue.register();
 
         AiNetworking.registerPayloads();

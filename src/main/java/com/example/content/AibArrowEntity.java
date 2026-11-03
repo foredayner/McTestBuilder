@@ -32,6 +32,9 @@ public class AibArrowEntity extends PersistentProjectileEntity {
     private static final TrackedData<ItemStack> BOW = DataTracker.registerData(AibArrowEntity.class, TrackedDataHandlerRegistry.ITEM_STACK);
     /** Which of the bow's arrow shapes, or which letter of its text, this one is. */
     private static final TrackedData<Integer> VARIANT = DataTracker.registerData(AibArrowEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    /** An extra projectile's way of flying (Motion as JSON); empty for the main shot. */
+    private static final TrackedData<String> EXTRA = DataTracker.registerData(AibArrowEntity.class, TrackedDataHandlerRegistry.STRING);
+    private static final com.google.gson.Gson GSON = new com.google.gson.Gson();
     /** Shots taken in turn ("cycle"): the last one per shooter. */
     private static final java.util.Map<java.util.UUID, Integer> TURNS = new java.util.HashMap<>();
     private boolean landed;
@@ -55,6 +58,7 @@ public class AibArrowEntity extends PersistentProjectileEntity {
         super.initDataTracker(builder);
         builder.add(BOW, ItemStack.EMPTY);
         builder.add(VARIANT, 0);
+        builder.add(EXTRA, "");
     }
 
     /** True once it has hit a block or an entity (its landing effect has played). */
@@ -101,17 +105,132 @@ public class AibArrowEntity extends PersistentProjectileEntity {
         this.dataTracker.set(VARIANT, v);
     }
 
-    /** How it flies (from the bow; null = like a normal arrow). */
+    /**
+     * How an extra projectile flies (both the server and every game steer it the same way, so it
+     * needs no extra messages): spiral round the line of the main shot, arc or home into a point
+     * or an entity; other paths fly like an arrow.
+     */
+    public static final class Motion {
+        public String path = "";
+        /** spiral: the main shot's velocity (the line it turns round); whether it falls. */
+        public double bx, by, bz;
+        public boolean gravity = true;
+        public double radius;
+        /** spiral: radians per tick, and where it starts round the line. */
+        public double rate;
+        public double phase;
+        /** arc / homing: where it goes, or what it follows (-1 = none). */
+        public double tx, ty, tz;
+        public int target = -1;
+        /** Drawn size (0 = as the main shot). */
+        public double size;
+    }
+
+    private String motionJson;
+    private Motion motion;
+    /** Spiral: the line's velocity now; ticks steered. */
+    private Vec3d base;
+    private int steered;
+    /** Server: the one a melee weapon hit directly (its extras pass through it). */
+    private java.util.UUID passThrough;
+
+    /** Make this an extra projectile of a shot (or a swing). */
+    public void makeExtra(Motion m, Entity skip, int variant) {
+        this.dataTracker.set(EXTRA, GSON.toJson(m));
+        this.dataTracker.set(VARIANT, Math.max(0, variant));
+        this.passThrough = skip == null ? null : skip.getUuid();
+        this.pickupType = PickupPermission.CREATIVE_ONLY;
+        calculateDimensions();
+    }
+
+    /** An extra projectile: it hurts half as much and plays no landing effects of its own. */
+    public boolean isExtra() {
+        return motion() != null;
+    }
+
+    public Motion motion() {
+        if (this.dataTracker == null) {
+            return null;
+        }
+        String json = this.dataTracker.get(EXTRA);
+        if (!json.equals(motionJson)) {
+            motionJson = json;
+            try {
+                motion = json.isEmpty() ? null : GSON.fromJson(json, Motion.class);
+            } catch (RuntimeException exception) {
+                motion = null;
+            }
+        }
+        return motion;
+    }
+
+    @Override
+    protected boolean canHit(Entity entity) {
+        return super.canHit(entity) && (passThrough == null || !passThrough.equals(entity.getUuid()));
+    }
+
+    /** How it flies (from the bow; null = like a normal arrow). An extra may be drawn at its own size. */
     public Spark.Shot shot() {
         if (this.dataTracker == null) {
             return null; // still being made
         }
         ItemStack b = bow();
+        Motion m = motion();
         if (b != shotOf) {
             shotOf = b;
             shot = b.isEmpty() ? null : GearEffects.of(b).shot;
+            sizedShot = null;
+        }
+        if (shot != null && m != null && m.size > 0) {
+            if (sizedShot == null) {
+                sizedShot = Spark.Effects.fromJson("{\"shot\":" + GSON.toJson(shot) + "}").shot;
+                sizedShot.size = m.size;
+                sizedShot.clamped();
+            }
+            return sizedShot;
         }
         return shot;
+    }
+
+    private Spark.Shot sizedShot;
+
+    /** Steer an extra along its path (before it moves this tick). */
+    private void steer(Motion m) {
+        switch (m.path) {
+            case "spiral" -> {
+                if (base == null) {
+                    base = new Vec3d(m.bx, m.by, m.bz);
+                }
+                Vec3d d = base.lengthSquared() < 1e-8 ? new Vec3d(0, 0, 1) : base.normalize();
+                Vec3d u = d.crossProduct(new Vec3d(0, 1, 0));
+                u = u.lengthSquared() < 1e-6 ? new Vec3d(1, 0, 0) : u.normalize();
+                Vec3d v = d.crossProduct(u).normalize();
+                double a0 = m.phase + steered * m.rate, a1 = a0 + m.rate;
+                Vec3d off0 = u.multiply(Math.cos(a0)).add(v.multiply(Math.sin(a0))).multiply(m.radius);
+                Vec3d off1 = u.multiply(Math.cos(a1)).add(v.multiply(Math.sin(a1))).multiply(m.radius);
+                setVelocity(base.add(off1.subtract(off0)));
+                base = base.multiply(0.99).add(0, m.gravity ? -0.05 : 0, 0);
+            }
+            case "arc", "homing" -> {
+                Vec3d goal = new Vec3d(m.tx, m.ty, m.tz);
+                if (m.target >= 0) {
+                    Entity t = getWorld().getEntityById(m.target);
+                    if (t != null && t.isAlive()) {
+                        goal = t.getPos().add(0, t.getHeight() / 2, 0);
+                    }
+                }
+                Vec3d to = goal.subtract(getPos());
+                if (to.lengthSquared() < 1e-4) {
+                    return;
+                }
+                double speed = Math.max(0.6, getVelocity().length());
+                double k = "homing".equals(m.path) ? 0.25 : Math.min(1, 0.06 + steered * 0.025);
+                setVelocity(getVelocity().multiply(1 - k).add(to.normalize().multiply(speed * k)));
+            }
+            default -> {
+            }
+        }
+        steered++;
     }
 
     @Override
@@ -135,17 +254,28 @@ public class AibArrowEntity extends PersistentProjectileEntity {
 
     @Override
     protected double getGravity() {
+        Motion m = motion();
+        if (m != null && (m.path.equals("spiral") || m.path.equals("arc") || m.path.equals("homing"))) {
+            return 0; // steered: its path has its own fall
+        }
         Spark.Shot s = shot();
         return s != null && !s.gravity ? 0 : super.getGravity();
     }
 
     @Override
     public void tick() {
+        Motion m = motion();
+        if (m != null && isFlying()) {
+            steer(m);
+        }
         super.tick();
         Spark.Shot s = shot();
-        // Without gravity it would fly on for ever.
-        if (!getWorld().isClient && s != null && !s.gravity && isFlying() && this.age > 200) {
+        // Without gravity it would fly on for ever (and extras never stay long).
+        if (!getWorld().isClient && isFlying() && this.age > 200 && (s != null && !s.gravity || m != null)) {
             discard();
+        }
+        if (!getWorld().isClient && m != null && !isFlying() && this.age > 100) {
+            discard(); // extras stuck somewhere do not stay
         }
     }
 
@@ -192,9 +322,13 @@ public class AibArrowEntity extends PersistentProjectileEntity {
     @Override
     protected void onEntityHit(EntityHitResult hit) {
         Vec3d at = hit.getEntity().getPos(); // effects are placed from the feet of what was hit
+        hitDirect = hit.getEntity();
         super.onEntityHit(hit);
         land(at);
     }
+
+    /** What the arrow hit directly (its landing effects do not hurt it again). */
+    private Entity hitDirect;
 
     @Override
     protected void onBlockHit(BlockHitResult hit) {
@@ -207,8 +341,17 @@ public class AibArrowEntity extends PersistentProjectileEntity {
             return;
         }
         landed = true;
-        GearEffects.arrowImpact(world, this, at);
         Spark.Shot s = shot();
+        if (isExtra()) {
+            if (s != null && s.vanishes() && !s.beam()) {
+                GearEffects.vanish(world, this, getPos(), s);
+                discard();
+            }
+            return;
+        }
+        GearEffects.arrowImpact(world, this, at, hitDirect);
+        // Extras that burst out where it lands.
+        com.example.ai.build.ShotExtras.split(world, this, at.add(0, 0.3, 0));
         if (s != null && s.vanishes() && !s.beam()) {
             GearEffects.vanish(world, this, getPos(), s);
             discard();

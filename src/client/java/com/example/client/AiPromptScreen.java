@@ -32,7 +32,7 @@ import static com.example.client.WoodUi.*;
  */
 public class AiPromptScreen extends Screen {
 
-    private enum Page { CREATE, HISTORY, LOGS }
+    private enum Page { GUIDE, CREATE, HISTORY, LOGS }
 
     private static final int LINE = 10;
     private static final int ROW = 38;
@@ -70,6 +70,7 @@ public class AiPromptScreen extends Screen {
     }
 
     private static final Tab[] TABS = {
+        new Tab(Page.GUIDE, Items.KNOWLEDGE_BOOK, "가이드"),
         new Tab(Page.CREATE, Items.WRITABLE_BOOK, "AI 공방"),
         new Tab(Page.HISTORY, Items.CHEST, "보관함"),
         new Tab(Page.LOGS, Items.PAPER, "작업 일지"),
@@ -96,6 +97,24 @@ public class AiPromptScreen extends Screen {
 
     public AiPromptScreen() {
         super(Text.literal("AI Builder"));
+    }
+
+    /** Open the 가이드 on one of its sections. */
+    public static AiPromptScreen openGuide(int section) {
+        guideSection = section;
+        guideScroll = 0;
+        return open("GUIDE", null);
+    }
+
+    /** Opened with the key: the very first time on the 가이드, after that on the tab last looked at. */
+    public static AiPromptScreen openDefault() {
+        com.example.config.AiBuilderConfig config = com.example.config.AiBuilderConfig.get();
+        if (!config.guideSeen) {
+            config.guideSeen = true;
+            com.example.config.AiBuilderConfig.save();
+            page = Page.GUIDE;
+        }
+        return new AiPromptScreen();
     }
 
     /** Open on a page: "CREATE", "HISTORY" (optionally with a record open) or "LOGS". */
@@ -153,10 +172,96 @@ public class AiPromptScreen extends Screen {
         this.icons.clear();
         this.addDrawableChild(new WoodButton(this.x0 + this.w - 13, this.y0 - 7, 18, 18, Text.literal("×"), b -> this.close(), true));
         switch (page) {
+            case GUIDE -> buildGuide();
             case CREATE -> buildCreate();
             case HISTORY -> buildHistory();
             case LOGS -> buildLogs();
         }
+    }
+
+    // ---------------------------------------------------------------- 가이드
+
+    private static int guideSection = 0;
+    private static int guideScroll = 0;
+    private static final int GUIDE_ROW = 14;
+    private static final int GUIDE_LIST = 92;
+
+    private boolean guideHasExamples() {
+        return !GuideContent.SECTIONS.get(guideSection).examples().isEmpty();
+    }
+
+    private void buildGuide() {
+        guideSection = Math.max(0, Math.min(guideSection, GuideContent.SECTIONS.size() - 1));
+        List<GuideContent.Example> examples = GuideContent.SECTIONS.get(guideSection).examples();
+        if (examples.isEmpty()) {
+            return;
+        }
+        // Examples fill the order screen: try one, change it, send it.
+        int x = left() + GUIDE_LIST + 6;
+        int n = examples.size();
+        int bw = Math.min(120, (right() - x - 4 * (n - 1)) / n);
+        for (int i = 0; i < n; i++) {
+            GuideContent.Example ex = examples.get(i);
+            button("예시: " + ex.label(), x + i * (bw + 4), bottom() - 18, bw, b -> useExample(ex));
+        }
+    }
+
+    private void useExample(GuideContent.Example ex) {
+        AiClientState.loadExample(ex.mode(), ex.gear(), ex.motion(), ex.fxHit(), ex.fxIdle());
+        this.draftPrompt = ex.prompt();
+        AiClientState.addLog("[가이드] 예시 '" + ex.label() + "'을(를) 주문 칸에 채웠어요. 고쳐서 보내도 돼요.");
+        switchPage(Page.CREATE);
+    }
+
+    private int guideRowAt(double mx, double my) {
+        int t = top() + 4;
+        if (mx < left() || mx >= left() + GUIDE_LIST || my < t) {
+            return -1;
+        }
+        int row = (int) ((my - t) / GUIDE_ROW);
+        return row < GuideContent.SECTIONS.size() ? row : -1;
+    }
+
+    private void renderGuide(DrawContext ctx, int mouseX, int mouseY) {
+        int l = left(), t = top(), b = bottom();
+        inset(ctx, l, t, l + GUIDE_LIST, b, PARCHMENT_DEEP);
+        int hover = guideRowAt(mouseX, mouseY);
+        for (int i = 0; i < GuideContent.SECTIONS.size(); i++) {
+            int y = t + 4 + i * GUIDE_ROW;
+            if (i == guideSection) {
+                ctx.fill(l + 2, y - 1, l + GUIDE_LIST - 2, y + GUIDE_ROW - 2, 0xFFE8B070);
+            } else if (i == hover) {
+                ctx.fill(l + 2, y - 1, l + GUIDE_LIST - 2, y + GUIDE_ROW - 2, 0x40FFFFFF);
+            }
+            ctx.drawText(this.textRenderer, ellipsize(GuideContent.SECTIONS.get(i).title(), GUIDE_LIST - 10), l + 5, y + 2,
+                i == guideSection ? INK : INK_SOFT, false);
+        }
+        int cl = l + GUIDE_LIST + 6, cr = right(), cb = guideHasExamples() ? b - 22 : b;
+        inset(ctx, cl, t, cr, cb, PARCHMENT_DEEP);
+        int width = cr - cl - 14;
+        ctx.enableScissor(cl + 1, t + 1, cr - 1, cb - 1);
+        int y = t + 6 - guideScroll;
+        GuideContent.Section s = GuideContent.SECTIONS.get(guideSection);
+        ctx.drawText(this.textRenderer, s.title(), cl + 7, y, TAG, false);
+        y += LINE + 4;
+        for (String line : s.lines()) {
+            boolean heading = line.startsWith("# ");
+            String text = heading ? line.substring(2) : line;
+            if (heading) {
+                y += 3;
+            }
+            int indent = text.startsWith("  ") ? 10 : 0;
+            for (OrderedText part : this.textRenderer.wrapLines(Text.literal(text.strip()), width - indent)) {
+                ctx.drawText(this.textRenderer, part, cl + 7 + indent, y, heading ? TAG : INK, false);
+                y += LINE;
+            }
+            if (heading) {
+                y += 1;
+            }
+        }
+        ctx.disableScissor();
+        int contentHeight = y + guideScroll - t;
+        guideScroll = Math.max(0, Math.min(guideScroll, Math.max(0, contentHeight - (cb - t) + 6)));
     }
 
     @Override
@@ -1067,6 +1172,7 @@ public class AiPromptScreen extends Screen {
         frame(ctx, this.x0, this.y0, this.x0 + this.w, this.y0 + this.h);
         renderTabs(ctx, mouseX, mouseY, true);
         String title = switch (page) {
+            case GUIDE -> "가이드";
             case CREATE -> "AI 건축 공방";
             case HISTORY -> selected() == null ? "보관함" : "보관함 · 상세";
             case LOGS -> "작업 일지";
@@ -1092,6 +1198,7 @@ public class AiPromptScreen extends Screen {
         this.hoveredRecord = null;
         renderFrame(ctx, mouseX, mouseY);
         switch (page) {
+            case GUIDE -> renderGuide(ctx, mouseX, mouseY);
             case CREATE -> renderCreate(ctx);
             case HISTORY -> renderHistory(ctx, mouseX, mouseY);
             case LOGS -> renderLogs(ctx, mouseX, mouseY);
@@ -1142,6 +1249,15 @@ public class AiPromptScreen extends Screen {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
+        if (page == Page.GUIDE && button == 0) {
+            int row = guideRowAt(mouseX, mouseY);
+            if (row >= 0) {
+                guideSection = row;
+                guideScroll = 0;
+                rebuild();
+                return true;
+            }
+        }
         if (page == Page.HISTORY && selected() == null && filter != NEARBY && button == 0) {
             BuildRecord hit = gridAt(mouseX, mouseY);
             if (hit != null) {
@@ -1175,6 +1291,7 @@ public class AiPromptScreen extends Screen {
         }
         int step = verticalAmount > 0 ? 1 : -1;
         switch (page) {
+            case GUIDE -> guideScroll = Math.max(0, guideScroll - step * 20);
             case CREATE -> chatScroll = Math.max(0, chatScroll + step * 24);
             case LOGS -> {
                 if (rawLog) {

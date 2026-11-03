@@ -184,7 +184,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         }
         Model arrow = null;
         List<Model> arrows = new ArrayList<>();
-        if (bow && !arrowParts.isEmpty()) {
+        if (!worn && !arrowParts.isEmpty()) {
+            // Bows' arrows, and what melee weapons send with a swing.
             for (List<BuildPlan.Part> shape : shapes) {
                 arrows.add(shape.isEmpty() ? null : arrowModel(shape));
             }

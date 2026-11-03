@@ -890,9 +890,27 @@ public class AiController {
             plan.fx.trail.clear();
             plan.fx.shot = null;
         }
-        if (kind != GearKind.BOW) {
-            plan.fx.trail.clear();
+        if (kind.worn()) {
             plan.fx.shot = null;
+        }
+        if (kind != GearKind.BOW && !kind.worn()) {
+            // A melee weapon's shot is only its extras (projectiles sent with a swing); they may have a trail.
+            if (plan.fx.shot != null) {
+                Spark.Shot extras = new Spark.Shot();
+                extras.extras = plan.fx.shot.extras;
+                extras.text = plan.fx.shot.text;
+                extras.order = plan.fx.shot.order;
+                extras.facing = plan.fx.shot.facing;
+                extras.hit = plan.fx.shot.hit;
+                extras.gravity = plan.fx.shot.gravity;
+                extras.size = plan.fx.shot.size;
+                extras.color = plan.fx.shot.color;
+                extras.color2 = plan.fx.shot.color2;
+                plan.fx.shot = extras.hasExtras() ? extras.clamped() : null;
+            }
+            if (plan.fx.shot == null) {
+                plan.fx.trail.clear();
+            }
         }
         if (fxIdle == null || fxIdle.isBlank()) {
             plan.fx.idle.clear();
@@ -912,7 +930,8 @@ public class AiController {
             && (fx.shot == null || !fx.shot.beam() && fx.shot.letters().length == 0) && plan.arrowShapes() == 0) {
             problems.add("the order asks for an arrow effect (\"" + fxHit.trim() + "\") but the script makes none: "
                 + "call ai.effect('trail', [...]) for the flight and/or ai.effect('attack', [...]) for where it lands.");
-        } else if (kind != GearKind.BOW && !kind.worn() && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty()) {
+        } else if (kind != GearKind.BOW && !kind.worn() && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty()
+            && (fx.shot == null || !fx.shot.hasExtras())) {
             problems.add("the order asks for an effect on attack (\"" + fxHit.trim() + "\") but the script makes none: "
                 + "call ai.effect('attack', [...]) with a shape, colours and moves that match it.");
         }
@@ -956,6 +975,38 @@ public class AiController {
                                                                 gravity: false, hit: 'vanish', size: 0.7, color: '#80ffea'])
             """;
 
+    /** Extra projectiles with each shot or swing (Spark.Extra), for bows and melee weapons. */
+    static final String EXTRA_API = """
+            EXTRA PROJECTILES (only when the attack/arrow line asks for more than one thing flying: "두 개가 나선형으로",
+            "3발", "부채꼴", "따라오는", "휘어서", "유도", "화살비", "쏟아지는", "갈라지는", "분열"...). Inside ai.shot:
+              ai.shot([extra: [[count: 2, path: 'spiral'], [count: 3, path: 'split']], ...other shot settings])
+              each group: count 1-8 (at most 12 in all), path, and as fits:
+                'spread'  a fan side to side (angle: degrees each side, 15)          - 3발 산탄, 부채꼴
+                'ring'    a cone all round the aim (angle 10)                        - 사방으로 퍼짐
+                'spiral'  turning round the main shot as it flies (radius 0.5, turns per second 2) - 나선형으로 감싸며
+                'trail'   one after another on the same line                         - 연사, 따라오는
+                'arc'     curving out and back into where it is aimed (angle 40)     - 휘어 들어오는
+                'homing'  after what it is aimed at                                  - 유도, 추적
+                'rain'    falling from the sky onto where it is aimed (radius 2.5)   - 화살비, 별똥별
+                'split'   bursting out where the main shot lands (angle 50)          - 착탄 시 분열, 파편
+                delay: ticks before they go; shape: 1-8 = which ai.arrowStart(n) shape (0 = the main shot's);
+                size: drawn size
+              Each extra hurts HALF as much as the main shot, costs no arrow and cannot be picked up; extras play no
+              landing effects of their own. With a beam, arc/homing/rain/split aim at where the beam stopped.
+              e.g. two arrows spiralling round the main one: ai.shot([extra: [[count: 2, path: 'spiral']]])
+                   a beam with two arrows curving into the same spot: ai.shot([kind: 'beam', extra: [[count: 2, path: 'arc']]])
+            """;
+
+    /** Melee weapons: what they may send with a swing. */
+    static final String MELEE_SHOT = """
+            PROJECTILES FROM A SWING (melee weapons; only when the attack line asks for something flying off the weapon:
+            검기, 날아가는 참격, 마법탄, 불꽃 구슬...): ai.shot([extra: [[count: 1, path: 'trail']], facing: 'spin',
+              hit: 'vanish', gravity: false, size: 0.8]) - the extras leave with the swing and pass the one it hits
+              directly. Their shape: pieces between ai.arrowStart(n)/arrowEnd() (pointing up, +Y) or text: '...'.
+              For a sword wave: ai.shot([extra: [[count: 1, path: 'trail']], gravity: false, hit: 'vanish', size: 1.2])
+              with a crescent-shaped arrowStart(1) piece (flat, wide).
+            """;
+
     /** API and rules for effects, added to the equipment prompts. */
     static final String EFFECT_API = effectApi();
 
@@ -997,6 +1048,12 @@ public class AiController {
                                      ticks 6-12). For lightning, thunder and smiting use THIS, not a pillar or dots.
                   lightning: true  (attack: also a real vanilla lightning strike there, harmless: no fire, no damage;
                          only when the request wants real thunderbolts)
+                  damage: 0.1-0.5 (attack only: what the effect touches is HURT by that part of the weapon's damage;
+                         only when the attack line says the effect itself hurts: "충격파로 주변 적에게 피해", "번개가 떨어져
+                         피해", "검기가 적을 벤다", "폭발 피해". The one hit directly is not hurt again; a swing or landing
+                         hurts each target by at most 0.5 in all. Where it reaches: swipe = the fan in front, shockwave =
+                         the ring as it spreads, beam = the line, pillar/bolt = the column, disc = the circle, dots = the
+                         ball (flying with 'forward'). Leave it out for effects that only look.)
                          Smooth pieces take color/colors, size, plane, start/anchor, moves (expand, spin, fade, rise...)
                          and ticks; count, dot, look and particle are for dots. Combine a smooth piece with dots
                          (a swipe + sparks flying off it, a shockwave + dust, a pillar + rising embers).
@@ -1107,7 +1164,8 @@ public class AiController {
         String hitLine = kind == GearKind.BOW ? "\nArrow effect (trail in flight and/or where it lands): " : "\nEffect on attack (swing): ";
         String effects = hitLine + hit + "\nEffect while " + (kind.worn() ? "worn" : "held")
             + " (particles, movement, glow): " + blankToNone(fxIdle);
-        String system = base.system() + "\n" + EFFECT_API + (kind == GearKind.BOW ? "\n" + SHOT_API : "");
+        String system = base.system() + "\n" + EFFECT_API + (kind == GearKind.BOW ? "\n" + SHOT_API + "\n" + EXTRA_API
+            : !kind.worn() ? "\n" + EXTRA_API + "\n" + MELEE_SHOT : "");
         return new AiPrompt(system, base.user().replace("\nWrite the Groovy script", effects + "\nWrite the Groovy script"));
     }
 

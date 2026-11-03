@@ -556,6 +556,74 @@ public class AibGameTests implements FabricGameTest {
         context.complete();
     }
 
+    private static net.minecraft.item.ItemStack gearWith(TestContext context, ServerPlayerEntity player, BlockPos origin, String kind,
+                                                       String script) {
+        BuildPlan plan = Demo.plan(context.getWorld(), origin, player, script, true);
+        BuildRecord record = BuildRecord.create(kind + " test", "TEST", "script", plan);
+        record.kind = "gear";
+        record.gear = kind;
+        return com.example.ai.build.GearItems.stackFor(record);
+    }
+
+    /** A hurting shockwave: the golem beside the one hit is hurt (by at most half), the one hit is not hurt again. */
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 100)
+    public void hurtingEffectsSpareTheOneHit(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        net.minecraft.item.ItemStack sword = gearWith(context, player, origin, "sword",
+            "ai.addPart('iron_block', -0.04, 0, -0.04, 0.08, 1.2, 0.08)\n"
+                + "ai.effect('attack', [form: 'shockwave', size: 3, width: 0.4, damage: 0.5, start: 'target', ticks: 10])\n"
+                + "ai.effect('attack', [shape: 'burst', size: 2, damage: 0.4, start: 'target'])\n");
+        player.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, sword);
+        var hit = context.spawnEntity(net.minecraft.entity.EntityType.IRON_GOLEM, new BlockPos(1, 1, 4));
+        var beside = context.spawnEntity(net.minecraft.entity.EntityType.IRON_GOLEM, new BlockPos(3, 1, 4));
+        hit.setAiDisabled(true);
+        beside.setAiDisabled(true);
+        double weapon = com.example.ai.build.EffectDamage.weaponDamage(player);
+        com.example.ai.build.GearEffects.onHit(sword, hit, player);
+        check(com.example.ai.build.EffectDamage.pending() >= 2, "the hurting layers wait for the swing");
+        context.waitAndRun(30, () -> {
+            check(hit.getHealth() == hit.getMaxHealth(), "the one hit directly is not hurt by its effects");
+            float lost = beside.getMaxHealth() - beside.getHealth();
+            check(lost > 0, "the golem beside it is hurt");
+            check(lost <= weapon * 0.5 + 0.01, "by at most half the weapon's damage (" + lost + " of " + weapon + ")");
+            context.complete();
+        });
+    }
+
+    /** Extra projectiles: a fan of three with a bow shot (half damage, no pickup), and a wave sent with a sword's swing. */
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 100)
+    public void extraProjectilesGoWithShotsAndSwings(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        net.minecraft.item.ItemStack bow = bowWith(context, player, origin,
+            "ai.shot([extra: [[count: 3, path: 'spread', angle: 20], [count: 2, path: 'spiral']]])\n");
+        var main = (com.example.content.AibArrowEntity) ((com.example.content.GearBowItem) bow.getItem()).createArrowEntity(world, player, bow,
+            new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), false);
+        main.refreshPositionAndAngles(origin.getX() + 0.5, origin.getY() + 1.5, origin.getZ() + 0.5, 0, 0);
+        main.setVelocity(0, 0.2, 0.6);
+        world.spawnEntity(main);
+        net.minecraft.item.ItemStack sword = gearWith(context, player, origin, "sword",
+            "ai.addPart('iron_block', -0.04, 0, -0.04, 0.08, 1.2, 0.08)\n"
+                + "ai.arrowStart(1)\nai.addPart('#a0e0ff', -0.5, 0, -0.05, 1, 0.2, 0.1)\nai.arrowEnd()\n"
+                + "ai.shot([extra: [[count: 1, path: 'trail']], gravity: false, hit: 'vanish'])\n");
+        check(com.example.ai.build.GearEffects.of(sword).shot != null, "a sword keeps the projectiles it sends");
+        com.example.ai.build.ShotExtras.fromSwing(world, player, sword, com.example.ai.build.GearEffects.of(sword).shot, null, 0);
+        context.waitAndRun(6, () -> {
+            java.util.List<com.example.content.AibArrowEntity> extras = world.getEntitiesByClass(com.example.content.AibArrowEntity.class,
+                new net.minecraft.util.math.Box(origin).expand(16), com.example.content.AibArrowEntity::isExtra);
+            long fromBow = extras.stream().filter(a -> a.bow().getItem() instanceof net.minecraft.item.BowItem).count();
+            long fromSword = extras.size() - fromBow;
+            check(fromBow == 5, "three in a fan and two spiralling, got " + fromBow);
+            check(fromSword == 1, "the sword sent its wave, got " + fromSword);
+            check(extras.stream().allMatch(a -> a.pickupType != net.minecraft.entity.projectile.PersistentProjectileEntity.PickupPermission.ALLOWED),
+                "extras cannot be picked up");
+            context.complete();
+        });
+    }
+
     /** A bubble wand: a big shot that flies straight (no gravity) and pops where it hits. */
     @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 200)
     public void bowBubbleFliesStraightAndPops(TestContext context) {

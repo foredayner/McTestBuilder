@@ -51,6 +51,9 @@ public class GearBowItem extends BowItem implements GearItem {
         if (critical) {
             arrow.setCritical(true);
         }
+        if (world instanceof ServerWorld server) {
+            com.example.ai.build.ShotExtras.afterShot(server, shooter, arrow);
+        }
         return arrow;
     }
 
@@ -104,6 +107,7 @@ public class GearBowItem extends BowItem implements GearItem {
         arrow.setPosition(at.subtract(look.multiply(0.2)));
         Vec3d muzzle = player.getEyePos().add(0, -0.18, 0).add(look.multiply(0.6));
         GearEffects.beam(world, player, muzzle, at, shot);
+        com.example.ai.build.ShotExtras.afterBeam(world, player, bow, muzzle, look.multiply(pull * 3.0F), shot, hit);
         if (hit instanceof EntityHitResult entityHit) {
             arrow.beamHit(entityHit);
         } else if (hit.getType() == HitResult.Type.BLOCK && hit instanceof BlockHitResult blockHit) {

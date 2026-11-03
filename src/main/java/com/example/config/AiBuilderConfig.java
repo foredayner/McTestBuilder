@@ -35,6 +35,8 @@ public final class AiBuilderConfig {
     public int keepAliveMinutes = 30;
     /** This player's own choice: big hits shake the view a little (equipment effects). */
     public boolean screenShake = true;
+    /** This game has opened the AI 공방 before (the 가이드 opens first only the very first time). */
+    public boolean guideSeen = false;
     /** Last model typed for each provider, so switching provider does not lose it. */
     public java.util.Map<String, String> modelByProvider = new java.util.HashMap<>();
 
@@ -176,6 +178,7 @@ public final class AiBuilderConfig {
         copy.autoRetries = autoRetries;
         copy.keepAliveMinutes = keepAliveMinutes;
         copy.screenShake = screenShake;
+        copy.guideSeen = guideSeen;
         copy.modelByProvider = new java.util.HashMap<>(modelByProvider);
         return copy;
     }

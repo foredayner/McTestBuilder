@@ -65,7 +65,7 @@ public final class GearEffects {
             return 0;
         }
         Spark.Effects fx = of(stack);
-        if (fx.attack.isEmpty()) {
+        if (fx.attack.isEmpty() && (fx.shot == null || !fx.shot.hasExtras())) {
             return 0;
         }
         int now = player.getServer() == null ? player.age : player.getServer().getTicks();
@@ -81,8 +81,12 @@ public final class GearEffects {
         net.minecraft.util.hit.EntityHitResult aimed = net.minecraft.entity.projectile.ProjectileUtil.raycast(player, eye,
             eye.add(look.multiply(reach)), player.getBoundingBox().stretch(look.multiply(reach)).expand(1.0),
             e -> e instanceof LivingEntity && !e.isSpectator() && e.canHit(), reach * reach);
-        return play(world, player, fx.attack, aimed == null ? null : aimed.getEntity(), look, sizeFor(stack),
-            swingTicks(player, stack));
+        Entity hit = aimed == null ? null : aimed.getEntity();
+        // A weapon may also send projectiles with each swing (ai.shot extras): they pass the one it hits.
+        if (fx.shot != null && fx.shot.hasExtras()) {
+            ShotExtras.fromSwing(world, player, stack, fx.shot, hit, swingTicks(player, stack));
+        }
+        return play(world, player, fx.attack, hit, look, sizeFor(stack), swingTicks(player, stack));
     }
 
     /**
@@ -114,13 +118,21 @@ public final class GearEffects {
             swingTicks(attacker, stack));
     }
 
-    /** An arrow from an AI bow landed at {@code at}: the bow's attack effects play there. */
-    public static int arrowImpact(ServerWorld world, com.example.content.AibArrowEntity arrow, Vec3d at) {
+    /** The damage of a fully drawn arrow, what a bow's hurting landing effects are a part of. */
+    public static final double ARROW_DAMAGE = 6;
+
+    /**
+     * An arrow from an AI bow landed at {@code at}: the bow's attack effects play there (hurting
+     * ones hurt what is around, not {@code direct}, the one the arrow hit).
+     */
+    public static int arrowImpact(ServerWorld world, com.example.content.AibArrowEntity arrow, Vec3d at, Entity direct) {
         Spark.Effects fx = of(arrow.bow());
         if (fx.attack.isEmpty()) {
             return 0;
         }
         Vec3d dir = arrow.getVelocity().lengthSquared() < 1e-6 ? arrow.getRotationVec(1.0F) : arrow.getVelocity().normalize();
+        EffectDamage.Swing swing = arrow.getOwner() instanceof LivingEntity owner
+            ? EffectDamage.swing(world, owner, direct, ARROW_DAMAGE) : null;
         for (Spark s : fx.attack) {
             Vec3d o = switch (s.start) {
                 case "above" -> at.add(0, 1.5, 0);
@@ -129,6 +141,9 @@ public final class GearEffects {
             send(world, o, dir, s, 1, PlayerLookup.around(world, at, 64));
             if (s.lightning) {
                 strike(world, at);
+            }
+            if (swing != null) {
+                EffectDamage.add(swing, s, o, dir, null, 1, s.delay);
             }
         }
         return fx.attack.size();
@@ -205,6 +220,7 @@ public final class GearEffects {
         flat = flat.lengthSquared() < 1e-6 ? new Vec3d(0, 0, 1) : flat.normalize();
         Vec3d targetCenter = target != null ? target.getPos().add(0, target.getHeight() * 0.5, 0) : eye.add(look.multiply(2.5));
         Vec3d targetFeet = target != null ? target.getPos() : wielder.getPos().add(flat.multiply(2.5));
+        EffectDamage.Swing swing = EffectDamage.swing(world, wielder, target, EffectDamage.weaponDamage(wielder));
         List<ServerPlayerEntity> viewers = new ArrayList<>(PlayerLookup.tracking(wielder));
         if (wielder instanceof ServerPlayerEntity self && !viewers.contains(self)) {
             viewers.add(self);
@@ -226,6 +242,7 @@ public final class GearEffects {
             if (s.lightning) {
                 strike(world, targetFeet);
             }
+            EffectDamage.add(swing, s, o, look, eye, scale, s.delay + lead);
         }
         return sparks.size();
     }

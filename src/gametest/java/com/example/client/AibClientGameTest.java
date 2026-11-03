@@ -155,6 +155,9 @@ public class AibClientGameTest implements FabricClientGameTest {
                 AiClientState.setMode(2);
             });
             shot(context, () -> AiPromptScreen.open("CREATE", null), "16_create_gear_mode");
+            // The 가이드: the first tab, its sections, and examples that fill the order screen.
+            shot(context, () -> AiPromptScreen.openGuide(0), "16g_guide_start");
+            shot(context, () -> AiPromptScreen.openGuide(6), "16h_guide_bows");
             context.runOnClient(client -> AiClientState.setMode(0));
             shot(context, () -> AiPromptScreen.openGear(null), "17_history_gear");
             String swordId = BuildRecord.fromJson(gear.get(0)).id;

@@ -404,6 +404,18 @@ public final class AiClientState {
         refreshOpenScreen(true);
     }
 
+    /** The 가이드's examples: fill the order screen (0 건물, 1 소품, 2 장비). */
+    public static void loadExample(int newMode, String gear, String newMotion, String hit, String idle) {
+        editing = null;
+        mode = Math.floorMod(newMode, 3);
+        if (mode == 2) {
+            gearKind = com.example.content.GearKind.of(gear);
+            motion = com.example.content.GearMotions.normalize(newMotion);
+            fxHit = hit == null ? "" : hit;
+            fxIdle = idle == null ? "" : idle;
+        }
+    }
+
     /** Fill the order with a kept design's order (다시 주문), or start changing it (고쳐서 주문). */
     public static void loadOrder(com.example.ai.build.BuildRecord record, boolean revise) {
         if ("gear".equals(record.kind)) {
