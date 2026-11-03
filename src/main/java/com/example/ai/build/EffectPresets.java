@@ -44,8 +44,9 @@ public final class EffectPresets {
                 "delay", 2),
             m("shape", "burst", "particle", "flame", "size", 0.5, "count", 18, "start", "target", "moves", List.of("scatter"),
                 "speed", 1.5, "ticks", 10, "delay", 3)));
-        add("lightning", "attack", "a bolt of light on the target with crackling sparks and a ring over the ground", List.of(
-            m("form", "pillar", "colors", List.of("#ffffff", "#a0d0ff"), "size", 0.6, "width", 0.25, "start", "target", "ticks", 8,
+        add("lightning", "attack", "a jagged lightning bolt striking the target from the sky, crackling sparks and a ring over the ground",
+            List.of(
+            m("form", "bolt", "colors", List.of("#ffffff", "#a0d0ff"), "size", 0.8, "width", 0.3, "start", "ground", "ticks", 10,
                 "sound", "entity.lightning_bolt.thunder", "volume", 0.5, "pitch", 1.4, "shake", 0.5),
             m("shape", "bolt", "look", "glow", "color", "#e0f0ff", "size", 1.2, "count", 40, "start", "target",
                 "moves", List.of("flicker", "fade"), "ticks", 8),
@@ -181,6 +182,7 @@ public final class EffectPresets {
         double scale = 1;
         String sound = null;
         Double shake = null;
+        boolean lightning = false;
         if (changes != null) {
             for (var e : changes.entrySet()) {
                 String key = String.valueOf(e.getKey()).trim();
@@ -196,7 +198,8 @@ public final class EffectPresets {
                     case "scale", "size" -> scale = v instanceof Number n ? n.doubleValue() : Double.parseDouble(String.valueOf(v));
                     case "sound" -> sound = String.valueOf(v);
                     case "shake" -> shake = v instanceof Number n ? n.doubleValue() : Double.parseDouble(String.valueOf(v));
-                    default -> throw new IllegalArgumentException("unknown preset change '" + key + "'; use colors, scale, sound, shake");
+                    case "lightning" -> lightning = Boolean.TRUE.equals(v) || "true".equalsIgnoreCase(String.valueOf(v).trim());
+                    default -> throw new IllegalArgumentException("unknown preset change '" + key + "'; use colors, scale, sound, shake, lightning");
                 }
             }
         }
@@ -229,12 +232,15 @@ public final class EffectPresets {
             if (shake != null && out.isEmpty()) {
                 l.put("shake", shake);
             }
+            if (lightning && out.isEmpty()) {
+                l.put("lightning", true);
+            }
             out.add(Spark.fromMap(l));
         }
         if (sound != null && !sound.isBlank() && !soundSet && !out.isEmpty()) {
-            Map<String, Object> first = new LinkedHashMap<>(preset.layers().get(0));
-            first.put("sound", sound);
-            out.set(0, Spark.fromMap(first));
+            // The first layer gets it (keeping the changed colours and size).
+            Spark withSound = Spark.fromMap(Map.of("sound", sound));
+            out.get(0).sound = withSound.sound;
         }
         return out;
     }

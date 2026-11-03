@@ -47,6 +47,7 @@ public final class AiScriptApi {
         "arrowEnd",
         "effect",
         "preset",
+        "shot",
         "pixelArt",
         "pixelBox"
     );

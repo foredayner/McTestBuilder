@@ -45,6 +45,26 @@ class EffectPresetsTest {
     }
 
     @Test
+    void lightningStrikesAsABoltAndMayBeReal() {
+        List<Spark> plain = EffectPresets.build("lightning", null);
+        assertEquals("bolt", plain.get(0).form, "the lightning preset is a jagged bolt, not a pillar");
+        assertFalse(plain.get(0).lightning);
+        List<Spark> real = EffectPresets.build("lightning", Map.of("lightning", true, "colors", List.of("#ffffff", "#ffe040"),
+            "sound", "entity.lightning_bolt.impact"));
+        assertTrue(real.get(0).lightning, "a real (harmless) strike when asked");
+        assertEquals(0xFFE040, real.get(0).colors[1], "the changed colours are kept");
+        assertEquals("entity.lightning_bolt.impact", real.get(0).sound);
+    }
+
+    @Test
+    void aChangedSoundKeepsTheOtherChanges() {
+        List<Spark> frost = EffectPresets.build("frost", Map.of("sound", "block.glass.break", "scale", 2));
+        List<Spark> base = EffectPresets.build("frost", null);
+        assertEquals("block.glass.break", frost.get(0).sound);
+        assertEquals(Math.min(4, base.get(0).size * 2), frost.get(0).size, 1e-9, "the scale is kept");
+    }
+
+    @Test
     void layersMayWaitAndShake() {
         Spark s = Spark.fromMap(Map.of("delay", 99, "shake", 5));
         assertEquals(40, s.delay);

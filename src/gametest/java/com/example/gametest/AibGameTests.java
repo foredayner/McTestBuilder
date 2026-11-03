@@ -460,6 +460,62 @@ public class AibGameTests implements FabricGameTest {
         });
     }
 
+    private static net.minecraft.item.ItemStack bowWith(TestContext context, ServerPlayerEntity player, BlockPos origin, String shot) {
+        BuildPlan plan = Demo.plan(context.getWorld(), origin, player, Demo.BOW + shot, true);
+        BuildRecord record = BuildRecord.create("bow test", "TEST", "script", plan);
+        record.kind = "gear";
+        record.gear = "bow";
+        return com.example.ai.build.GearItems.stackFor(record);
+    }
+
+    /** A bubble wand: a big shot that flies straight (no gravity) and pops where it hits. */
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 200)
+    public void bowBubbleFliesStraightAndPops(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        net.minecraft.item.ItemStack bow = bowWith(context, player, origin,
+            "ai.shot([facing: 'fixed', hit: 'vanish', gravity: false, size: 1.6, color: '#c0f0ff'])\n");
+        com.example.ai.build.Spark.Shot shot = com.example.ai.build.GearEffects.of(bow).shot;
+        check(shot != null && "fixed".equals(shot.facing) && shot.vanishes() && !shot.gravity, "the shot is kept on the bow");
+        var aib = (com.example.content.AibArrowEntity) ((com.example.content.GearBowItem) bow.getItem()).createArrowEntity(world, player, bow,
+            new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), false);
+        check(Math.abs(aib.getWidth() - 0.8F) < 0.01F, "a 1.6-block shot has a 0.8 box, got " + aib.getWidth());
+        world.setBlockState(context.getAbsolutePos(new BlockPos(1, 3, 6)), net.minecraft.block.Blocks.STONE.getDefaultState());
+        double y0 = origin.getY() + 2;
+        aib.refreshPositionAndAngles(origin.getX() + 0.5, y0, origin.getZ() + 0.5, 0, 0);
+        aib.setVelocity(0, 0, 0.4);
+        world.spawnEntity(aib);
+        context.waitAndRun(5, () -> check(Math.abs(aib.getY() - y0) < 0.01, "no gravity: it flies straight, y " + aib.getY()));
+        context.waitAndRun(40, () -> {
+            check(aib.hasLanded() && aib.isRemoved(), "it hit the stone and vanished");
+            context.complete();
+        });
+    }
+
+    /** A beam bow: the ray stops at the first mob (never goes through) and hurts it like an arrow. */
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 100)
+    public void bowBeamStopsAtTheFirstMob(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f); // looking south (+z)
+        net.minecraft.item.ItemStack bow = bowWith(context, player, origin,
+            "ai.shot([kind: 'beam', color: '#ff4040', width: 0.2, ticks: 6])\n");
+        com.example.ai.build.Spark.Shot shot = com.example.ai.build.GearEffects.of(bow).shot;
+        check(shot != null && shot.beam(), "a beam shot");
+        var near = context.spawnEntity(net.minecraft.entity.EntityType.IRON_GOLEM, new BlockPos(1, 1, 4));
+        var far = context.spawnEntity(net.minecraft.entity.EntityType.IRON_GOLEM, new BlockPos(1, 1, 7));
+        near.setAiDisabled(true);
+        far.setAiDisabled(true);
+        var target = com.example.content.GearBowItem.beamTarget(world, player);
+        check(target instanceof net.minecraft.util.hit.EntityHitResult hit && hit.getEntity() == near,
+            "the beam reaches the nearer golem first, got " + target);
+        com.example.content.GearBowItem.fireBeam(world, player, bow, new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), 1.0F, shot);
+        check(near.getHealth() < near.getMaxHealth(), "the first golem is hurt");
+        check(far.getHealth() == far.getMaxHealth(), "the one behind it is not (no piercing)");
+        context.complete();
+    }
+
     /**
      * The API other mods use: a building designed for a site (front on z = -1) is checked against
      * the site and its marked spots, then placed turned so its front faces east, with the marked

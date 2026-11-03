@@ -53,7 +53,9 @@ public enum GearKind {
             + "lying along X with the grip under the hand and the muzzle at x = -0.4 to -0.9. You may also design the "
             + "projectile it shoots between "
             + "ai.arrowStart() and ai.arrowEnd(): the arrow points UP (+Y), fletching at y = 0 to 0.2, shaft up to the head "
-            + "at y = 0.6-0.9, centred on x = z = 0, about 0.03-0.08 thick (without it, arrows look normal)."),
+            + "at y = 0.6-0.9, centred on x = z = 0, about 0.03-0.08 thick (without it, arrows look normal). The projectile may be "
+            + "anything the order says (a bubble, a fireball, a shuriken): model it about 0.3-0.9 big, its front up (+Y), and "
+            + "say how it flies with ai.shot."),
 
     // Worn equipment: drawn on the wearer's head or torso and following its movement.
     HELMET("투구", Items.IRON_HELMET, Items.IRON_HELMET, EquipmentSlot.HEAD,

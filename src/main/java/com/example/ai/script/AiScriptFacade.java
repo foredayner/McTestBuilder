@@ -253,6 +253,11 @@ public final class AiScriptFacade {
         MinecraftAI.preset(when, name, changes);
     }
 
+    /** Bows: what is shot: ai.shot([kind: 'beam', color: '#ffe060']) or ai.shot([facing: 'spin', hit: 'vanish', size: 0.5]). */
+    public void shot(java.util.Map<?, ?> settings) {
+        MinecraftAI.shot(settings);
+    }
+
     public void mark(String name, Number x, Number y, Number z) {
         MinecraftAI.mark(name, x, y, z);
     }

@@ -245,6 +245,14 @@ public class MinecraftAI {
         }
     }
 
+    /** Bows: what the bow shoots (see Spark.Shot): an arrow-like thing with its own flight, or a beam. */
+    public static void shot(java.util.Map<?, ?> settings) {
+        if (recorder == null) {
+            return;
+        }
+        recorder.fx.shot = Spark.Shot.fromMap(settings);
+    }
+
     private static void addEffect(String when, Spark spark) {
         if (!spark.sound.isEmpty()
             && !net.minecraft.registry.Registries.SOUND_EVENT.containsId(net.minecraft.util.Identifier.ofVanilla(spark.sound))) {

@@ -36,9 +36,10 @@ public final class Spark {
      * What the effect is drawn as: dots (the shape's dots), or one smooth piece: swipe (the glowing
      * band a blade leaves), shockwave (a ring spreading over the ground), pillar (a column of light
      * going up), beam (a ray going ahead), disc (a magic circle), ribbon (a band left behind along
-     * the path of what it follows: arrows, orbiting lights).
+     * the path of what it follows: arrows, orbiting lights), bolt (a jagged, branching lightning
+     * bolt from the sky down to where it starts).
      */
-    public static final List<String> FORMS = List.of("dots", "swipe", "shockwave", "pillar", "beam", "disc", "ribbon");
+    public static final List<String> FORMS = List.of("dots", "swipe", "shockwave", "pillar", "beam", "disc", "ribbon", "bolt");
     /** What each dot looks like (cells of textures/misc/looks.png). */
     public static final List<String> LOOKS = List.of("dot", "glow", "star", "streak", "shard", "rune", "ember", "ring");
     /** Vanilla particles an effect may use instead of its own dots ("dust" takes the effect's colours). */
@@ -103,6 +104,10 @@ public final class Spark {
     public int lead = 0;
     /** 0-1: shakes the view of whoever is right there when it starts (big hits; players can turn it off). */
     public double shake = 0;
+    /** Also a real (harmless) vanilla lightning strike where it starts: no fire, no damage. */
+    public boolean lightning;
+    /** Set by the server, not the AI: a beam this long (blocks) instead of one sized by size (a bow's beam shot). */
+    public double reach = 0;
 
     /** All effects of one piece of equipment. */
     public static final class Effects {
@@ -112,9 +117,11 @@ public final class Spark {
         public List<Spark> idle = new ArrayList<>();
         /** Bows: behind the arrow in flight. At most 1. */
         public List<Spark> trail = new ArrayList<>();
+        /** Bows: what the shot is (an arrow-like thing that flies, or a beam). Null = a normal arrow. */
+        public Shot shot;
 
         public boolean isEmpty() {
-            return attack.isEmpty() && idle.isEmpty() && trail.isEmpty();
+            return attack.isEmpty() && idle.isEmpty() && trail.isEmpty() && shot == null;
         }
 
         public String toJson() {
@@ -130,6 +137,7 @@ public final class Spark {
                 set.attack = clean(set.attack, MAX_ATTACK);
                 set.idle = clean(set.idle, MAX_IDLE);
                 set.trail = clean(set.trail, 1);
+                set.shot = set.shot == null ? null : set.shot.clamped();
                 return set;
             } catch (RuntimeException exception) {
                 return new Effects();
@@ -227,6 +235,7 @@ public final class Spark {
         sound = sound != null && sound.matches("[a-z0-9_.]{1,80}") ? sound : "";
         volume = clamp(volume, 0, 2);
         pitch = clamp(pitch, 0.5, 2);
+        reach = clamp(reach, 0, 80);
         delay = (int) clamp(delay, 0, 40);
         lead = (int) clamp(lead, 0, 30);
         shake = clamp(shake, 0, 1);
@@ -304,6 +313,7 @@ public final class Spark {
                 case "volume" -> s.volume = num(v, key);
                 case "delay", "wait" -> s.delay = (int) Math.round(num(v, key));
                 case "shake" -> s.shake = num(v, key);
+                case "lightning", "realLightning", "real_lightning" -> s.lightning = bool(v);
                 case "pitch" -> s.pitch = num(v, key);
                 case "move", "moves" -> {
                     s.moves = new ArrayList<>();
@@ -335,13 +345,93 @@ public final class Spark {
                 }
                 default -> throw new IllegalArgumentException("unknown effect setting '" + key + "'; use shape, color, color2, "
                     + "colors, size, count, dot, look, form, arc, width, particle, vary, gravity, drag, turbulence, plane, start, anchor, moves, speed, "
-                    + "ticks, every, fill, lines, points, sound, volume, pitch, delay, shake");
+                    + "ticks, every, fill, lines, points, sound, volume, pitch, delay, shake, lightning");
             }
         }
         if ("points".equals(s.shape) && (s.points == null || s.points.isEmpty())) {
             throw new IllegalArgumentException("shape 'points' needs points: [[u, v], ...]");
         }
         return s.clamped();
+    }
+
+    private static boolean bool(Object v) {
+        return Boolean.TRUE.equals(v) || "true".equalsIgnoreCase(String.valueOf(v).trim());
+    }
+
+    /**
+     * What a bow shoots. kind 'arrow': a thing that flies (the arrow shape made with the bow, or a
+     * normal arrow): it may point along its flight, spin or keep still; stick where it hits or vanish
+     * with a small burst; fly straight without gravity; be drawn bigger (size, blocks) with a hitbox
+     * of about half that. kind 'beam': no arrow flies; a ray of light reaches at once up to 64 blocks
+     * and stops at the first thing it meets (it never goes through), hitting like an arrow shot with
+     * the same draw.
+     */
+    public static final class Shot {
+        public static final List<String> KINDS = List.of("arrow", "beam");
+        public static final List<String> FACINGS = List.of("flight", "spin", "fixed");
+        public static final List<String> HITS = List.of("stick", "vanish");
+        public static final double RANGE = 64;
+        public String kind = "arrow";
+        public String facing = "flight";
+        public String hit = "stick";
+        public boolean gravity = true;
+        /** Drawn length of the arrow shape in blocks (0.25-2); 0 = as designed. */
+        public double size = 0;
+        /** Beam (and the vanish burst): colour, colour it fades to, width (blocks), how long it shows (ticks). */
+        public int color = 0xFFFFFF;
+        public int color2 = -1;
+        public double width = 0.25;
+        public int ticks = 8;
+
+        public boolean beam() {
+            return "beam".equals(kind);
+        }
+
+        public boolean vanishes() {
+            return "vanish".equals(hit);
+        }
+
+        /** The hitbox (blocks): about half the drawn size, never smaller than a normal arrow's. */
+        public double hitbox() {
+            return size <= 0 ? 0.5 : Math.max(0.5, size * 0.5);
+        }
+
+        public Shot clamped() {
+            kind = KINDS.contains(kind) ? kind : "arrow";
+            facing = FACINGS.contains(facing) ? facing : "flight";
+            hit = HITS.contains(hit) ? hit : "stick";
+            size = size <= 0 || Double.isNaN(size) ? 0 : clamp(size, 0.25, 2);
+            color &= 0xFFFFFF;
+            color2 = color2 < 0 ? -1 : color2 & 0xFFFFFF;
+            width = clamp(width, 0.05, 1);
+            ticks = (int) clamp(ticks, 4, 20);
+            return this;
+        }
+
+        /** From the AI script: [kind: 'beam', color: '#ffe060', width: 0.3] or [facing: 'spin', hit: 'vanish', gravity: false, size: 0.5]. */
+        public static Shot fromMap(Map<?, ?> map) {
+            Shot s = new Shot();
+            if (map != null) {
+                for (Map.Entry<?, ?> e : map.entrySet()) {
+                    String key = String.valueOf(e.getKey()).trim();
+                    Object v = e.getValue();
+                    switch (key) {
+                        case "kind", "type" -> s.kind = word(v, KINDS, "shot kind");
+                        case "facing", "face", "turn" -> s.facing = word(v, FACINGS, "shot facing");
+                        case "hit", "onHit", "on_hit" -> s.hit = word(v, HITS, "shot hit");
+                        case "gravity" -> s.gravity = bool(v);
+                        case "size" -> s.size = num(v, key);
+                        case "color", "colour" -> s.color = color(v);
+                        case "color2", "colour2" -> s.color2 = color(v);
+                        case "width" -> s.width = num(v, key);
+                        case "ticks", "time" -> s.ticks = (int) Math.round(num(v, key));
+                        default -> throw new IllegalArgumentException("unknown shot setting '" + key
+                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks");
+                    }
+                }
+            }
+            return s.clamped();
+        }
     }
 
     private static String word(Object v, List<String> allowed, String what) {

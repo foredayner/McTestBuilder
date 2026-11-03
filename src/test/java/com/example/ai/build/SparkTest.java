@@ -83,6 +83,50 @@ class SparkTest {
     }
 
     @Test
+    void shotSettingsAreReadAndKeptSafe() {
+        Spark.Shot s = Spark.Shot.fromMap(Map.of("kind", "beam", "color", "#ff4040", "width", 5, "ticks", 2));
+        assertTrue(s.beam());
+        assertEquals(0xFF4040, s.color);
+        assertEquals(1, s.width, 1e-9, "width is capped");
+        assertEquals(4, s.ticks, "ticks are at least 4");
+        Spark.Shot bubble = Spark.Shot.fromMap(Map.of("facing", "fixed", "hit", "vanish", "gravity", false, "size", 9));
+        assertEquals("fixed", bubble.facing);
+        assertTrue(bubble.vanishes());
+        assertFalse(bubble.gravity);
+        assertEquals(2, bubble.size, 1e-9, "size is capped at 2 blocks");
+        assertEquals(1, bubble.hitbox(), 1e-9, "the hitbox is half the size");
+        assertEquals(0.5, Spark.Shot.fromMap(Map.of("size", 0.3)).hitbox(), 1e-9, "never smaller than an arrow's");
+        assertEquals(0.5, new Spark.Shot().hitbox(), 1e-9);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> Spark.Shot.fromMap(Map.of("kind", "laser")));
+        assertTrue(e.getMessage().contains("shot kind"));
+        assertThrows(IllegalArgumentException.class, () -> Spark.Shot.fromMap(Map.of("pierce", true)));
+        // Kept with the bow's effects, and made safe when read back.
+        Spark.Effects fx = new Spark.Effects();
+        assertTrue(fx.isEmpty());
+        fx.shot = bubble;
+        assertFalse(fx.isEmpty(), "a shot alone is something to keep");
+        Spark.Effects back = Spark.Effects.fromJson(fx.toJson());
+        assertEquals("vanish", back.shot.hit);
+        assertFalse(back.shot.gravity);
+        Spark.Shot bad = Spark.Effects.fromJson("{\"shot\":{\"kind\":\"x\",\"facing\":\"y\",\"size\":50}}").shot;
+        assertEquals("arrow", bad.kind);
+        assertEquals("flight", bad.facing);
+        assertEquals(2, bad.size, 1e-9);
+        assertNull(Spark.Effects.fromJson("{}").shot, "no shot = a normal arrow");
+    }
+
+    @Test
+    void boltIsAFormAndLightningIsAnOption() {
+        Spark s = Spark.fromMap(Map.of("form", "bolt", "lightning", true));
+        assertEquals("bolt", s.form);
+        assertTrue(s.lightning);
+        assertFalse(Spark.fromMap(Map.of("form", "bolt")).lightning, "no real lightning unless asked");
+        Spark beam = new Spark();
+        beam.reach = 500;
+        assertEquals(80, beam.clamped().reach, 1e-9, "a beam's length is capped");
+    }
+
+    @Test
     void jsonRoundTripIsClamped() {
         Spark.Effects fx = new Spark.Effects();
         fx.attack.add(Spark.fromMap(Map.of("shape", "star", "moves", List.of("spin"))));

@@ -1,5 +1,6 @@
 package com.example.client;
 
+import com.example.ai.build.Spark;
 import com.example.content.AibArrowEntity;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.TexturedRenderLayers;
@@ -12,15 +13,22 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
 
 /**
- * Arrows from AI bows: drawn with the arrow shape designed with the bow (pointing where it
- * flies), or as a normal arrow when the bow has none.
+ * Arrows from AI bows: drawn with the arrow shape designed with the bow, or as a normal arrow when
+ * the bow has none. The bow's shot settings say how it turns (along its flight, tumbling, or kept
+ * upright) and how big it is drawn.
  */
 public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, AibArrowRenderer.State> {
 
     private static final Identifier TEXTURE = Identifier.ofVanilla("textures/entity/projectiles/arrow.png");
+    /** Tumbling: degrees per tick (about two turns a second). */
+    private static final float SPIN = 36.0F;
 
     public static class State extends ProjectileEntityRenderState {
         GearModelRenderer.Model arrow;
+        String facing = "flight";
+        float size;
+        float box;
+        float spin;
     }
 
     public AibArrowRenderer(EntityRendererFactory.Context context) {
@@ -42,20 +50,47 @@ public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, A
         super.updateRenderState(entity, state, tickDelta);
         GearModelRenderer.Model bow = GearModelRenderer.modelFor(entity.bow());
         state.arrow = bow == null ? null : bow.arrow();
+        Spark.Shot shot = entity.shot();
+        state.facing = shot == null ? "flight" : shot.facing;
+        state.size = shot == null ? 0 : (float) shot.size;
+        state.box = shot == null || shot.size <= 0 ? 0 : (float) shot.hitbox();
+        if (entity.isFlying()) {
+            entity.spin = (entity.age + tickDelta) * SPIN; // it stops turning where it sticks
+        }
+        state.spin = entity.spin;
     }
 
     @Override
     public void render(State state, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
-        if (state.arrow == null || state.arrow.parts().isEmpty()) {
+        boolean shape = state.arrow != null && !state.arrow.parts().isEmpty();
+        float length = shape ? state.arrow.reach() : 0.5F;
+        float k = state.size > 0 && length > 0.05F ? state.size / length : 1;
+        matrices.push();
+        // A bigger shot has a bigger box: draw it round the box's middle.
+        matrices.translate(0, state.box / 2, 0);
+        if (!shape) {
+            matrices.scale(k, k, k);
             super.render(state, matrices, vertexConsumers, light);
+            matrices.pop();
             return;
         }
-        matrices.push();
         // Same turn as a vanilla arrow (which lies along +X, pointing where it flies); the AI's arrow points up (+Y).
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(state.yaw - 90.0F));
-        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(state.pitch));
-        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-90.0F));
-        matrices.translate(0, -state.arrow.reach() * 0.6F, 0);
+        switch (state.facing) {
+            case "fixed" -> {
+                // Upright as designed, only turned to face the way it goes.
+            }
+            case "spin" -> {
+                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-state.spin));
+                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-90.0F));
+            }
+            default -> {
+                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(state.pitch));
+                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-90.0F));
+            }
+        }
+        matrices.scale(k, k, k);
+        matrices.translate(0, -length * ("flight".equals(state.facing) ? 0.6F : 0.5F), 0);
         GearModelRenderer.draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), state.arrow, light,
             OverlayTexture.DEFAULT_UV);
         matrices.pop();

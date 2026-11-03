@@ -341,6 +341,26 @@ public class AibClientGameTest implements FabricClientGameTest {
                 com.example.client.SparkRenderer.clearForTests();
                 client.options.setPerspective(net.minecraft.client.option.Perspective.FIRST_PERSON);
             });
+            // A lightning bolt striking ahead (the 'lightning' preset's bolt) and a bow's beam shot reaching past it.
+            context.runOnClient(client -> {
+                var p = client.player;
+                var look = p.getRotationVec(1.0F);
+                var flat = new net.minecraft.util.math.Vec3d(look.x, 0, look.z).normalize();
+                var side = new net.minecraft.util.math.Vec3d(-flat.z, 0, flat.x);
+                var bolt = com.example.ai.build.Spark.fromMap(java.util.Map.of("form", "bolt", "colors", List.of("#ffffff", "#a0d0ff"),
+                    "size", 1.0, "width", 0.3, "ticks", 60));
+                com.example.client.SparkRenderer.play("[" + bolt.toJson() + "]", p.getPos().add(flat.multiply(7)).add(side.multiply(-1.5)), flat, 1);
+                var shot = com.example.ai.build.Spark.Shot.fromMap(java.util.Map.of("kind", "beam", "color", "#ff4040", "color2", "#ffc0c0",
+                    "width", 0.25, "ticks", 20));
+                var from = p.getEyePos().add(0, -0.18, 0).add(flat.multiply(0.6));
+                var to = p.getPos().add(flat.multiply(14)).add(side.multiply(2)).add(0, 1, 0);
+                var beam = com.example.ai.build.GearEffects.beamSpark(shot, from.distanceTo(to));
+                beam.ticks = 60;
+                com.example.client.SparkRenderer.play("[" + beam.toJson() + "]", from, to.subtract(from), 1);
+            });
+            context.waitTicks(6);
+            context.takeScreenshot("34d_lightning_bolt_and_beam");
+            context.runOnClient(client -> com.example.client.SparkRenderer.clearForTests());
             // A ready-made layered effect played as a preview (the 보관함's "이펙트 보기"): holy light and a flame aura.
             context.runOnClient(client -> {
                 var fx = new com.example.ai.build.Spark.Effects();

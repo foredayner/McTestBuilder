@@ -493,9 +493,23 @@ public final class SparkRenderer {
                 int argb = argb(alpha, rgb);
                 quadUv(b, cam, p0, p1, p2, p3, 3, 0, 1, 1, 0, argb, argb, argb, argb);
             }
-            case "pillar", "beam" -> {
-                // A column of light up from the ground, or a ray ahead; it shoots out quickly.
-                Vec3d axis = "pillar".equals(s.form) ? new Vec3d(0, 1, 0) : ax.d();
+            case "beam" -> {
+                if (s.reach > 0) {
+                    // A bow's beam shot: from the bow to where it stopped, there at once, then fading.
+                    Vec3d end = c.add(ax.d().multiply(s.reach));
+                    double half = s.width * 0.5;
+                    beam(b, cam, c, end, half, half, argb(alpha * 0.55F, rgb), argb(alpha * 0.55F, rgb));
+                    beam(b, cam, c, end, half * 0.35, half * 0.35, argb(alpha, 0xFFFFFF), argb(alpha, 0xFFFFFF));
+                } else {
+                    double length = size * 4 * Math.min(1, t * 5 + (loops ? 1 : 0));
+                    double half = size * s.width * 0.6;
+                    beam(b, cam, c, c.add(ax.d().multiply(length)), half, half * 0.6, argb(alpha, rgb), argb(alpha * 0.25F, rgb));
+                }
+            }
+            case "bolt" -> bolt(b, cam, e, c, size, t, seconds, alpha, rgb);
+            case "pillar" -> {
+                // A column of light up from the ground; it shoots up quickly.
+                Vec3d axis = new Vec3d(0, 1, 0);
                 double length = size * 4 * Math.min(1, t * 5 + (loops ? 1 : 0));
                 Vec3d end = c.add(axis.multiply(length));
                 double half = size * s.width * 0.6;
@@ -527,6 +541,61 @@ public final class SparkRenderer {
         Vec3d outer = c.add(u.multiply(cos * size)).add(v.multiply(sin * size));
         Vec3d inner = c.add(u.multiply(cos * size * (1 - thick))).add(v.multiply(sin * size * (1 - thick)));
         return new Vec3d[] { outer, inner };
+    }
+
+    /**
+     * Lightning: a jagged line from high in the sky down to the point, with a few forks, redrawn in
+     * a new zigzag every couple of ticks, flickering, and a flash where it strikes.
+     */
+    private static void bolt(VertexConsumer b, Vec3d cam, Effect e, Vec3d hit, double size, double t, double seconds, float alpha, int rgb) {
+        Spark s = e.spark;
+        int frame = (int) Math.floor(seconds * 10); // a new zigzag every 2 ticks
+        int seed = (int) (e.start * 31) ^ (int) Math.floor(hit.x * 7) ^ (int) Math.floor(hit.z * 13) * 17;
+        // Strobing: bright, dim, bright, as real strikes do.
+        float strobe = (frame % 3 == 1) ? 0.35F : 1.0F;
+        float a = alpha * strobe;
+        double height = 14 + size * 10;
+        double spread = 0.6 + size * 1.2;
+        double half = Math.max(0.04, s.width * size * 0.35);
+        int segments = 14;
+        Vec3d[] main = new Vec3d[segments + 1];
+        for (int i = 0; i <= segments; i++) {
+            double f = (double) i / segments; // 0 = sky, 1 = the point
+            double jx = i == segments ? 0 : (rand(i, seed + frame * 101) - 0.5) * spread * (1 - f * 0.7);
+            double jz = i == segments ? 0 : (rand(i, seed + frame * 101 + 7) - 0.5) * spread * (1 - f * 0.7);
+            main[i] = hit.add(jx, height * (1 - f), jz);
+        }
+        // The bolt grows down from the sky in the first moment.
+        int shown = (int) Math.ceil(segments * Math.min(1, t * 6));
+        for (int i = 0; i < shown; i++) {
+            beam(b, cam, main[i], main[i + 1], half * 2.2, half * 2.2, argb(a * 0.45F, rgb), argb(a * 0.45F, rgb));
+            beam(b, cam, main[i], main[i + 1], half * 0.6, half * 0.6, argb(a, 0xFFFFFF), argb(a, 0xFFFFFF));
+        }
+        // Forks: from a few points of the main line, shorter crooked lines going down and out.
+        for (int f = 0; f < 3; f++) {
+            int from = 2 + (int) (rand(f, seed + 3) * (segments - 6));
+            if (from >= shown) {
+                continue;
+            }
+            Vec3d p = main[from];
+            double ang = rand(f, seed + 5) * Math.PI * 2;
+            Vec3d out = new Vec3d(Math.cos(ang), 0, Math.sin(ang));
+            for (int k = 0; k < 4; k++) {
+                Vec3d q = p.add(out.multiply(spread * 0.5)).add((rand(k, seed + f * 13 + frame) - 0.5) * spread * 0.4, -height / segments * 1.2,
+                    (rand(k, seed + f * 17 + frame) - 0.5) * spread * 0.4);
+                float fade = a * (1 - k / 4F);
+                beam(b, cam, p, q, half * 1.4 * (1 - k / 5.0), half * 1.4 * (1 - (k + 1) / 5.0), argb(fade * 0.4F, rgb), argb(fade * 0.3F, rgb));
+                beam(b, cam, p, q, half * 0.4, half * 0.3, argb(fade, 0xFFFFFF), argb(fade * 0.8F, 0xFFFFFF));
+                p = q;
+            }
+        }
+        // The flash where it strikes: a bright disc on the ground that dies quickly.
+        if (shown >= segments) {
+            float flash = alpha * (float) Math.max(0, 1 - t * 2.5);
+            Vec3d x = new Vec3d(1, 0, 0), z = new Vec3d(0, 0, 1);
+            ring(b, cam, hit.add(0, 0.05, 0), x, z, 0, 0.6 + size * 1.6, 1, rgb, flash);
+            beam(b, cam, hit, hit.add(0, 0.8 + size, 0), 0.5 + size, 0.1, argb(flash, 0xFFFFFF), argb(0, 0xFFFFFF));
+        }
     }
 
     /** A flat ring between two radii (texture across it: outer edge v = 0). */
@@ -945,6 +1014,11 @@ public final class SparkRenderer {
             // A ribbon or trail drawn once from the player to where the arrow would land.
             Effect e = new Effect(s, target, flat, 1, now + 10, null, "");
             add(e);
+        }
+        if (fx.shot != null && fx.shot.beam()) {
+            // The beam shot, from the bow to where the landing effects play.
+            Vec3d from = p.getEyePos().add(0, -0.18, 0).add(look.multiply(0.6));
+            add(new Effect(GearEffects.beamSpark(fx.shot, from.distanceTo(target)), from, target.subtract(from), 1, now + 10, null, ""));
         }
     }
 

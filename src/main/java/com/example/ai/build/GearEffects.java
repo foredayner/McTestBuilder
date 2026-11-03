@@ -127,8 +127,73 @@ public final class GearEffects {
                 default -> at;
             };
             send(world, o, dir, s, 1, PlayerLookup.around(world, at, 64));
+            if (s.lightning) {
+                strike(world, at);
+            }
         }
         return fx.attack.size();
+    }
+
+    /** A real lightning strike that only looks and sounds like one: no fire, no damage. */
+    public static void strike(ServerWorld world, Vec3d at) {
+        net.minecraft.entity.LightningEntity bolt = net.minecraft.entity.EntityType.LIGHTNING_BOLT.create(world,
+            net.minecraft.entity.SpawnReason.TRIGGERED);
+        if (bolt != null) {
+            bolt.setCosmetic(true);
+            bolt.refreshPositionAfterTeleport(at);
+            world.spawnEntity(bolt);
+        }
+    }
+
+    /** A shot that vanishes where it hits pops with a small burst in its colours. */
+    public static void vanish(ServerWorld world, Entity shot, Vec3d at, Spark.Shot settings) {
+        send(world, at, shot.getVelocity().lengthSquared() < 1e-6 ? new Vec3d(0, 0, 1) : shot.getVelocity().normalize(),
+            vanishBurst(settings), 1, PlayerLookup.around(world, at, 64));
+    }
+
+    public static Spark vanishBurst(Spark.Shot settings) {
+        Spark s = new Spark();
+        s.shape = "sphere";
+        s.look = "glow";
+        s.color = settings.color;
+        s.color2 = settings.color2;
+        s.size = Math.max(0.25, (settings.size > 0 ? settings.size : 0.6) * 0.5);
+        s.count = 28;
+        s.dot = 0.08;
+        s.start = "target";
+        s.moves = new ArrayList<>(List.of("scatter", "fade"));
+        s.speed = 2.5;
+        s.drag = 0.5;
+        s.vary = 0.4;
+        s.ticks = 10;
+        return s.clamped();
+    }
+
+    /** The light of a beam shot, from the bow to where it stopped, seen by everyone near either end. */
+    public static void beam(ServerWorld world, LivingEntity shooter, Vec3d from, Vec3d to, Spark.Shot settings) {
+        Vec3d d = to.subtract(from);
+        if (d.lengthSquared() < 1e-6) {
+            return;
+        }
+        List<ServerPlayerEntity> viewers = new ArrayList<>(PlayerLookup.around(world, from, 96));
+        for (ServerPlayerEntity p : PlayerLookup.around(world, to, 64)) {
+            if (!viewers.contains(p)) {
+                viewers.add(p);
+            }
+        }
+        send(world, from, d.normalize(), beamSpark(settings, d.length()), 1, viewers);
+    }
+
+    public static Spark beamSpark(Spark.Shot settings, double length) {
+        Spark s = new Spark();
+        s.form = "beam";
+        s.color = settings.color;
+        s.color2 = settings.color2;
+        s.width = settings.width;
+        s.ticks = settings.ticks;
+        s.reach = length;
+        s.moves = new ArrayList<>(List.of("fade"));
+        return s.clamped();
     }
 
     /** Where each effect starts: at the weapon, on the target, on the ground under it, above it, or on the wielder. */
@@ -157,6 +222,9 @@ public final class GearEffects {
                 late.lead = lead;
             }
             send(world, o, look, late, scale, viewers);
+            if (s.lightning) {
+                strike(world, targetFeet);
+            }
         }
         return sparks.size();
     }

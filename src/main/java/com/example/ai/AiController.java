@@ -818,9 +818,11 @@ public class AiController {
         if (fxHit == null || fxHit.isBlank() || kind.worn()) {
             plan.fx.attack.clear();
             plan.fx.trail.clear();
+            plan.fx.shot = null;
         }
         if (kind != GearKind.BOW) {
             plan.fx.trail.clear();
+            plan.fx.shot = null;
         }
         if (fxIdle == null || fxIdle.isBlank()) {
             plan.fx.idle.clear();
@@ -836,7 +838,8 @@ public class AiController {
     public static String effectProblem(BuildPlan plan, GearKind kind, String fxHit, String fxIdle) {
         List<String> problems = new java.util.ArrayList<>();
         Spark.Effects fx = plan.fx == null ? new Spark.Effects() : plan.fx;
-        if (kind == GearKind.BOW && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty() && fx.trail.isEmpty()) {
+        if (kind == GearKind.BOW && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty() && fx.trail.isEmpty()
+            && (fx.shot == null || !fx.shot.beam())) {
             problems.add("the order asks for an arrow effect (\"" + fxHit.trim() + "\") but the script makes none: "
                 + "call ai.effect('trail', [...]) for the flight and/or ai.effect('attack', [...]) for where it lands.");
         } else if (kind != GearKind.BOW && !kind.worn() && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty()) {
@@ -849,6 +852,28 @@ public class AiController {
         }
         return problems.isEmpty() ? null : PLAN_PROBLEMS + "\n- " + String.join("\n- ", problems);
     }
+
+    /** Bows: what is shot (Spark.Shot), from the order's arrow line. */
+    static final String SHOT_API = """
+            WHAT THE BOW SHOOTS (bows only; decide it from the order's arrow line, leave it out for a plain arrow):
+              ai.shot([settings])
+                kind: 'arrow' (something flies: the shape between ai.arrowStart()/arrowEnd(), which may be ANYTHING the
+                      order says - a bubble, a fireball, a shuriken, a fish - not only an arrow) or
+                      'beam' (nothing flies: a ray of light reaches the target at once, up to 64 blocks, and stops at the
+                      first mob or block; it hits like a fully drawn arrow; use it for lasers, rays, beams, light shots)
+                facing: 'flight' (points where it flies, like an arrow; the default), 'spin' (tumbles: shurikens,
+                        axes, stars), 'fixed' (keeps upright: balls, bubbles, orbs, fireballs)
+                hit: 'stick' (stays where it hits, like an arrow; the default) or 'vanish' (pops with a small burst:
+                     bubbles, fireballs, magic bolts, bullets)
+                gravity: true (falls in an arc, the default) or false (flies straight: magic, lasers, bullets)
+                size: drawn length in blocks, 0.25-2 (a head-sized bubble 0.6-0.8, a huge fireball 1.5); leave it
+                      out to draw the shape as designed. Bigger shots also hit a little easier.
+                color, color2, width (0.05-1), ticks (4-20, how long the beam shows): the beam, or the vanish burst
+              The arrow line's look (trail, landing effects) still comes from ai.effect('trail'/'attack').
+              e.g. a laser gun: ai.shot([kind: 'beam', color: '#ff4040', color2: '#ffc0c0', width: 0.15, ticks: 6])
+                   a bubble wand: ai.shot([facing: 'fixed', hit: 'vanish', gravity: false, size: 0.7, color: '#c0f0ff'])
+                   a shuriken: ai.shot([facing: 'spin', size: 0.5])
+            """;
 
     /** API and rules for effects, added to the equipment prompts. */
     static final String EFFECT_API = effectApi();
@@ -885,6 +910,12 @@ public class AiController {
                          'disc'      a glowing magic circle (plane 'flat' on the ground; moves ['spin'] to turn it)
                          'ribbon'    a band left behind along the path (bow 'trail', or 'idle' with moves ['orbit'];
                                      width; ticks = how long the band is)
+                         'bolt'      a jagged, branching LIGHTNING BOLT striking down from the sky onto the start, with
+                                     a flash where it hits; it flickers (attack with start 'target' or 'ground'; colors
+                                     e.g. ['#ffffff', '#a0d0ff']; size 0.4-1.5 = how thick and wide it branches; width;
+                                     ticks 6-12). For lightning, thunder and smiting use THIS, not a pillar or dots.
+                  lightning: true  (attack: also a real vanilla lightning strike there, harmless: no fire, no damage;
+                         only when the request wants real thunderbolts)
                          Smooth pieces take color/colors, size, plane, start/anchor, moves (expand, spin, fade, rise...)
                          and ticks; count, dot, look and particle are for dots. Combine a smooth piece with dots
                          (a swipe + sparks flying off it, a shockwave + dust, a pillar + rising embers).
@@ -925,7 +956,7 @@ public class AiController {
             adjust it and/or add your own layer:
               ai.preset(when, name)   or   ai.preset(when, name, [colors: ['#rrggbb', ...], scale: 1.3, sound: '...', shake: 0.5])
                 colors: 1-4 colours replacing the preset's (keep their light-to-dark order); scale: size x0.3-3;
-                sound: another vanilla sound, or '' for none; shake: 0-1
+                sound: another vanilla sound, or '' for none; shake: 0-1; lightning: true (attack: a real harmless strike too)
             %PRESETS%            e.g. ai.preset('attack', 'frost', [colors: ['#ffffff', '#ffb0f0', '#c040c0'], scale: 1.2])  // pink ice
                  ai.preset('idle', 'flame_aura')
                  ai.effect('attack', [shape: 'star', look: 'star', color: '#ffe080', size: 0.6, count: 12, start: 'target',
@@ -989,7 +1020,8 @@ public class AiController {
         String hitLine = kind == GearKind.BOW ? "\nArrow effect (trail in flight and/or where it lands): " : "\nEffect on attack (swing): ";
         String effects = hitLine + hit + "\nEffect while " + (kind.worn() ? "worn" : "held")
             + " (particles, movement, glow): " + blankToNone(fxIdle);
-        return new AiPrompt(base.system() + "\n" + EFFECT_API, base.user().replace("\nWrite the Groovy script", effects + "\nWrite the Groovy script"));
+        String system = base.system() + "\n" + EFFECT_API + (kind == GearKind.BOW ? "\n" + SHOT_API : "");
+        return new AiPrompt(system, base.user().replace("\nWrite the Groovy script", effects + "\nWrite the Groovy script"));
     }
 
     private static String blankToNone(String text) {
