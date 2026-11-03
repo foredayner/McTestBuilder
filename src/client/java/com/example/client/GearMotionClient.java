@@ -136,13 +136,13 @@ public final class GearMotionClient {
     // Poses also turn the whole item round the view's axes at the hand: {.., view roll (in the picture, + turns the
     // tip toward the left), view pitch (+ tips it back toward the eye, - forward and down)}.
     // Slash: the blade turned level (tip to the left) and swept from the right of the view across to the left.
-    private static final Key[] FP_SLASH = motion(p(0.32F, 0.02F, 0.05F, 0, 0, 0, 48, 0), p(-0.2F, 0.0F, -0.05F, 0, 0, 0, 45, -10),
-        p(-0.4F, -0.03F, 0.0F, 0, 0, 0, 52, -16), null);
+    private static final Key[] FP_SLASH = motion(p(0.34F, 0.06F, 0.05F, 0, 0, 0, 82, -10), p(-0.22F, 0.04F, -0.08F, 0, 0, 0, 86, -18),
+        p(-0.42F, 0.02F, -0.02F, 0, 0, 0, 90, -22), null);
     // Smash: the arm alone brings the weapon down from overhead (tipped back) to the front (tipped forward and down).
-    private static final Key[] FP_SMASH = motion(p(0.02F, 0.2F, 0.08F, 0, 0, 0, 0, 42), p(-0.02F, -0.12F, -0.15F, 0, 0, 0, 0, -70),
+    private static final Key[] FP_SMASH = motion(p(0.02F, 0.26F, 0.06F, 0, 0, 0, 0, 18), p(-0.02F, -0.1F, -0.15F, 0, 0, 0, 0, -70),
         p(-0.03F, -0.18F, -0.1F, 0, 0, 0, 0, -95), null);
     // Thrust: the arm drops back and low (tip back), then drives forward and up (tip ahead).
-    private static final Key[] FP_THRUST = motion(p(0.1F, -0.28F, 0.15F, 0, 0, 0, -15, 25), p(-0.04F, 0.06F, -0.5F, 0, 0, 0, 30, -75),
+    private static final Key[] FP_THRUST = motion(p(0.1F, -0.3F, 0.15F, 0, 0, 0, -10, 15), p(-0.04F, 0.06F, -0.5F, 0, 0, 0, 30, -80),
         p(-0.05F, 0.1F, -0.58F, 0, 0, 0, 30, -85), null);
     private static final Key[] FP_SPIN = motion(p(0.2F, 0.05F, 0.0F, 50, -35, -55, 0, 0), p(-0.1F, 0.04F, -0.12F, -240, -35, -55, 0, 0),
         p(-0.12F, 0.0F, -0.08F, -330, -30, -50, 0, 0), p(0, 0, 0, -360, 0, 0, 0, 0));
