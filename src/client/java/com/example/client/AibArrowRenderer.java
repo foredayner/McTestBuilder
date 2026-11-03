@@ -34,6 +34,11 @@ public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, A
         /** A letter shot (the bow's shot text), or null. */
         String letter;
         int color;
+        int color2 = -1;
+        int axes;
+        String model = "";
+        float tilt;
+        float thickness;
     }
 
     private final TextRenderer font;
@@ -62,6 +67,11 @@ public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, A
         int[] letters = shot == null ? new int[0] : shot.letters();
         state.letter = letters.length == 0 ? null : new String(Character.toChars(letters[Math.floorMod(entity.variant(), letters.length)]));
         state.color = shot == null ? 0xFFFFFF : shot.color;
+        state.color2 = shot == null ? -1 : shot.color2;
+        state.axes = entity.axes();
+        state.model = shot == null ? "" : shot.model;
+        state.tilt = shot == null ? 0 : (float) shot.tilt;
+        state.thickness = shot == null ? 0.06F : (float) shot.thickness;
         state.facing = shot == null ? "flight" : shot.facing;
         state.size = shot == null ? 0 : (float) shot.size;
         state.box = shot == null || shot.size <= 0 ? 0 : (float) shot.hitbox();
@@ -77,12 +87,18 @@ public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, A
             renderLetter(state, matrices, vertexConsumers);
             return;
         }
-        boolean shape = state.arrow != null && !state.arrow.parts().isEmpty();
-        float length = shape ? state.arrow.reach() : 0.5F;
+        boolean builtIn = !state.model.isEmpty();
+        boolean shape = builtIn || state.arrow != null && !state.arrow.parts().isEmpty();
+        float length = builtIn ? 1 : shape ? state.arrow.reach() : 0.5F;
         float k = state.size > 0 && length > 0.05F ? state.size / length : 1;
         matrices.push();
         // A bigger shot has a bigger box: draw it round the box's middle.
         matrices.translate(0, state.box / 2, 0);
+        if (shape && (builtIn || state.axes >= 2)) {
+            renderFlat(state, matrices, vertexConsumers, light, builtIn, length, k);
+            matrices.pop();
+            return;
+        }
         if (!shape) {
             matrices.scale(k, k, k);
             super.render(state, matrices, vertexConsumers, light);
@@ -109,6 +125,40 @@ public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, A
         GearModelRenderer.draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), state.arrow, light,
             OverlayTexture.DEFAULT_UV);
         matrices.pop();
+    }
+
+    /**
+     * Designs made since flat shapes fly flat: the shape's y points where it flies, its x stays side
+     * to side and its z up, so a crescent wave or a shuriken made lying flat flies flat (tilt turns it
+     * round its flight). spin = turning flat like a shuriken, tumble = end over end, roll = round its
+     * flight, fixed = level, flight = along its flight.
+     */
+    private void renderFlat(State state, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, boolean builtIn,
+                            float length, float k) {
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(state.yaw - 90.0F));
+        switch (state.facing) {
+            case "spin" -> matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-state.spin));
+            case "tumble" -> matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-state.spin));
+            case "fixed" -> {
+            }
+            default -> matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(state.pitch));
+        }
+        // The shape's y along +x (where it flies), its x to the side, its z up.
+        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-90.0F));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90.0F));
+        float roll = state.tilt + ("roll".equals(state.facing) ? state.spin : 0);
+        if (roll != 0) {
+            matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(roll));
+        }
+        if (builtIn) {
+            ProjectileShapes.draw(matrices, vertexConsumers, state.model, state.size > 0 ? state.size : 0.8F, state.color, state.color2,
+                state.thickness);
+            return;
+        }
+        matrices.scale(k, k, k);
+        matrices.translate(0, -length * ("flight".equals(state.facing) || "roll".equals(state.facing) ? 0.6F : 0.5F), 0);
+        GearModelRenderer.draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), state.arrow, light,
+            OverlayTexture.DEFAULT_UV);
     }
 
     /**

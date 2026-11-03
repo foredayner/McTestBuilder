@@ -52,6 +52,9 @@ public class MinecraftAI {
      */
     public static void startRecording(BuildPlan plan, boolean fine) {
         recorder = plan;
+        if (plan.fx != null) {
+            plan.fx.axes = 2; // new designs: projectile shapes keep their x side to side
+        }
         canvas = new ShapeCanvas(fine);
         mirrorX = null;
         group = 0;

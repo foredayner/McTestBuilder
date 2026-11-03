@@ -94,6 +94,18 @@ public final class BuildHistory {
         }
     }
 
+    /** 전체 삭제: these designs here, and every one of this kind in the world (everyone's). */
+    public static void deleteAll(List<BuildRecord> records, String kind) {
+        for (BuildRecord r : records) {
+            removeHere(r.id);
+        }
+        if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(
+            com.example.network.AiNetworkPayloads.HistoryDeleteAllC2SPayload.ID)) {
+            net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+                new com.example.network.AiNetworkPayloads.HistoryDeleteAllC2SPayload(kind));
+        }
+    }
+
     /** Drop a design from this game (the file and the shared copy). */
     public static synchronized void removeHere(String id) {
         if (id == null || !id.matches("[0-9a-z_]{1,40}")) {

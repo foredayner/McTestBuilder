@@ -179,7 +179,9 @@ public class AibArrowEntity extends PersistentProjectileEntity {
         Motion m = motion();
         if (b != shotOf) {
             shotOf = b;
-            shot = b.isEmpty() ? null : GearEffects.of(b).shot;
+            Spark.Effects fx = b.isEmpty() ? null : GearEffects.of(b);
+            shot = fx == null ? null : fx.shot;
+            axes = fx == null ? 0 : fx.axes;
             sizedShot = null;
         }
         if (shot != null && m != null && m.size > 0) {
@@ -194,6 +196,13 @@ public class AibArrowEntity extends PersistentProjectileEntity {
     }
 
     private Spark.Shot sizedShot;
+    private int axes;
+
+    /** How its shape is turned (Spark.Effects.axes): 0 for designs made before flat shapes flew flat. */
+    public int axes() {
+        shot();
+        return axes;
+    }
 
     /** Steer an extra along its path (before it moves this tick). */
     private void steer(Motion m) {

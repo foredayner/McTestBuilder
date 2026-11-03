@@ -238,6 +238,33 @@ public class AibClientGameTest implements FabricClientGameTest {
             });
             context.waitTicks(5);
             context.takeScreenshot("20s_letter_arrows");
+            // Shapes drawn by the mod, flying flat: a horizontal sword wave, an upright one, and a shuriken turning flat.
+            game.getServer().runOnServer(server -> {
+                ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
+                var world = p.getServerWorld();
+                String[] shots = {
+                    "ai.shot([model: 'crescent', size: 1.6, gravity: false, color: '#60c8ff', color2: '#ffffff'])",
+                    "ai.shot([model: 'crescent', tilt: 90, size: 1.4, gravity: false, color: '#ff7040', color2: '#ffe0a0'])",
+                    "ai.shot([model: 'shuriken', facing: 'spin', size: 0.7, thickness: 0.05, gravity: false, color: '#c8ccd4'])" };
+                var look = p.getRotationVec(1.0F);
+                var flat = new net.minecraft.util.math.Vec3d(look.x, 0, look.z).normalize();
+                var side = new net.minecraft.util.math.Vec3d(-flat.z, 0, flat.x);
+                for (int i = 0; i < shots.length; i++) {
+                    BuildRecord r = BuildRecord.create("투사체 " + i, "TEST", "script", Demo.plan(world, p.getBlockPos(), p,
+                        com.example.gametest.Demo.BOW + shots[i] + "\n", true));
+                    r.kind = "gear";
+                    r.gear = "bow";
+                    net.minecraft.item.ItemStack bow = com.example.ai.build.GearItems.stackFor(r);
+                    var arrow = (com.example.content.AibArrowEntity) ((com.example.content.GearBowItem) bow.getItem())
+                        .createArrowEntity(world, p, bow, new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), false);
+                    var at = p.getEyePos().add(flat.multiply(3.2)).add(side.multiply((i - 1) * 1.6)).add(0, -0.7, 0);
+                    arrow.refreshPositionAndAngles(at.x, at.y, at.z, p.getYaw(), 0);
+                    arrow.setVelocity(flat.multiply(0.001));
+                    world.spawnEntity(arrow);
+                }
+            });
+            context.waitTicks(5);
+            context.takeScreenshot("20t_projectile_shapes");
             game.getServer().runOnServer(server -> {
                 var world = server.getPlayerManager().getPlayerList().get(0).getServerWorld();
                 java.util.List<net.minecraft.entity.Entity> arrows = new java.util.ArrayList<>();
@@ -250,7 +277,7 @@ public class AibClientGameTest implements FabricClientGameTest {
             });
 
             // Swords ordered with attack motions, frozen at the wind-up and at the strike, in third and first person.
-            for (String motion : List.of("thrust", "slash", "smash")) {
+            for (String motion : List.of("thrust", "slash", "smash", "spin")) {
                 game.getServer().runOnServer(server -> {
                     ServerPlayerEntity p = server.getPlayerManager().getPlayerList().get(0);
                     BuildRecord r = BuildRecord.fromJson(gear.get(0));
@@ -258,8 +285,8 @@ public class AibClientGameTest implements FabricClientGameTest {
                     p.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, com.example.ai.build.GearItems.stackFor(r));
                 });
                 context.waitTicks(motion.equals("thrust") ? 40 : 5);
-                for (float[] at : new float[][] { { 0.25F }, { 0.5F } }) {
-                    String phase = at[0] < 0.3F ? "wind" : "strike";
+                for (float[] at : new float[][] { { 0.28F }, { 0.42F }, { 0.56F } }) {
+                    String phase = at[0] < 0.3F ? "wind" : at[0] < 0.5F ? "strike" : "follow";
                     context.runOnClient(client -> {
                         com.example.client.GearMotionClient.forceProgress = at[0];
                         client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_FRONT);

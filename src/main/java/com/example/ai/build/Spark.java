@@ -128,6 +128,11 @@ public final class Spark {
         public List<Spark> trail = new ArrayList<>();
         /** Bows: what the shot is (an arrow-like thing that flies, or a beam). Null = a normal arrow. */
         public Shot shot;
+        /**
+         * How projectile shapes are turned: 0 = as made before (the shape's x became up and down in
+         * flight), 2 = its x stays side to side and its z up (flat shapes fly flat). New designs are 2.
+         */
+        public int axes;
 
         public boolean isEmpty() {
             return attack.isEmpty() && idle.isEmpty() && trail.isEmpty() && shot == null;
@@ -380,7 +385,10 @@ public final class Spark {
      */
     public static final class Shot {
         public static final List<String> KINDS = List.of("arrow", "beam");
-        public static final List<String> FACINGS = List.of("flight", "spin", "fixed");
+        /** flight: along its flight; spin: turning flat like a shuriken; tumble: end over end; roll: round its flight; fixed. */
+        public static final List<String> FACINGS = List.of("flight", "spin", "tumble", "roll", "fixed");
+        /** Shapes drawn by the mod (smooth and thin), instead of a modelled one. */
+        public static final List<String> MODELS = List.of("crescent", "shuriken", "disc", "ring", "star", "orb", "arrowhead", "feather");
         public static final List<String> HITS = List.of("stick", "vanish");
         public static final List<String> ORDERS = List.of("random", "cycle");
         public static final int MAX_TEXT = 64;
@@ -402,6 +410,12 @@ public final class Spark {
         public String text = "";
         /** With several arrow shapes or letters: 'random' or 'cycle' (in turn). */
         public String order = "random";
+        /** A shape drawn by the mod (MODELS), or "" for the modelled one. */
+        public String model = "";
+        /** Degrees the shape is turned round its flight: 0 = lying flat (a sideways wave), 90 = standing up. */
+        public double tilt = 0;
+        /** Built-in shapes: how thick (0.02-0.3 of its size). */
+        public double thickness = 0.06;
         /** More projectiles with each shot (or each swing of a melee weapon), each hurting half as much. */
         public List<Extra> extras = new ArrayList<>();
 
@@ -449,6 +463,9 @@ public final class Spark {
             ticks = (int) clamp(ticks, 4, 20);
             opacity = clamp(opacity, 0, 1);
             order = ORDERS.contains(order) ? order : "random";
+            model = model != null && MODELS.contains(model) ? model : "";
+            tilt = clamp(tilt, -90, 90);
+            thickness = clamp(thickness, 0.02, 0.3);
             if (text == null) {
                 text = "";
             }
@@ -494,6 +511,9 @@ public final class Spark {
                         case "opacity", "alpha" -> s.opacity = num(v, key);
                         case "text", "letters" -> s.text = String.valueOf(v);
                         case "order" -> s.order = word(v, ORDERS, "shot order");
+                        case "model", "shape" -> s.model = word(v, MODELS, "shot model");
+                        case "tilt" -> s.tilt = num(v, key);
+                        case "thickness" -> s.thickness = num(v, key);
                         case "extra", "extras" -> {
                             List<?> list = v instanceof List<?> l ? l : List.of(v);
                             if (!list.isEmpty() && !(list.get(0) instanceof Map<?, ?>)) {
@@ -507,7 +527,7 @@ public final class Spark {
                             }
                         }
                         default -> throw new IllegalArgumentException("unknown shot setting '" + key
-                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks, opacity, text, order, extra");
+                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks, opacity, text, order, extra, model, tilt, thickness");
                     }
                 }
             }

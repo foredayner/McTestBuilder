@@ -47,6 +47,8 @@ public final class AiNetworking {
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.HistoryS2CPayload.ID, AiNetworkPayloads.HistoryS2CPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.HistoryDeleteC2SPayload.ID, AiNetworkPayloads.HistoryDeleteC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.OrderC2SPayload.ID, AiNetworkPayloads.OrderC2SPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.HistoryDeleteAllC2SPayload.ID,
+            AiNetworkPayloads.HistoryDeleteAllC2SPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.JournalS2CPayload.ID, AiNetworkPayloads.JournalS2CPayload.CODEC);
     }
 
@@ -66,6 +68,22 @@ public final class AiNetworking {
                     for (ServerPlayerEntity p : context.server().getPlayerManager().getPlayerList()) {
                         if (ServerPlayNetworking.canSend(p, AiNetworkPayloads.HistoryS2CPayload.ID)) {
                             ServerPlayNetworking.send(p, new AiNetworkPayloads.HistoryS2CPayload(AiNetworkPayloads.HistoryS2CPayload.REMOVE, id));
+                        }
+                    }
+                }
+            });
+        });
+
+        // 전체 삭제: every kept design of one kind (one 보관함 tab), for everyone.
+        ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.HistoryDeleteAllC2SPayload.ID, (payload, context) -> {
+            context.server().execute(() -> {
+                if (allowed(context.player())) {
+                    for (String id : com.example.ai.build.SharedHistory.deleteAll(context.server(), payload.kind())) {
+                        byte[] bytes = id.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        for (ServerPlayerEntity p : context.server().getPlayerManager().getPlayerList()) {
+                            if (ServerPlayNetworking.canSend(p, AiNetworkPayloads.HistoryS2CPayload.ID)) {
+                                ServerPlayNetworking.send(p, new AiNetworkPayloads.HistoryS2CPayload(AiNetworkPayloads.HistoryS2CPayload.REMOVE, bytes));
+                            }
                         }
                     }
                 }

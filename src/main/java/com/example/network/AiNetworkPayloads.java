@@ -193,6 +193,19 @@ public final class AiNetworkPayloads {
     }
 
     /** Server -> client: the 작업 일지 changed (gzip'd JSON, see WorkJournal.Update). */
+    /** Client -> server: delete every kept design of one kind (build, object or gear), everyone's. */
+    public record HistoryDeleteAllC2SPayload(String kind) implements CustomPayload {
+        public static final CustomPayload.Id<HistoryDeleteAllC2SPayload> ID =
+            new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "history_delete_all"));
+        public static final PacketCodec<RegistryByteBuf, HistoryDeleteAllC2SPayload> CODEC =
+            PacketCodec.tuple(PacketCodecs.STRING, HistoryDeleteAllC2SPayload::kind, HistoryDeleteAllC2SPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     /** Client -> server: an order from the order screen (AiOrder, gzip JSON). */
     public record OrderC2SPayload(byte[] data) implements CustomPayload {
         public static final CustomPayload.Id<OrderC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "order"));

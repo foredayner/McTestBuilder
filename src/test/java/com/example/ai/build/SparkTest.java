@@ -119,6 +119,18 @@ class SparkTest {
     }
 
     @Test
+    void builtInShapesTurnsAndTilt() {
+        Spark.Shot s = Spark.Shot.fromMap(Map.of("model", "crescent", "facing", "tumble", "tilt", 200, "thickness", 9));
+        assertEquals("crescent", s.model);
+        assertEquals("tumble", s.facing);
+        assertEquals(90, s.tilt, 1e-9, "tilt is at most standing up");
+        assertEquals(0.3, s.thickness, 1e-9);
+        assertThrows(IllegalArgumentException.class, () -> Spark.Shot.fromMap(Map.of("model", "banana")));
+        assertEquals("", Spark.Effects.fromJson("{\"shot\":{\"model\":\"x\"}}").shot.model, "unknown models are dropped");
+        assertEquals(0, Spark.Effects.fromJson("{\"shot\":{}}").axes, "older designs keep the older turn");
+    }
+
+    @Test
     void lettersAndOrderOfShots() {
         Spark.Shot s = Spark.Shot.fromMap(Map.of("text", "A B\tC가♪", "order", "cycle"));
         assertArrayEquals(new int[] { 'A', 'B', 'C', '가', '♪' }, s.letters(), "one letter per shot, spaces skipped");

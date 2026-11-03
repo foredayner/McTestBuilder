@@ -906,6 +906,9 @@ public class AiController {
                 extras.size = plan.fx.shot.size;
                 extras.color = plan.fx.shot.color;
                 extras.color2 = plan.fx.shot.color2;
+                extras.model = plan.fx.shot.model;
+                extras.tilt = plan.fx.shot.tilt;
+                extras.thickness = plan.fx.shot.thickness;
                 plan.fx.shot = extras.hasExtras() ? extras.clamped() : null;
             }
             if (plan.fx.shot == null) {
@@ -927,7 +930,7 @@ public class AiController {
         List<String> problems = new java.util.ArrayList<>();
         Spark.Effects fx = plan.fx == null ? new Spark.Effects() : plan.fx;
         if (kind == GearKind.BOW && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty() && fx.trail.isEmpty()
-            && (fx.shot == null || !fx.shot.beam() && fx.shot.letters().length == 0) && plan.arrowShapes() == 0) {
+            && (fx.shot == null || !fx.shot.beam() && fx.shot.letters().length == 0 && fx.shot.model.isEmpty()) && plan.arrowShapes() == 0) {
             problems.add("the order asks for an arrow effect (\"" + fxHit.trim() + "\") but the script makes none: "
                 + "call ai.effect('trail', [...]) for the flight and/or ai.effect('attack', [...]) for where it lands.");
         } else if (kind != GearKind.BOW && !kind.worn() && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty()
@@ -950,8 +953,14 @@ public class AiController {
                       order says - a bubble, a fireball, a shuriken, a fish - not only an arrow) or
                       'beam' (nothing flies: a ray of light reaches the target at once, up to 64 blocks, and stops at the
                       first mob or block; it hits like a fully drawn arrow; use it for lasers, rays, beams, light shots)
-                facing: 'flight' (points where it flies, like an arrow; the default), 'spin' (tumbles: shurikens,
-                        axes, stars), 'fixed' (keeps upright: balls, bubbles, orbs, fireballs)
+                model: a SMOOTH SHAPE DRAWN BY THE MOD instead of a modelled one - USE IT for these (it looks far better
+                       than pieces): 'crescent' (a sword wave / 검기, 참격), 'shuriken' (수리검), 'disc', 'ring', 'star',
+                       'orb' (a glowing ball: magic bolt, fireball, bubble), 'arrowhead', 'feather'; with color (its
+                       edge), color2 (its glow), thickness (0.02-0.3, thin 0.04-0.08), size (blocks across)
+                facing: 'flight' (points where it flies, like an arrow; the default), 'spin' (turns FLAT like a thrown
+                        shuriken or disc), 'tumble' (end over end: thrown axes, hammers), 'roll' (turns round its
+                        flight like a drill or a spiralling bolt), 'fixed' (level, never turning: balls, bubbles, orbs)
+                tilt: degrees turned round its flight: 0 = lying flat (a horizontal wave, 가로), 90 = standing (세로)
                 hit: 'stick' (stays where it hits, like an arrow; the default) or 'vanish' (pops with a small burst:
                      bubbles, fireballs, magic bolts, bullets)
                 gravity: true (falls in an arc, the default) or false (flies straight: magic, lasers, bullets)
@@ -970,7 +979,10 @@ public class AiController {
               e.g. a laser gun: ai.shot([kind: 'beam', color: '#ff4040', color2: '#ffc0c0', width: 0.15, ticks: 6])
                    an invisible ray that strikes lightning: ai.shot([kind: 'beam', opacity: 0]) + ai.preset('attack', 'lightning')
                    a bubble wand: ai.shot([facing: 'fixed', hit: 'vanish', gravity: false, size: 0.7, color: '#c0f0ff'])
-                   a shuriken: ai.shot([facing: 'spin', size: 0.5])
+                   a shuriken: ai.shot([model: 'shuriken', facing: 'spin', size: 0.5, thickness: 0.05, color: '#c8ccd4'])
+                   a horizontal sword wave: ai.shot([model: 'crescent', facing: 'flight', size: 1.6, color: '#80d0ff',
+                                                     color2: '#ffffff', gravity: false, hit: 'vanish'])
+                   a vertical one: the same with tilt: 90
                    a keyboard shooting random letters: ai.shot([text: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', facing: 'fixed',
                                                                 gravity: false, hit: 'vanish', size: 0.7, color: '#80ffea'])
             """;
@@ -1003,8 +1015,10 @@ public class AiController {
             검기, 날아가는 참격, 마법탄, 불꽃 구슬...): ai.shot([extra: [[count: 1, path: 'trail']], facing: 'spin',
               hit: 'vanish', gravity: false, size: 0.8]) - the extras leave with the swing and pass the one it hits
               directly. Their shape: pieces between ai.arrowStart(n)/arrowEnd() (pointing up, +Y) or text: '...'.
-              For a sword wave: ai.shot([extra: [[count: 1, path: 'trail']], gravity: false, hit: 'vanish', size: 1.2])
-              with a crescent-shaped arrowStart(1) piece (flat, wide).
+              A sword wave (검기): ai.shot([extra: [[count: 1, path: 'trail']], model: 'crescent', gravity: false,
+                hit: 'vanish', size: 1.6, color: '#80d0ff', color2: '#ffffff'])  (tilt: 90 for an upright one)
+              Thrown shurikens in a fan: ai.shot([extra: [[count: 3, path: 'spread', angle: 20]], model: 'shuriken',
+                facing: 'spin', size: 0.5, thickness: 0.05, color: '#c8ccd4'])
             """;
 
     /** API and rules for effects, added to the equipment prompts. */

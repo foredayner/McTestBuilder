@@ -624,6 +624,33 @@ public class AibGameTests implements FabricGameTest {
         });
     }
 
+    /** A beam with three arrows curving in: they go over the top (never into the ground), all hurt, and none is left. */
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 120)
+    public void beamExtrasCurveInHurtAndVanish(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        net.minecraft.item.ItemStack bow = bowWith(context, player, origin,
+            "ai.shot([kind: 'beam', extra: [[count: 3, path: 'arc']]])\n");
+        var golem = context.spawnEntity(net.minecraft.entity.EntityType.IRON_GOLEM, new BlockPos(1, 1, 7));
+        golem.setAiDisabled(true);
+        com.example.ai.build.Spark.Shot shot = com.example.ai.build.GearEffects.of(bow).shot;
+        for (int i = 0; i < 3; i++) {
+            net.minecraft.util.math.Vec3d[] go = com.example.ai.build.ShotExtras.startForTests(shot.extras.get(0), i, net.minecraft.util.math.Vec3d.ZERO, new net.minecraft.util.math.Vec3d(0, 0, 1.5));
+            check(go[1].y >= -1e-6, "arc " + i + " leaves over the top or to the side, not down: " + go[1]);
+        }
+        com.example.content.GearBowItem.fireBeam(world, player, bow, new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW), 1.0F, shot);
+        context.waitAndRun(60, () -> {
+            float lost = golem.getMaxHealth() - golem.getHealth();
+            // The beam alone does 6-10; three extras at half add 9 more.
+            check(lost >= 13, "the extras hurt too, despite the hit just before (lost " + lost + ")");
+            long left = world.getEntitiesByClass(com.example.content.AibArrowEntity.class, new net.minecraft.util.math.Box(origin).expand(20),
+                com.example.content.AibArrowEntity::isExtra).size();
+            check(left == 0, "no extra is left stuck or hanging, got " + left);
+            context.complete();
+        });
+    }
+
     /** A bubble wand: a big shot that flies straight (no gravity) and pops where it hits. */
     @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 200)
     public void bowBubbleFliesStraightAndPops(TestContext context) {

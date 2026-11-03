@@ -180,6 +180,11 @@ public final class ShotExtras {
         };
     }
 
+    /** Tests: where extra i starts and how it moves at first. */
+    public static Vec3d[] startForTests(Spark.Extra e, int i, Vec3d from, Vec3d velocity) {
+        return start(e, i, from, velocity);
+    }
+
     /** Turn a direction round an axis (perpendicular to it) by an angle. */
     static Vec3d turn(Vec3d d, Vec3d axis, double angle) {
         Vec3d k = axis.normalize();

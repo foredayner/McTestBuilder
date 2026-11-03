@@ -54,8 +54,10 @@ public enum GearKind {
             + "projectile it shoots between "
             + "ai.arrowStart() and ai.arrowEnd(): the arrow points UP (+Y), fletching at y = 0 to 0.2, shaft up to the head "
             + "at y = 0.6-0.9, centred on x = z = 0, about 0.03-0.08 thick (without it, arrows look normal). The projectile may be "
-            + "anything the order says (a bubble, a fireball, a shuriken): model it about 0.3-0.9 big, its front up (+Y), and "
-            + "say how it flies with ai.shot. Several shapes shot by turns: ai.arrowStart(1) ... ai.arrowStart(8)."),
+            + "anything the order says: model it about 0.3-0.9 big, its FRONT UP (+Y = where it flies), x = side to side, "
+            + "z = up in flight (so a flat thing - a wave, a shuriken - lies in the x-y plane, thin in z); and say how it flies "
+            + "with ai.shot. For waves, shurikens, discs, stars, orbs use ai.shot model instead of pieces. Several shapes shot "
+            + "by turns: ai.arrowStart(1) ... ai.arrowStart(8)."),
 
     // Worn equipment: drawn on the wearer's head or torso and following its movement.
     HELMET("투구", Items.IRON_HELMET, Items.IRON_HELMET, EquipmentSlot.HEAD,

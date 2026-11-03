@@ -37,7 +37,7 @@ public final class GearEffects {
     }
 
     static void write(NbtCompound nbt, Spark.Effects fx) {
-        if (fx != null && !fx.isEmpty()) {
+        if (fx != null && (!fx.isEmpty() || fx.axes != 0)) {
             nbt.putString(KEY, fx.toJson());
         }
     }
@@ -95,8 +95,8 @@ public final class GearEffects {
      * finishes its strike at about the same point of its own clock.
      */
     public static int swingTicks(LivingEntity wielder, ItemStack stack) {
-        if (!com.example.content.GearMotions.of(stack).isEmpty()) {
-            return 6;
+        if (!com.example.content.GearMotions.of(stack).isEmpty() && stack.getItem() instanceof GearItem gear) {
+            return com.example.content.GearMotions.strikeTicks(gear.kind(), lengthOf(stack));
         }
         if (net.minecraft.entity.effect.StatusEffectUtil.hasHaste(wielder)) {
             return Math.max(1, 6 - (1 + net.minecraft.entity.effect.StatusEffectUtil.getHasteAmplifier(wielder)));
@@ -255,6 +255,22 @@ public final class GearEffects {
                 ServerPlayNetworking.send(p, payload);
             }
         }
+    }
+
+    /** How long a weapon is (blocks, its pieces from bottom to top, not counting projectile shapes). */
+    static double lengthOf(ItemStack stack) {
+        BuildPlan model = GearItems.modelOf(stack);
+        if (model == null || model.parts.isEmpty()) {
+            return 1.5;
+        }
+        double low = Double.MAX_VALUE, high = -Double.MAX_VALUE;
+        for (BuildPlan.Part p : model.parts) {
+            if (!BuildPlan.isArrow(p.group)) {
+                low = Math.min(low, p.y - p.sy / 2);
+                high = Math.max(high, p.y + p.sy / 2);
+            }
+        }
+        return high > low ? high - low : 1.5;
     }
 
     /** Big weapons get bigger effects: about the weapon's length over a normal sword's (1-2.5x). */

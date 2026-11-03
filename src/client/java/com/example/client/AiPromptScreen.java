@@ -84,6 +84,7 @@ public class AiPromptScreen extends Screen {
     private TextFieldWidget promptField;
     private String draftPrompt = "";
     private boolean confirmDelete = false;
+    private boolean confirmDeleteAll = false;
     private int x0;
     private int y0;
     private int w;
@@ -584,6 +585,7 @@ public class AiPromptScreen extends Screen {
                 int target = filters[i];
                 button(names[i], tx + i * 48, top(), 44, b -> {
                     filter = target;
+                    this.confirmDeleteAll = false;
                     listScroll = 0;
                     rebuild();
                 }).selected(filter == target);
@@ -599,6 +601,25 @@ public class AiPromptScreen extends Screen {
                 listScroll = 0;
                 rebuild();
             }).selected(filter == NEARBY);
+            List<BuildRecord> shown = filter == NEARBY ? List.of() : filtered();
+            if (!shown.isEmpty()) {
+                // 전체 삭제: everything on this tab (everyone's), after a second press.
+                String kind = filter == OBJECTS ? "object" : filter == GEAR ? "gear" : "build";
+                int dw = this.confirmDeleteAll ? 92 : 64;
+                this.addDrawableChild(new WoodButton(tx - 48 - 4 - dw, top(), dw, 18,
+                    Text.literal(this.confirmDeleteAll ? "정말 " + shown.size() + "개 삭제?" : "전체 삭제"), b -> {
+                        if (!this.confirmDeleteAll) {
+                            this.confirmDeleteAll = true;
+                            rebuild();
+                            return;
+                        }
+                        this.confirmDeleteAll = false;
+                        BuildHistory.deleteAll(shown, kind);
+                        AiClientState.addLog("[보관함] " + shown.size() + "개를 모두 삭제했어요.");
+                        listScroll = 0;
+                        rebuild();
+                    }, this.confirmDeleteAll));
+            }
             if (filter == NEARBY) {
                 // One "지우기" per visible row of placed objects.
                 List<com.example.ai.build.ObjectService.Nearby> list = AiClientState.getNearby();
@@ -614,8 +635,7 @@ public class AiPromptScreen extends Screen {
         }
         int y = bottom() - 18;
         boolean object = "object".equals(record.kind);
-        boolean previewable = "gear".equals(record.kind) && record.plan != null && record.plan.fx != null && !record.plan.fx.isEmpty();
-        int slots = object || previewable ? 4 : 3;
+        int slots = object ? 4 : 3;
         int quarter = (right() - left() - 4 * (slots - 1)) / slots;
         int scale = object ? SCALES[scaleIndex] : 100;
         String size = object ? " " + com.example.ai.build.RebuildService.scaleLabel(scale / 100.0) : "";
@@ -642,14 +662,6 @@ public class AiPromptScreen extends Screen {
         this.icons.add(new IconAt(new ItemStack(gear ? com.example.content.GearKind.of(record.gear).icon
             : object ? Items.ARMOR_STAND : Items.PAPER), x + 3, y + 1));
         x += quarter + 4;
-        if (previewable) {
-            // See its effects play here first (only this game sees them).
-            button("이펙트 보기", x, y, quarter, b -> {
-                SparkRenderer.preview(record.plan.fx, com.example.content.GearKind.of(record.gear).worn());
-                this.client.setScreen(null);
-            });
-            x += quarter + 4;
-        }
         this.addDrawableChild(new WoodButton(x, y, right() - x, 18,
             Text.literal(this.confirmDelete ? "정말 삭제?" : "삭제"), b -> {
                 if (!this.confirmDelete) {
@@ -699,7 +711,7 @@ public class AiPromptScreen extends Screen {
         }
         List<BuildRecord> records = filtered();
         String head = records.isEmpty() ? "만든 것을 꺼내 쓸 수 있어요" : "모두가 만든 것 " + records.size() + "개 · 눌러서 열기";
-        ctx.drawText(this.textRenderer, ellipsize(head, right() - left() - 200), left() + 2, top() + 5, INK_SOFT, false);
+        ctx.drawText(this.textRenderer, ellipsize(head, right() - left() - 300), left() + 2, top() + 5, INK_SOFT, false);
         int l = left(), r = right(), t = listTop(), b = bottom();
         inset(ctx, l, t, r, b, PARCHMENT_DEEP);
         if (records.isEmpty()) {

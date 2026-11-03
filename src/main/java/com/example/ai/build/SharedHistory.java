@@ -80,6 +80,18 @@ public final class SharedHistory {
         return "0".repeat(Math.max(0, 20 - id.length())) + id;
     }
 
+    /** Delete every kept design of a kind ("build", "object" or "gear"); returns their ids. */
+    public static synchronized List<String> deleteAll(MinecraftServer server, String kind) {
+        List<String> gone = new ArrayList<>();
+        for (BuildRecord r : list(server, Integer.MAX_VALUE)) {
+            String k = r.kind == null ? "build" : r.kind;
+            if (k.equals(kind) && delete(server, r.id)) {
+                gone.add(r.id);
+            }
+        }
+        return gone;
+    }
+
     /** One kept design, or null. */
     public static synchronized BuildRecord get(MinecraftServer server, String id) {
         if (server == null || !validId(id)) {
