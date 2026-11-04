@@ -83,14 +83,13 @@ public final class Preview3d {
     }
 
     /**
-     * Make the pictures this frame asked for, within its time (at least one); call once per frame
-     * after drawing. The rest are asked for again by the next frame if they are still on screen.
+     * Make the pictures the last frame asked for, within this frame's time (at least one); call at
+     * the start of each frame, before anything is drawn. The rest are asked for again if still on screen.
      */
     public static void work(DrawContext ctx) {
         if (QUEUE.isEmpty()) {
             return;
         }
-        ctx.draw(); // what the screen drew so far goes out before the off-screen picture
         long start = System.nanoTime();
         boolean first = true;
         while (!QUEUE.isEmpty() && (first || System.nanoTime() - start < FRAME_BUDGET_NS)) {

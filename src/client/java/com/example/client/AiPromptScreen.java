@@ -1344,6 +1344,8 @@ public class AiPromptScreen extends Screen {
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         layout();
+        // 3D pictures the last frame asked for are made first, before this frame draws anything.
+        Preview3d.work(ctx);
         this.hoveredRecord = null;
         this.hoveredPreset = null;
         this.modelBox = null;
@@ -1379,8 +1381,6 @@ public class AiPromptScreen extends Screen {
         if (this.hoveredRecord != null && page == Page.HISTORY) {
             renderRecordTooltip(ctx, this.hoveredRecord, this.hoverX, this.hoverY);
         }
-        // 3D pictures asked for this frame are made now (a few per frame), and show from the next one.
-        Preview3d.work(ctx);
         if (this.hoveredPreset != null && page == Page.CREATE) {
             String name = this.hoveredPreset.prompt;
             int tw = this.textRenderer.getWidth(name) + 8;
