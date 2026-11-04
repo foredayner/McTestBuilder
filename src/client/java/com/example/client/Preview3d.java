@@ -165,6 +165,11 @@ public final class Preview3d {
         net.minecraft.client.gl.Framebuffer main = client.framebuffer;
         // The game's render layers draw into "the main buffer": for this picture, that is ours.
         client.framebuffer = fb;
+        // A clipped part of the screen (a scrolling list) must not clip the picture.
+        boolean scissor = org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
+        int[] box = new int[4];
+        org.lwjgl.opengl.GL11.glGetIntegerv(org.lwjgl.opengl.GL11.GL_SCISSOR_BOX, box);
+        RenderSystem.disableScissor();
         try {
             fb.setClearColor(0, 0, 0, 0);
             fb.clear();
@@ -197,6 +202,9 @@ public final class Preview3d {
             client.framebuffer = main;
             fb.delete();
             main.beginWrite(true);
+            if (scissor) {
+                RenderSystem.enableScissor(box[0], box[1], box[2], box[3]);
+            }
         }
     }
 
