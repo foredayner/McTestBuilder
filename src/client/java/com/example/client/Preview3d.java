@@ -103,12 +103,17 @@ public final class Preview3d {
                 break;
             }
             first = false;
+            long t0 = System.nanoTime();
             try {
                 keep(p.key(), render(p.record().plan, p.px()));
+                debug("made " + p.key() + " in " + (System.nanoTime() - t0) / 1_000_000 + " ms");
             } catch (RuntimeException e) {
                 System.out.println("[ERROR] 3D picture of " + p.record().id + " failed: " + e.getMessage());
                 keep(p.key(), null);
             }
+        }
+        if (!QUEUE.isEmpty()) {
+            debug(QUEUE.size() + " left for the next frame");
         }
         // Left for the next frame to ask again (kept here only so tests can finish them).
         MISSED.clear();
@@ -118,6 +123,12 @@ public final class Preview3d {
     }
 
     private static final List<Pending> MISSED = new ArrayList<>();
+
+    private static void debug(String s) {
+        if (System.getProperty("fabric.client.gametest") != null || Boolean.getBoolean("aib.debug3d")) {
+            System.out.println("[3D] " + s);
+        }
+    }
 
     /** Forget a design's pictures (deleted or changed). */
     public static void forget(String recordId) {
@@ -375,6 +386,7 @@ public final class Preview3d {
 
     /** Tests: make every waiting picture now. */
     public static void finishForTests() {
+        debug("finishing " + MISSED.size() + " missed and " + QUEUE.size() + " queued");
         List<Pending> all = new ArrayList<>(MISSED);
         all.addAll(QUEUE);
         MISSED.clear();
