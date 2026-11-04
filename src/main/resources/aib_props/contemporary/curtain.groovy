@@ -7,10 +7,10 @@ def cloth = '#dccdb0'
 def fold = '#c2b291'
 def ridge = '#ebe1cb'
 // the rod with its brackets and end knobs
-ai.addCapsule('#4a3b2c', -1.04, 1.96, -0.1, 1.04, 1.96, -0.1, 0.022)
+ai.addCapsule('#4a3b2c', -0.96, 1.96, -0.1, 0.96, 1.96, -0.1, 0.022)
 ai.mirrorOn()
-ai.addPart('#4a3b2c', 0.88, 1.94, -0.1, 0.03, 0.03, 0.1)
-ai.addSphere('#4a3b2c', 1.05, 1.96, -0.1, 0.04)
+ai.addPart('#4a3b2c', 0.84, 1.94, -0.1, 0.03, 0.03, 0.1)
+ai.addSphere('#4a3b2c', 0.97, 1.96, -0.1, 0.035)
 // rings on the rod
 for (int i = 0; i < 6; i++) {
     ai.addPart('#4a3b2c', -0.95 + i * 0.17, 1.915, -0.125, 0.02, 0.07, 0.05)
