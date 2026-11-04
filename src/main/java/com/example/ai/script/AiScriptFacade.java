@@ -279,6 +279,46 @@ public final class AiScriptFacade {
         MinecraftAI.oversize();
     }
 
+    public void prop(String id, Number x, Number y, Number z, String facing) {
+        MinecraftAI.prop(id, x, y, z, facing);
+    }
+
+    public void roofGable(Number x, Number y, Number z, Number w, Number l, String material, String axis) {
+        MinecraftAI.roofGable(x, y, z, w, l, material, axis, null);
+    }
+
+    public void roofGable(Number x, Number y, Number z, Number w, Number l, String material, String axis, String gable) {
+        MinecraftAI.roofGable(x, y, z, w, l, material, axis, gable);
+    }
+
+    public void roofHip(Number x, Number y, Number z, Number w, Number l, String material) {
+        MinecraftAI.roofHip(x, y, z, w, l, material);
+    }
+
+    public void door(Number x, Number y, Number z, String facing) {
+        MinecraftAI.door(x, y, z, facing, "oak");
+    }
+
+    public void door(Number x, Number y, Number z, String facing, String material) {
+        MinecraftAI.door(x, y, z, facing, material);
+    }
+
+    public void window(Number x, Number y, Number z, Number w, Number h, String facing) {
+        MinecraftAI.window(x, y, z, w, h, facing, "spruce", null);
+    }
+
+    public void window(Number x, Number y, Number z, Number w, Number h, String facing, String frame) {
+        MinecraftAI.window(x, y, z, w, h, facing, frame, null);
+    }
+
+    public void window(Number x, Number y, Number z, Number w, Number h, String facing, String frame, String glass) {
+        MinecraftAI.window(x, y, z, w, h, facing, frame, glass);
+    }
+
+    public void wallMix(Number x, Number y, Number z, Number h, Number l, String direction, java.util.Map<?, ?> weights) {
+        MinecraftAI.wallMix(x, y, z, h, l, direction, weights);
+    }
+
     public void arrowStart() {
         MinecraftAI.arrowStart();
     }

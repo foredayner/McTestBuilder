@@ -1356,6 +1356,103 @@ public class AiController {
         return new AiPrompt(buildingSystem(false), userText);
     }
 
+    /** How to make a building look built, not boxed (the part of the building instructions about quality). */
+    static final String BUILDING_CRAFT = """
+            CRAFT (what makes a building look real; do all of it unless the request says otherwise):
+            - Palette of 3-4 materials: main wall, frame/trim (logs or a darker stone), roof, one accent. Mix the main wall
+              with ai.wallMix (2-3 related blocks, e.g. 60% stone_bricks, 25% cobblestone, 15% mossy_stone_bricks) instead of one flat block.
+            - Foundation: a plinth 1 block wider than the walls, of a darker or rougher stone, at the ground line.
+            - Frame: corner posts of logs or pillars, and a beam line along the top of each storey's walls, so the
+              structure shows on the outside. Where the style allows, posts stick out 1 block from the wall.
+            - Depth on every face: something comes out or goes in (porch or step at the door, bay or balcony, chimney,
+              awning, a deeper window). Never a flat box.
+            - Windows with ai.window (panes set in the wall, a sill and shutters outside); 2 high; at least one on each
+              outer wall of each room; line them up storey over storey.
+            - Doors with ai.door; a step, a small roof or awning, and a light beside the main door.
+            - A real roof: ai.roofGable or ai.roofHip with 1 block of overhang (a flat roof only for modern buildings,
+              then with a parapet and a top edge). Fill the gable ends; add a chimney on houses with a hearth or stove.
+            - Inside: floors, a ceiling under the roof, room walls with doorways, light in every room, furniture that fits each
+              room. In modern and contemporary buildings use the library props (ai.prop) for what blocks cannot show well.
+
+            """;
+
+    /** A small modern house using the helpers and props (in the prompt as a style reference, and built in the tests). */
+    public static final String EXAMPLE_HOUSE = """
+            // EXAMPLE (style reference; make your own design): a modern cottage 11 x 9, x -5..5, z 3..11, the player at the
+            // origin looking +Z; the front with the door faces the player (north, z = 3). Palette: mixed stone, spruce frame,
+            // dark oak roof, white accent.
+            def mix = ['stone_bricks': 60, 'cobblestone': 25, 'andesite': 15]
+            ai.clearArea(-6, 0, 2, 13, 10, 11)
+            ai.placeFloor(-6, -1, 2, 13, 11, 'polished_andesite')            // plinth, 1 wider than the walls
+            ai.placeFloor(-5, 0, 3, 11, 9, 'spruce_planks')                  // floor
+            ai.wallMix(-5, 1, 3, 4, 11, 'x', mix)                            // front
+            ai.wallMix(-5, 1, 11, 4, 11, 'x', mix)                           // back
+            ai.wallMix(-5, 1, 3, 4, 9, 'z', mix)                             // west
+            ai.wallMix(5, 1, 3, 4, 9, 'z', mix)                              // east
+            def corners = [[-5, 3], [5, 3], [-5, 11], [5, 11]]
+            for (int i = 0; i < 4; i++) {
+                ai.placePillar(corners[i][0], 0, corners[i][1], 5, 'stripped_spruce_log')   // corner posts
+            }
+            ai.placeWall(-5, 5, 3, 1, 11, 'x', 'spruce_log[axis=x]')         // beams on top of the walls
+            ai.placeWall(-5, 5, 11, 1, 11, 'x', 'spruce_log[axis=x]')
+            ai.placeWall(-5, 5, 4, 1, 7, 'z', 'spruce_log[axis=z]')
+            ai.placeWall(5, 5, 4, 1, 7, 'z', 'spruce_log[axis=z]')
+            ai.placeFloor(-4, 5, 4, 9, 7, 'spruce_planks')                   // ceiling
+            ai.placeWall(0, 1, 4, 4, 7, 'z', 'white_concrete')               // room wall: living room west, kitchen east
+            ai.placeBlock(0, 1, 9, 'air'); ai.placeBlock(0, 2, 9, 'air')     // doorway between them
+            ai.door(-2, 1, 3, 'north', 'spruce')                             // front door
+            ai.placeBlock(-2, 0, 2, 'spruce_stairs[facing=south]')           // step
+            ai.placePillar(-3, 0, 2, 3, 'spruce_fence'); ai.placeBlock(-3, 3, 2, 'lantern')
+            ai.window(-4, 2, 3, 1, 2, 'north', 'spruce')
+            ai.window(2, 2, 3, 2, 2, 'north', 'spruce')
+            ai.window(-5, 2, 6, 2, 2, 'west', 'spruce')
+            ai.window(5, 2, 6, 2, 2, 'east', 'spruce')
+            ai.window(-3, 2, 11, 2, 2, 'south', 'spruce')
+            ai.roofGable(-5, 6, 3, 11, 9, 'dark_oak', 'x', 'spruce_planks')  // roof, ridge along x, gable ends filled
+            ai.placePillar(3, 6, 9, 6, 'bricks')                             // chimney
+            // living room (west): sofa against the west wall facing the TV on the room wall, a lamp, curtains at the back window
+            ai.prop('sofa', -4, 1, 5, 'east')
+            ai.prop('wall_tv', -1, 1, 5, 'west')
+            ai.prop('floor_lamp', -4, 1, 10, 'north')
+            ai.prop('curtain', -3, 1, 10, 'north')
+            ai.prop('ceiling_light', -3, 4, 6, 'south')
+            // kitchen (east): fridge, a counter with a phone on it (the counter's top is y = 2), a clock on the room wall
+            ai.prop('fridge', 4, 1, 10, 'west')
+            ai.placeFloor(1, 1, 10, 2, 1, 'smooth_stone')
+            ai.prop('desk_phone', 2, 2, 10, 'north')
+            ai.prop('wall_clock', 1, 1, 6, 'east')
+            ai.prop('ceiling_light', 2, 4, 7, 'south')
+            """;
+
+    /** The building helpers, for the API list. */
+    static final String BUILDING_HELPERS = """
+            Building parts (they get stairs, doors and shutters the right way round):
+              ai.roofGable(x, y, z, width, length, material, ridgeAxis)          // stairs from both long sides up to a ridge along 'x' or 'z'
+              ai.roofGable(x, y, z, width, length, material, ridgeAxis, gableBlock) // ... and the two triangle ends filled with gableBlock
+              ai.roofHip(x, y, z, width, length, material)                       // stairs from all four sides
+                // (x, z, width, length) = the walls' outline; y = one above the walls' top; 1 block of overhang is added all round.
+                // material = a block that has stairs and slabs: 'spruce', 'dark_oak', 'stone_brick', 'deepslate_tile', 'brick', 'mud_brick'
+              ai.door(x, y, z, facing) | ai.door(x, y, z, facing, wood)            // a door in the wall block (x, y, z); facing = the way the outside looks
+              ai.window(x, y, z, width, height, facing) | ai.window(..., frameWood) | ai.window(..., frameWood, glassBlock)
+                // panes in the wall from (x, y, z) along the wall toward +x or +z; sill and open shutters on the outside (facing)
+              ai.wallMix(x, y, z, height, length, direction, ['stone_bricks': 60, 'cobblestone': 25, 'mossy_stone_bricks': 15])
+                // like placeWall, of several blocks mixed by weight
+            """;
+
+    /** The furniture library, for the API list. */
+    static String propsDoc() {
+        return "Ready-made furniture (modern and contemporary buildings only; never in old-period buildings):\n"
+            + "  ai.prop(id, x, y, z, facing)\n"
+            + "    // (x, y, z) = the air block it stands in, just above the floor; facing = the way its front looks (into the room).\n"
+            + "    // Its back lies against the far side of that block: put it in the block right in front of a wall, facing away from it.\n"
+            + "    // A prop N blocks wide takes N blocks from x toward +x (facing north/south) or from z toward +z (facing east/west).\n"
+            + "    // 'top' props stand on a table: y = the table's top (e.g. y of the table block + 1, or + 0.5 on a bottom slab).\n"
+            + "    // 'ceiling' props: (x, y, z) = the air block just under the ceiling. Lamps light the room themselves.\n"
+            + "    // Place no blocks where a prop is. At most " + com.example.ai.api.MinecraftAI.MAX_PROPS + " per building. Ids:\n"
+            + com.example.ai.build.PropLibrary.catalog()
+            + "    // Beds, chests, doors, tables, chairs, shelves, stoves and the like stay real blocks.\n";
+    }
+
     static String buildingSystem(boolean webSearchEnabled) {
         StringBuilder prompt = new StringBuilder();
 
@@ -1378,6 +1475,9 @@ public class AiController {
         prompt.append("- Windows on the outer walls of every room, light inside (lanterns, glowstone), and a few pieces of furniture.\n");
         prompt.append("- Clear the inside with air (clearArea) so terrain does not stay inside the rooms.\n\n");
 
+        prompt.append(BUILDING_CRAFT);
+        prompt.append(EXAMPLE_HOUSE).append("\n");
+
         prompt.append("The request and the World Information (terrain around the player) come in the next message.\n\n");
 
         prompt.append("API signatures (exact order; all x/y/z relative to player feet):\n");
@@ -1394,6 +1494,8 @@ public class AiController {
         prompt.append("  ai.placeWall(blockName, x, y, z, height, length, direction)\n");
         prompt.append("  ai.clearArea(x, y, z, width, length)              // 5 args: clear 1 horizontal layer\n");
         prompt.append("  ai.clearArea(x, y, z, width, height, length)      // 6 args: clear box volume\n");
+        prompt.append(BUILDING_HELPERS);
+        prompt.append(propsDoc());
         prompt.append("Inspect:\n");
         prompt.append("  ai.getFacing() -> String\n");
         prompt.append("  ai.getForwardX(distance) -> int | ai.getForwardZ(distance) -> int\n");

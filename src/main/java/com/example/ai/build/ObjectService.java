@@ -8,6 +8,7 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.decoration.InteractionEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 
@@ -44,6 +45,12 @@ public final class ObjectService {
 
     /** The object tag on an entity, or null. */
     public static String objectTag(Entity entity) {
+        // A building's furniture also carries the building's tag: the piece of furniture is the object.
+        for (String t : entity.getCommandTags()) {
+            if (t.startsWith("aib_prop_") && TAG.matcher(t).matches()) {
+                return t;
+            }
+        }
         for (String t : entity.getCommandTags()) {
             if (!t.equals("aib_obj") && !t.equals("aib_box") && TAG.matcher(t).matches()) {
                 return t;
@@ -92,6 +99,9 @@ public final class ObjectService {
             if (e instanceof InteractionEntity && e.hasCustomName()) {
                 name = e.getCustomName().getString();
             }
+            if (e.getCommandTags().contains("aib_box")) {
+                clearLights(world, e.getBoundingBox().expand(1.5));
+            }
             e.discard();
         }
         if (found.isEmpty()) {
@@ -100,6 +110,20 @@ public final class ObjectService {
             AiNetworking.sendLog(player, "[History] \"" + (name == null || name.isBlank() ? "소품" : name) + "\"을(를) 지웠어요.");
         }
         sendNearby(player);
+    }
+
+    /** A lamp's hidden light block goes with the lamp. */
+    private static void clearLights(ServerWorld world, Box box) {
+        BlockPos.Mutable pos = new BlockPos.Mutable();
+        for (int x = (int) Math.floor(box.minX); x <= (int) Math.floor(box.maxX); x++) {
+            for (int y = (int) Math.floor(box.minY); y <= (int) Math.floor(box.maxY); y++) {
+                for (int z = (int) Math.floor(box.minZ); z <= (int) Math.floor(box.maxZ); z++) {
+                    if (world.getBlockState(pos.set(x, y, z)).isOf(net.minecraft.block.Blocks.LIGHT)) {
+                        world.setBlockState(pos, net.minecraft.block.Blocks.AIR.getDefaultState());
+                    }
+                }
+            }
+        }
     }
 
     /** List objects near the player (also ones placed before hitboxes existed). */

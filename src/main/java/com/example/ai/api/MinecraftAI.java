@@ -185,6 +185,125 @@ public class MinecraftAI {
         }
     }
 
+    // ---------------------------------------------------------------- building parts (BuildingHelpers)
+
+    /** Set the helper's blocks; every block it names must exist (e.g. there are no "glass_stairs"). */
+    private static void placeCells(String what, List<BuildingHelpers.Cell> cells) {
+        java.util.Set<String> checked = new java.util.HashSet<>();
+        for (BuildingHelpers.Cell c : cells) {
+            String id = c.block();
+            int open = id.indexOf('[');
+            String name = normalizeBlockId(open < 0 ? id : id.substring(0, open));
+            if (checked.add(name) && !Registries.BLOCK.containsId(Identifier.of(name))) {
+                throw new IllegalArgumentException(what + ": there is no block " + name + " (give a material that has stairs, slabs or"
+                    + " trapdoors, e.g. 'spruce', 'dark_oak', 'stone_brick', 'deepslate_tile')");
+            }
+        }
+        for (BuildingHelpers.Cell c : cells) {
+            placeBlock(c.x(), c.y(), c.z(), c.block());
+        }
+    }
+
+    public static void roofGable(Number x, Number y, Number z, Number w, Number l, String material, String axis, String gable) {
+        placeCells("roofGable", BuildingHelpers.roofGable(toInt(x), toInt(y), toInt(z), Math.max(1, toInt(w)), Math.max(1, toInt(l)),
+            material, axis, gable));
+    }
+
+    public static void roofHip(Number x, Number y, Number z, Number w, Number l, String material) {
+        placeCells("roofHip", BuildingHelpers.roofHip(toInt(x), toInt(y), toInt(z), Math.max(1, toInt(w)), Math.max(1, toInt(l)), material));
+    }
+
+    public static void door(Number x, Number y, Number z, String facing, String material) {
+        placeCells("door", BuildingHelpers.door(toInt(x), toInt(y), toInt(z), facing, material));
+    }
+
+    public static void window(Number x, Number y, Number z, Number w, Number h, String facing, String frame, String glass) {
+        placeCells("window", BuildingHelpers.window(toInt(x), toInt(y), toInt(z), Math.max(1, toInt(w)), Math.max(1, toInt(h)), facing, frame, glass));
+    }
+
+    public static void wallMix(Number x, Number y, Number z, Number h, Number l, String direction, Map<?, ?> weights) {
+        Map<String, Integer> w = new java.util.LinkedHashMap<>();
+        if (weights != null) {
+            for (Map.Entry<?, ?> e : weights.entrySet()) {
+                w.put(String.valueOf(e.getKey()), e.getValue() instanceof Number n ? n.intValue() : 0);
+            }
+        }
+        placeCells("wallMix", BuildingHelpers.wallMix(toInt(x), toInt(y), toInt(z), Math.max(1, toInt(h)), Math.max(1, toInt(l)), direction, w));
+    }
+
+    /** Most library props one building may have (each is a few dozen display pieces). */
+    public static final int MAX_PROPS = 30;
+
+    /**
+     * A ready-made piece of furniture from the prop library, standing in block (x, y, z) with its
+     * front looking {@code facing} (north, south, east, west); y may be a table's top (e.g. 1.5 on a slab).
+     */
+    public static void prop(String id, Number x, Number y, Number z, String facing) {
+        if (recorder == null) {
+            return;
+        }
+        com.example.ai.build.PropLibrary.Def def = com.example.ai.build.PropLibrary.get(id);
+        if (def == null) {
+            throw new IllegalArgumentException("ai.prop: there is no prop \"" + id + "\"; use one of " + com.example.ai.build.PropLibrary.ids());
+        }
+        String f = facing == null ? "" : facing.trim().toLowerCase(Locale.ROOT);
+        if (!List.of("north", "south", "east", "west").contains(f)) {
+            throw new IllegalArgumentException("ai.prop: facing must be north, south, east or west (the way its front looks), not \"" + facing + "\"");
+        }
+        if (recorder.props.size() >= MAX_PROPS) {
+            throw new IllegalArgumentException("ai.prop: at most " + MAX_PROPS + " props in one building");
+        }
+        recorder.props.add(new BuildPlan.Prop(def.id(), toInt(x), toDouble(y), toInt(z), f));
+    }
+
+    /**
+     * Run an object script on its own (a library prop) and return its pieces, without disturbing a
+     * recording in progress.
+     */
+    public static BuildPlan recordDetached(String code) {
+        BuildPlan savedRecorder = recorder;
+        ShapeCanvas savedCanvas = canvas;
+        Double savedMirror = mirrorX;
+        int savedGroup = group;
+        Map<String, Integer> savedIds = groupIds;
+        BuildPlan plan = new BuildPlan();
+        try {
+            startRecording(plan, false);
+            com.example.ai.script.ScriptExecutor.ExecutionResult result = com.example.ai.script.ScriptExecutor.executeScript(code);
+            stopRecording();
+            if (!result.success()) {
+                throw new IllegalStateException(result.message());
+            }
+        } finally {
+            recorder = savedRecorder;
+            canvas = savedCanvas;
+            mirrorX = savedMirror;
+            group = savedGroup;
+            groupIds = savedIds;
+        }
+        plan.facing = "south";
+        return plan;
+    }
+
+    /** An object's pieces turned by quarter turns clockwise (as placing turns them), block states too. */
+    public static BuildPlan turned(BuildPlan plan, int turns) {
+        BuildPlan out = new BuildPlan();
+        out.facing = plan.facing;
+        for (BuildPlan.Part p : plan.parts) {
+            double cx = p.x, cz = p.z;
+            for (int i = 0; i < Math.floorMod(turns, 4); i++) {
+                double t = cx;
+                cx = -cz;
+                cz = t;
+            }
+            String block = com.example.ai.build.Paint.valid(p.block) ? p.block : rotateBlockState(p.block, turns);
+            BuildPlan.Part q = new BuildPlan.Part(block, cx, p.y, cz, p.sx, p.sy, p.sz, p.yaw - 90.0 * turns, p.pitch, p.roll);
+            q.group = p.group;
+            out.parts.add(q);
+        }
+        return out;
+    }
+
     /** Equipment: the order asked for it to be big, so it may go past the slot's usual size. */
     public static void oversize() {
         if (recorder != null) {
@@ -947,6 +1066,16 @@ public class MinecraftAI {
      *              pushed into the ground would draw its part black.
      */
     static String summonCommand(BuildPlan.Part part, BlockPos at, int turns, String tag, double floor) {
+        return summonCommand(part, at, turns, tag, floor, List.of());
+    }
+
+    /** Same, with more tags on the entity (e.g. the building a library prop belongs to, so removing the building removes it). */
+    static String summonCommand(BuildPlan.Part part, BlockPos at, int turns, String tag, double floor, List<String> extraTags) {
+        StringBuilder more = new StringBuilder();
+        for (String t : extraTags) {
+            more.append("\",\"").append(t);
+        }
+        tag = tag + more;
         double cx = part.x;
         double cz = part.z;
         for (int i = 0; i < Math.floorMod(turns, 4); i++) {
@@ -1224,7 +1353,7 @@ public class MinecraftAI {
         List<String> batch = new ArrayList<>();
         double floor = plan.parts.isEmpty() ? 0 : plan.partBounds()[1];
         for (BuildPlan.Part part : plan.parts) {
-            batch.add(summonCommand(part, at, turns, tag, floor));
+            batch.add(summonCommand(part, at, turns, tag, floor, extraTags));
             count++;
             if (batch.size() == 8) {
                 List<String> part8 = List.copyOf(batch);
@@ -1247,6 +1376,46 @@ public class MinecraftAI {
                     run.accept(cleanup);
                 }
             });
+        }
+        count += placeProps(plan, at, turns, tag, run, owner);
+        return count;
+    }
+
+    /**
+     * The building's library props, after its blocks: each one its own object (its own tag, so it
+     * can be removed alone, plus the building's tag, so removing the building removes it), with a
+     * hidden light block where it gives light.
+     */
+    private static int placeProps(BuildPlan plan, BlockPos at, int turns, String tag, java.util.function.Consumer<String> run,
+                                  java.util.UUID owner) {
+        if (plan.props == null || plan.props.isEmpty()) {
+            return 0;
+        }
+        String base = tag == null ? "aib_b" + Long.toString(System.currentTimeMillis(), 36) : tag;
+        List<String> buildingTags = tag == null ? List.of() : List.of(tag);
+        int count = 0;
+        for (int i = 0; i < plan.props.size(); i++) {
+            BuildPlan.Prop prop = plan.props.get(i);
+            com.example.ai.build.PropLibrary.Placed placed;
+            try {
+                placed = com.example.ai.build.PropLibrary.place(prop);
+            } catch (RuntimeException exception) {
+                System.out.println("[ERROR] Prop " + prop.id + " could not be placed: " + exception.getMessage());
+                continue;
+            }
+            if (placed == null) {
+                continue;
+            }
+            String propTag = "aib_prop_" + Integer.toHexString(base.hashCode()) + "_" + i;
+            count += executePlan(placed.plan(), at, turns, propTag, placed.name(), buildingTags, run, owner);
+            if (placed.light() != null) {
+                int[] l = placed.light();
+                int[] r = BuildPlan.rotate(l[0], l[2], turns);
+                String command = "setblock " + (at.getX() + r[0]) + " " + (at.getY() + l[1]) + " " + (at.getZ() + r[1])
+                    + " minecraft:light[level=" + l[3] + "] keep";
+                BuildTaskQueue.enqueue(owner, () -> run.accept(command));
+                count++;
+            }
         }
         return count;
     }

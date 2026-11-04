@@ -43,6 +43,108 @@ public class AibGameTests implements FabricGameTest {
         "ai.placeBox(0, 0, -4, 3, 2, 3, 'stone_bricks')\n"
             + "ai.placeBlock(1, 2, -3, 'oak_stairs[facing=north]')\n";
 
+    /** Every library prop runs, is made of pieces only, and fits the blocks it says it takes. */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void everyLibraryPropFitsItsBlocks(TestContext context) {
+        var all = com.example.ai.build.PropLibrary.all();
+        check(all.size() == 11, "11 props in the library, got " + all.size());
+        for (var def : all) {
+            BuildPlan plan = com.example.ai.build.PropLibrary.plan(def);
+            check(plan.ops.isEmpty() && !plan.parts.isEmpty(), def.id() + ": pieces only");
+            check(plan.parts.size() <= 150, def.id() + ": at most 150 pieces, got " + plan.parts.size());
+            double[] b = plan.partBounds();
+            check(b[3] - b[0] <= def.w() + 0.15, def.id() + String.format(": %.2f wide for %d blocks", b[3] - b[0], def.w()));
+            check(b[5] - b[2] <= def.d() + 0.05, def.id() + String.format(": %.2f deep for %d block", b[5] - b[2], def.d()));
+            check(b[5] <= 0.05 && b[1] >= -0.01 && b[4] <= 2.6, def.id() + ": back at z = 0, between the floor and 2.6 up: "
+                + java.util.Arrays.toString(b));
+        }
+        context.complete();
+    }
+
+    /** Props come with the building, each removable on its own, and go when the building goes. */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void buildingPropsArePlacedAndRemoved(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        String script = "ai.placeFloor(0, -1, 0, 6, 5, 'stone')\n"
+            + "ai.placeWall(0, 0, 4, 3, 6, 'x', 'stone')\n"
+            + "ai.prop('sofa', 0, 0, 3, 'north')\n"
+            + "ai.prop('floor_lamp', 4, 0, 3, 'north')\n";
+        BuildPlan plan = Demo.plan(world, origin, player, script);
+        check(plan.props.size() == 2, "two props recorded, got " + plan.props.size());
+        BuildRecord record = Demo.place(player, origin, plan, 0, "room");
+        String tag = "aib_" + record.id;
+        Box area = new Box(origin).expand(8);
+        context.waitAndRun(5, () -> {
+            var parts = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag)).size()
+                + world.getEntitiesByType(EntityType.ITEM_DISPLAY, area, e -> e.getCommandTags().contains(tag)).size();
+            check(parts > 20, "the props' pieces carry the building's tag, got " + parts);
+            var boxes = world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area,
+                e -> e.getCommandTags().contains(tag) && e.getCommandTags().contains("aib_obj"));
+            check(boxes.size() == 2, "each prop is its own object, got " + boxes.size());
+            check(world.getBlockState(origin.add(4, 1, 3)).isOf(Blocks.LIGHT), "the lamp's light is above its foot");
+            // The sofa stands in x 0..2 with its back against the wall at z = 4.
+            var sofa = boxes.stream().filter(e -> "소파".equals(e.getCustomName().getString())).findFirst().orElseThrow();
+            String sofaTag = com.example.ai.build.ObjectService.objectTag(sofa);
+            check(sofaTag != null && sofaTag.startsWith("aib_prop_"), "the sofa's own tag: " + sofaTag);
+            var sofaParts = world.getEntitiesByClass(net.minecraft.entity.Entity.class, area, e -> e.getCommandTags().contains(sofaTag));
+            for (var e : sofaParts) {
+                double x = e.getX() - origin.getX(), z = e.getZ() - origin.getZ();
+                check(x > -0.1 && x < 3.1 && z > 2.9 && z < 4.1, "sofa piece in its blocks: " + x + ", " + z);
+            }
+            com.example.ai.build.ObjectService.removeByEntity(player, sofa.getId());
+            context.waitAndRun(2, () -> {
+                check(world.getEntitiesByClass(net.minecraft.entity.Entity.class, area, e -> e.getCommandTags().contains(sofaTag)).isEmpty(),
+                    "the sofa alone was removed");
+                check(world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area,
+                    e -> e.getCommandTags().contains(tag)).size() > 0, "the lamp stays");
+                com.example.api.AiBuildApi.removeTagged(world, tag);
+                context.waitAndRun(2, () -> {
+                    check(world.getEntitiesByClass(net.minecraft.entity.Entity.class, area, e -> e.getCommandTags().contains(tag)).isEmpty(),
+                        "removing the building removes its props");
+                    context.complete();
+                });
+            });
+        });
+    }
+
+    /** The building parts set stairs, doors and shutters the right way round. */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void buildingHelpersPlaceTheirParts(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(2, 1, 2));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        String script = "ai.wallMix(0, 0, 0, 3, 5, 'x', ['stone_bricks': 50, 'cobblestone': 50])\n"
+            + "ai.door(2, 0, 0, 'north', 'spruce')\n"
+            + "ai.window(0, 1, 0, 1, 1, 'north', 'spruce')\n"
+            + "ai.roofGable(0, 4, 2, 5, 3, 'dark_oak', 'x', 'spruce_planks')\n";
+        BuildPlan plan = Demo.plan(world, origin, player, script);
+        Demo.place(player, origin, plan, 0, "parts");
+        context.waitAndRun(5, () -> {
+            check(world.getBlockState(origin.add(2, 0, 0)).isOf(Blocks.SPRUCE_DOOR), "door lower half");
+            check(world.getBlockState(origin.add(2, 1, 0)).isOf(Blocks.SPRUCE_DOOR), "door upper half");
+            check(world.getBlockState(origin.add(0, 1, 0)).isOf(Blocks.GLASS_PANE), "window pane");
+            check(world.getBlockState(origin.add(0, 0, -1)).isOf(Blocks.SPRUCE_SLAB), "sill outside (north)");
+            BlockState low = world.getBlockState(origin.add(1, 4, 1));
+            check(low.isOf(Blocks.DARK_OAK_STAIRS) && low.get(StairsBlock.FACING) == Direction.SOUTH, "north eave climbs south: " + low);
+            BlockState high = world.getBlockState(origin.add(1, 4, 5));
+            check(high.isOf(Blocks.DARK_OAK_STAIRS) && high.get(StairsBlock.FACING) == Direction.NORTH, "south eave climbs north: " + high);
+            check(world.getBlockState(origin.add(1, 6, 3)).isOf(Blocks.DARK_OAK_SLAB), "slab ridge");
+            check(world.getBlockState(origin.add(0, 5, 3)).isOf(Blocks.SPRUCE_PLANKS), "gable end filled");
+            int stone = 0, cobble = 0;
+            for (int x = 0; x < 5; x++) {
+                for (int y = 0; y < 3; y++) {
+                    BlockState s = world.getBlockState(origin.add(x, y, 0));
+                    stone += s.isOf(Blocks.STONE_BRICKS) ? 1 : 0;
+                    cobble += s.isOf(Blocks.COBBLESTONE) ? 1 : 0;
+                }
+            }
+            check(stone > 0 && cobble > 0, "the wall mixes both blocks: " + stone + " / " + cobble);
+            context.complete();
+        });
+    }
+
     @GameTest(templateName = EMPTY_STRUCTURE)
     public void dryRunPlacesNothingThenBuildThenUndo(TestContext context) {
         ServerWorld world = context.getWorld();

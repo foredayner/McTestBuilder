@@ -349,6 +349,11 @@ public final class AiBuildApi {
             }
         }
         out.parts = plan.parts;
+        for (BuildPlan.Prop p : plan.props == null ? List.<BuildPlan.Prop>of() : plan.props) {
+            if (p.x >= 0 && p.x <= site.width() - 1 && p.z >= -site.depth() && p.z <= -1) {
+                out.props.add(p);
+            }
+        }
         return out;
     }
 

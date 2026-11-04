@@ -170,6 +170,28 @@ public final class BuildPlan {
     public boolean oversize;
     /** Named spots the script marked with ai.mark (e.g. where a clue goes), in the design frame. */
     public List<Mark> marks = new ArrayList<>();
+    /** Ready-made furniture from the prop library (ai.prop), in the design frame; placed with the building. */
+    public List<Prop> props = new ArrayList<>();
+
+    /** One library prop: which, the block it stands in (y may be a table's top) and the way its front looks. */
+    public static final class Prop {
+        public String id;
+        public double x;
+        public double y;
+        public double z;
+        public String facing = "south";
+
+        public Prop() {
+        }
+
+        public Prop(String id, double x, double y, double z, String facing) {
+            this.id = id;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.facing = facing;
+        }
+    }
 
     public static final class Mark {
         public String name;
@@ -192,7 +214,7 @@ public final class BuildPlan {
     public String motion = "";
 
     public boolean isEmpty() {
-        return (ops == null || ops.isEmpty()) && (parts == null || parts.isEmpty());
+        return (ops == null || ops.isEmpty()) && (parts == null || parts.isEmpty()) && (props == null || props.isEmpty());
     }
 
     public boolean isObject() {
