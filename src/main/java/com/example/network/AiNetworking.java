@@ -50,6 +50,7 @@ public final class AiNetworking {
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.HistoryDeleteAllC2SPayload.ID,
             AiNetworkPayloads.HistoryDeleteAllC2SPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.JournalS2CPayload.ID, AiNetworkPayloads.JournalS2CPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.PropGiveC2SPayload.ID, AiNetworkPayloads.PropGiveC2SPayload.CODEC);
     }
 
     public static void registerServerReceivers() {
@@ -70,6 +71,17 @@ public final class AiNetworking {
                             ServerPlayNetworking.send(p, new AiNetworkPayloads.HistoryS2CPayload(AiNetworkPayloads.HistoryS2CPayload.REMOVE, id));
                         }
                     }
+                }
+            });
+        });
+
+        // 소품 프리셋: a furniture preset from the library as an item.
+        ServerPlayNetworking.registerGlobalReceiver(AiNetworkPayloads.PropGiveC2SPayload.ID, (payload, context) -> {
+            context.server().execute(() -> {
+                com.example.ai.build.PropLibrary.Def def = com.example.ai.build.PropLibrary.get(payload.id());
+                if (def != null && allowed(context.player())) {
+                    context.player().getInventory().offerOrDrop(com.example.ai.build.ObjectItems.propStack(def));
+                    sendLog(context.player(), "[프리셋] \"" + def.name() + "\"을(를) 받았어요. " + com.example.ai.build.ObjectItems.howToPlace(def) + ".");
                 }
             });
         });

@@ -1,19 +1,20 @@
-// window curtain, 2 wide and 2 high, hung on a rod against the wall (z = 0): two panels that meet at the
-// top in the middle and sweep out to the bottom corners, with pleats; what is behind shows in the middle
-def top = 1.9
-def bottom = 0.02
+// window curtain over a 2 x 2 window (y = 0 is the window's bottom), hung on a rod just above it against the
+// wall (z = 0): two panels that meet at the top in the middle and sweep out to the bottom corners, with pleats;
+// the window shows in the middle
+def top = 1.99
+def bottom = 0.01
 def h = top - bottom
 def cloth = '#dccdb0'
 def fold = '#c2b291'
 def ridge = '#ebe1cb'
 // the rod with its brackets and end knobs
-ai.addCapsule('#4a3b2c', -0.96, 1.96, -0.1, 0.96, 1.96, -0.1, 0.022)
+ai.addCapsule('#4a3b2c', -0.96, 2.05, -0.1, 0.96, 2.05, -0.1, 0.022)
 ai.mirrorOn()
-ai.addPart('#4a3b2c', 0.84, 1.94, -0.1, 0.03, 0.03, 0.1)
-ai.addSphere('#4a3b2c', 0.97, 1.96, -0.1, 0.035)
-// rings on the rod
+ai.addPart('#4a3b2c', 0.84, 2.03, -0.1, 0.03, 0.03, 0.1)
+ai.addSphere('#4a3b2c', 0.97, 2.05, -0.1, 0.035)
+// rings on the rod, holding the top of the cloth
 for (int i = 0; i < 6; i++) {
-    ai.addPart('#4a3b2c', -0.95 + i * 0.17, 1.915, -0.125, 0.02, 0.07, 0.05)
+    ai.addPart('#4a3b2c', -0.95 + i * 0.17, 2.005, -0.125, 0.02, 0.07, 0.05)
 }
 // the left panel (mirrored to the right): strips from the top, each ending at the sweeping inner edge
 int n = 18

@@ -206,6 +206,19 @@ public final class AiNetworkPayloads {
         }
     }
 
+    /** Client -> server: give me this furniture preset (a PropLibrary id) as an item. */
+    public record PropGiveC2SPayload(String id) implements CustomPayload {
+        public static final CustomPayload.Id<PropGiveC2SPayload> ID =
+            new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "prop_give"));
+        public static final PacketCodec<RegistryByteBuf, PropGiveC2SPayload> CODEC =
+            PacketCodec.tuple(PacketCodecs.STRING, PropGiveC2SPayload::id, PropGiveC2SPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     /** Client -> server: an order from the order screen (AiOrder, gzip JSON). */
     public record OrderC2SPayload(byte[] data) implements CustomPayload {
         public static final CustomPayload.Id<OrderC2SPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "order"));

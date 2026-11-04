@@ -57,6 +57,9 @@ public class AiPromptScreen extends Screen {
     /** 작업 일지: the request open in detail (null = the list), or the old full log file view. */
     private static String journalId = null;
     private static boolean rawLog = false;
+    /** 소품 mode: the furniture presets (ready-made, no AI order) instead of the order chat. */
+    private static boolean presetView = false;
+    private static final int PRESET_ROW = 26;
     private static int journalScroll = 0;  // rows in the list, pixels in the detail
     private static final int JROW = 16;
     private static final SimpleDateFormat TIME = new SimpleDateFormat("MM-dd HH:mm");
@@ -332,6 +335,17 @@ public class AiPromptScreen extends Screen {
         boolean object = AiClientState.isObjectMode();
         boolean gear = AiClientState.isGearMode();
         button(gear ? "모드: 장비" : object ? "모드: 소품" : "모드: 건물", right() - 84, top(), 84, b -> AiClientState.cycleMode());
+        if (object) {
+            // 기본 소품 (an AI order) <-> 소품 프리셋 (ready-made furniture).
+            button(presetView ? "← 기본 소품" : "소품 프리셋", right() - 84 - 4 - 88, top(), 88, b -> {
+                presetView = !presetView;
+                rebuild();
+            });
+            if (presetView) {
+                buildPresets();
+                return;
+            }
+        }
         if (gear) {
             // Choose the kind of equipment first, then describe it. Buttons line up from the right.
             com.example.content.GearKind kind = AiClientState.getGearKind();
@@ -405,6 +419,54 @@ public class AiPromptScreen extends Screen {
         this.icons.add(new IconAt(new ItemStack(Items.FEATHER), right() - 61, fy + 1));
     }
 
+    /** Tests: show the presets (or the order chat) in 소품 mode. */
+    public static void showPresetsForTests(boolean on) {
+        presetView = on;
+    }
+
+    /** The presets in two columns, each with 받기 (the item goes to the inventory). */
+    private void buildPresets() {
+        this.promptField = null;
+        this.hitField = null;
+        this.idleField = null;
+        List<com.example.ai.build.PropLibrary.Def> all = com.example.ai.build.PropLibrary.all();
+        int colW = (right() - left() - 12) / 2;
+        for (int i = 0; i < all.size(); i++) {
+            com.example.ai.build.PropLibrary.Def def = all.get(i);
+            int cx = left() + 4 + (i % 2) * (colW + 4);
+            int cy = chatTop() + 4 + (i / 2) * PRESET_ROW;
+            if (cy + PRESET_ROW > bottom() - 2) {
+                break;
+            }
+            button("받기", cx + colW - 44, cy + 3, 40, b -> {
+                if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(
+                    com.example.network.AiNetworkPayloads.PropGiveC2SPayload.ID)) {
+                    net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+                        new com.example.network.AiNetworkPayloads.PropGiveC2SPayload(def.id()));
+                }
+            });
+        }
+    }
+
+    private void renderPresets(DrawContext ctx) {
+        ctx.drawText(this.textRenderer, ellipsize("미리 만들어 둔 소품이에요. 받아서 바로 놓을 수 있어요 (AI 주문 없음)", right() - left() - 190),
+            left() + 2, top() + 5, INK_SOFT, false);
+        inset(ctx, left(), chatTop(), right(), bottom() - 2, PARCHMENT_DEEP);
+        List<com.example.ai.build.PropLibrary.Def> all = com.example.ai.build.PropLibrary.all();
+        int colW = (right() - left() - 12) / 2;
+        for (int i = 0; i < all.size(); i++) {
+            com.example.ai.build.PropLibrary.Def def = all.get(i);
+            int cx = left() + 4 + (i % 2) * (colW + 4);
+            int cy = chatTop() + 4 + (i / 2) * PRESET_ROW;
+            if (cy + PRESET_ROW > bottom() - 2) {
+                break;
+            }
+            inset(ctx, cx, cy, cx + colW, cy + PRESET_ROW - 2, PARCHMENT);
+            ctx.drawText(this.textRenderer, def.name() + " · " + def.w() + "칸", cx + 5, cy + 3, INK, false);
+            ctx.drawText(this.textRenderer, ellipsize(com.example.ai.build.ObjectItems.howToPlace(def), colW - 54), cx + 5, cy + 13, INK_SOFT, false);
+        }
+    }
+
     private void sendBuild() {
         if (this.promptField == null) {
             return;
@@ -443,6 +505,10 @@ public class AiPromptScreen extends Screen {
     private void renderCreate(DrawContext ctx) {
         boolean object = AiClientState.isObjectMode();
         boolean gear = AiClientState.isGearMode();
+        if (object && presetView) {
+            renderPresets(ctx);
+            return;
+        }
         String header = gear ? "종류를 고르고 원하는 장비를 이야기해 주세요"
             : object ? "원하는 소품을 이야기해 주세요" : "원하는 건물을 이야기해 주세요";
         if (!gear) {

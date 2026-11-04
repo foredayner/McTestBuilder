@@ -34,7 +34,7 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
         ai.prop('computer', 3, 1, 35, 'north')
         ai.placeFloor(5, 3, 32, 2, 4, 'white_concrete')
         ai.prop('ceiling_light', 5, 2, 35, 'north')
-        ai.prop('curtain', 8, 0, 35, 'north')
+        ai.prop('curtain', 8, 1, 35, 'north')
         ai.prop('partition', 11, 0, 34, 'north')
         """;
 

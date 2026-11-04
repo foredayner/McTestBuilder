@@ -1178,17 +1178,24 @@ public class MinecraftAI {
         for (String t : extraTags) {
             extra.append(",\"").append(t).append('"');
         }
+        // A curtain and the like: the boxes are hit and mined but walked through.
+        String pass = extraTags.contains(PASS_TAG) ? "," + com.example.content.SolidHitboxEntity.PASS_KEY + ":1b" : "";
         List<String> out = new ArrayList<>();
         for (int i = 0; i < squares.size(); i++) {
             double[] s = squares.get(i); // {centreX, bottomY, centreZ, width, height}
             boolean primary = i == 0;
             out.add(String.format(Locale.ROOT,
-                "summon %s %.4f %.4f %.4f {width:%.4ff,height:%.4ff,response:1b,Tags:[\"aib\",\"aib_box\",\"%s\"%s%s]%s}",
-                HITBOX_ID, at.getX() + s[0], at.getY() + s[1], at.getZ() + s[2], s[3], s[4], tag,
+                "summon %s %.4f %.4f %.4f {width:%.4ff,height:%.4ff,response:1b%s,Tags:[\"aib\",\"aib_box\",\"%s\"%s%s]%s}",
+                HITBOX_ID, at.getX() + s[0], at.getY() + s[1], at.getZ() + s[2], s[3], s[4], pass, tag,
                 primary ? ",\"aib_obj\"" : "", extra, primary ? ",CustomName:'" + snbt + "'" : ""));
         }
         return out;
     }
+
+    /** Extra tag for an object whose hitboxes players walk through (a curtain). */
+    public static final String PASS_TAG = "aib_pass";
+    /** Tag on a library prop's hitboxes: aibprop_<id>, so mining it gives that prop back. */
+    public static final String PROP_TAG = "aibprop_";
 
     /** Id of the solid hitbox entity (registered in AibContent). */
     public static final String HITBOX_ID = "minecraft-ai-build-assistant:hitbox";
@@ -1392,7 +1399,6 @@ public class MinecraftAI {
             return 0;
         }
         String base = tag == null ? "aib_b" + Long.toString(System.currentTimeMillis(), 36) : tag;
-        List<String> buildingTags = tag == null ? List.of() : List.of(tag);
         int count = 0;
         for (int i = 0; i < plan.props.size(); i++) {
             BuildPlan.Prop prop = plan.props.get(i);
@@ -1407,7 +1413,16 @@ public class MinecraftAI {
                 continue;
             }
             String propTag = "aib_prop_" + Integer.toHexString(base.hashCode()) + "_" + i;
-            count += executePlan(placed.plan(), at, turns, propTag, placed.name(), buildingTags, run, owner);
+            // Its own tag; the building's (removing the building removes it); which prop (mined, it comes back as that prop).
+            List<String> tags = new ArrayList<>();
+            if (tag != null) {
+                tags.add(tag);
+            }
+            tags.add(PROP_TAG + placed.id());
+            if (placed.pass()) {
+                tags.add(PASS_TAG);
+            }
+            count += executePlan(placed.plan(), at, turns, propTag, placed.name(), tags, run, owner);
             if (placed.light() != null) {
                 int[] l = placed.light();
                 int[] r = BuildPlan.rotate(l[0], l[2], turns);

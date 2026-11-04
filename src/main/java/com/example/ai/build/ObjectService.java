@@ -104,6 +104,7 @@ public final class ObjectService {
             }
             e.discard();
         }
+        ObjectItems.clearLights(world, found);
         if (found.isEmpty()) {
             AiNetworking.sendLog(player, "[History] 지울 소품을 찾지 못했어요 (이미 지워졌을 수 있어요).");
         } else {

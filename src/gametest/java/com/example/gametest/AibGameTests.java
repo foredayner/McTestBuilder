@@ -109,6 +109,65 @@ public class AibGameTests implements FabricGameTest {
         });
     }
 
+    /**
+     * Presets by hand: a curtain clicked on a 2 x 2 window covers it from its lowest pane and is walked
+     * through; a lamp set on the floor lights it; mined, each comes back as its preset and the light goes.
+     */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void presetsAreSetByHandAndMinedBack(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        for (int x = 0; x < 5; x++) {
+            world.setBlockState(origin.add(x, -1, 2), Blocks.STONE.getDefaultState());
+            for (int y = 0; y < 4; y++) {
+                boolean pane = (x == 1 || x == 2) && (y == 1 || y == 2);
+                world.setBlockState(origin.add(x, y, 4), pane ? Blocks.GLASS.getDefaultState() : Blocks.STONE.getDefaultState());
+            }
+        }
+        var curtainDef = com.example.ai.build.PropLibrary.get("curtain");
+        var lampDef = com.example.ai.build.PropLibrary.get("floor_lamp");
+        BlockPos pane = origin.add(2, 2, 4); // the upper right pane, clicked from the room (its north face)
+        check(com.example.ai.build.ObjectItems.useProp(player, com.example.ai.build.ObjectItems.propStack(curtainDef), pane,
+            net.minecraft.util.math.Direction.NORTH, net.minecraft.util.math.Vec3d.ofCenter(pane)), "the curtain goes on the window");
+        check(!com.example.ai.build.ObjectItems.useProp(player, com.example.ai.build.ObjectItems.propStack(lampDef), pane,
+            net.minecraft.util.math.Direction.NORTH, net.minecraft.util.math.Vec3d.ofCenter(pane)), "a lamp does not go on a wall");
+        BlockPos floor = origin.add(4, -1, 2);
+        check(com.example.ai.build.ObjectItems.useProp(player, com.example.ai.build.ObjectItems.propStack(lampDef), floor,
+            net.minecraft.util.math.Direction.UP, net.minecraft.util.math.Vec3d.ofCenter(floor).add(0, 0.5, 0)), "the lamp goes on the floor");
+        Box area = new Box(origin).expand(8);
+        context.waitAndRun(40, () -> {
+            var curtain = world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area,
+                e -> e.getCommandTags().contains(com.example.ai.api.MinecraftAI.PROP_TAG + "curtain"));
+            check(!curtain.isEmpty(), "the curtain has hitboxes");
+            for (var box : curtain) {
+                check(box.passable() && !box.isCollidable(), "the curtain is walked through");
+            }
+            String tag = com.example.ai.build.ObjectService.objectTag(curtain.get(0));
+            var pieces = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag));
+            check(!pieces.isEmpty(), "the curtain's pieces");
+            for (var e : pieces) {
+                double x = e.getX() - origin.getX(), y = e.getY() - origin.getY(), z = e.getZ() - origin.getZ();
+                check(x > 0.9 && x < 3.1 && y > 0.9 && y < 3.2 && z > 3.5 && z < 4.05, "curtain piece over the window: " + x + ", " + y + ", " + z);
+            }
+            var lamp = world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area,
+                e -> e.getCommandTags().contains(com.example.ai.api.MinecraftAI.PROP_TAG + "floor_lamp"));
+            check(!lamp.isEmpty() && lamp.get(0).isCollidable(), "the lamp is solid");
+            check(world.getBlockState(origin.add(4, 1, 2)).isOf(Blocks.LIGHT), "the lamp lights its block");
+            com.example.ai.build.ObjectItems.breakObject(player, curtain.get(0).getId(), true);
+            com.example.ai.build.ObjectItems.breakObject(player, lamp.get(0).getId(), true);
+            context.waitAndRun(2, () -> {
+                check(world.getEntitiesByClass(net.minecraft.entity.Entity.class, area,
+                    e -> e.getCommandTags().contains(com.example.ai.api.MinecraftAI.PROP_TAG + "curtain")).isEmpty(), "the curtain is mined");
+                check(!world.getBlockState(origin.add(4, 1, 2)).isOf(Blocks.LIGHT), "the lamp's light went with it");
+                var drops = world.getEntitiesByType(EntityType.ITEM, area, e -> true);
+                check(drops.stream().anyMatch(e -> com.example.ai.build.ObjectItems.propOf(e.getStack()) == curtainDef), "the curtain item comes back");
+                check(drops.stream().anyMatch(e -> com.example.ai.build.ObjectItems.propOf(e.getStack()) == lampDef), "the lamp item comes back");
+                context.complete();
+            });
+        });
+    }
+
     /** The building parts set stairs, doors and shutters the right way round. */
     @GameTest(templateName = EMPTY_STRUCTURE)
     public void buildingHelpersPlaceTheirParts(TestContext context) {

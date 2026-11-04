@@ -23,12 +23,15 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class PropLibrary {
 
-    /** How a prop is listed: mount floor | top (on a table) | wall | ceiling; align back (against the wall behind) | center. */
-    public record Def(String id, String name, String era, String mount, String align, int w, int d, int light, String about) {
+    /**
+     * How a prop is listed: mount floor | top (on a table) | wall | ceiling | window (over a window, from its
+     * lowest pane up); align back (against the wall behind) | center; pass: players walk through it (a curtain).
+     */
+    public record Def(String id, String name, String era, String mount, String align, int w, int d, int light, String about, boolean pass) {
     }
 
-    /** A prop ready to place in the building's frame, its name, and its light {x, y, z, level} or null. */
-    public record Placed(BuildPlan plan, String name, int[] light) {
+    /** A prop ready to place in the building's frame, which and its name, its light {x, y, z, level} or null, whether it is walked through. */
+    public record Placed(BuildPlan plan, String id, String name, int[] light, boolean pass) {
     }
 
     private static final String ROOT = "/aib_props/";
@@ -101,7 +104,8 @@ public final class PropLibrary {
      * Where a prop goes in the building's frame. It takes its width in blocks from (x, z) toward +X
      * (facing north or south) or +Z (east or west), centred on them; its back lies against the far
      * side of its block (align back) or it stands in the middle of the block (center). Floor and top
-     * props stand on y, wall props keep their height above the floor y, ceiling props hang from the top of block y.
+     * props stand on y, wall props keep their height above the floor y, window props start at the window's
+     * lowest pane y, ceiling props hang from the top of block y.
      */
     public static Placed place(BuildPlan.Prop prop) {
         Def def = get(prop.id);
@@ -131,7 +135,7 @@ public final class PropLibrary {
             }
         }
         double dy = switch (def.mount()) {
-            case "wall" -> prop.y;
+            case "wall", "window" -> prop.y;
             case "ceiling" -> prop.y + 1 - b[4];
             default -> prop.y - b[1];
         };
@@ -140,6 +144,6 @@ public final class PropLibrary {
             int ly = "ceiling".equals(def.mount()) ? (int) Math.floor(prop.y) : (int) Math.floor(prop.y) + 1;
             light = new int[] { (int) Math.floor(prop.x), ly, (int) Math.floor(prop.z), Math.min(15, def.light()) };
         }
-        return new Placed(turned.translated(dx, dy, dz), def.name(), light);
+        return new Placed(turned.translated(dx, dy, dz), def.id(), def.name(), light, def.pass());
     }
 }

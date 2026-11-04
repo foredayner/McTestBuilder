@@ -1359,8 +1359,9 @@ public class AiController {
     /** How to make a building look built, not boxed (the part of the building instructions about quality). */
     static final String BUILDING_CRAFT = """
             CRAFT (what makes a building look real; do all of it unless the request says otherwise):
-            - Palette of 3-4 materials: main wall, frame/trim (logs or a darker stone), roof, one accent. Mix the main wall
-              with ai.wallMix (2-3 related blocks, e.g. 60% stone_bricks, 25% cobblestone, 15% mossy_stone_bricks) instead of one flat block.
+            - Palette of 3-4 materials: main wall, frame/trim (logs or a darker stone), roof, one accent. Every wall face is
+              ONE block (the main wall block): no mixing and no random blocks in it. The other materials go only on the
+              trim: corner posts, the foundation plinth, beam lines, window frames and sills, the door surround.
             - Foundation: a plinth 1 block wider than the walls, of a darker or rougher stone, at the ground line.
             - Frame: corner posts of logs or pillars, and a beam line along the top of each storey's walls, so the
               structure shows on the outside. Where the style allows, posts stick out 1 block from the wall.
@@ -1379,16 +1380,15 @@ public class AiController {
     /** A small modern house using the helpers and props (in the prompt as a style reference, and built in the tests). */
     public static final String EXAMPLE_HOUSE = """
             // EXAMPLE (style reference; make your own design): a modern cottage 11 x 9, x -5..5, z 3..11, the player at the
-            // origin looking +Z; the front with the door faces the player (north, z = 3). Palette: mixed stone, spruce frame,
-            // dark oak roof, white accent.
-            def mix = ['stone_bricks': 60, 'cobblestone': 25, 'andesite': 15]
+            // origin looking +Z; the front with the door faces the player (north, z = 3). Palette: stone brick walls (one block
+            // on every face), spruce frame, dark oak roof, white accent.
             ai.clearArea(-6, 0, 2, 13, 10, 11)
             ai.placeFloor(-6, -1, 2, 13, 11, 'polished_andesite')            // plinth, 1 wider than the walls
             ai.placeFloor(-5, 0, 3, 11, 9, 'spruce_planks')                  // floor
-            ai.wallMix(-5, 1, 3, 4, 11, 'x', mix)                            // front
-            ai.wallMix(-5, 1, 11, 4, 11, 'x', mix)                           // back
-            ai.wallMix(-5, 1, 3, 4, 9, 'z', mix)                             // west
-            ai.wallMix(5, 1, 3, 4, 9, 'z', mix)                              // east
+            ai.placeWall(-5, 1, 3, 4, 11, 'x', 'stone_bricks')               // front
+            ai.placeWall(-5, 1, 11, 4, 11, 'x', 'stone_bricks')              // back
+            ai.placeWall(-5, 1, 3, 4, 9, 'z', 'stone_bricks')                // west
+            ai.placeWall(5, 1, 3, 4, 9, 'z', 'stone_bricks')                 // east
             def corners = [[-5, 3], [5, 3], [-5, 11], [5, 11]]
             for (int i = 0; i < 4; i++) {
                 ai.placePillar(corners[i][0], 0, corners[i][1], 5, 'stripped_spruce_log')   // corner posts
@@ -1407,14 +1407,14 @@ public class AiController {
             ai.window(2, 2, 3, 2, 2, 'north', 'spruce')
             ai.window(-5, 2, 6, 2, 2, 'west', 'spruce')
             ai.window(5, 2, 6, 2, 2, 'east', 'spruce')
-            ai.window(-3, 2, 11, 2, 1, 'south', 'spruce')                    // 1 high: the curtain in front covers it
+            ai.window(-3, 2, 11, 2, 2, 'south', 'spruce')                    // 2 x 2: the curtain inside covers it
             ai.roofGable(-5, 6, 3, 11, 9, 'dark_oak', 'x', 'spruce_planks')  // roof, ridge along x, gable ends filled
             ai.placePillar(3, 6, 9, 6, 'bricks')                             // chimney
             // living room (west): sofa against the west wall facing the TV on the room wall, a lamp, curtains at the back window
             ai.prop('sofa', -4, 1, 5, 'east')
             ai.prop('wall_tv', -1, 1, 5, 'west')
             ai.prop('floor_lamp', -4, 1, 10, 'north')
-            ai.prop('curtain', -3, 1, 10, 'north')
+            ai.prop('curtain', -3, 2, 10, 'north')                          // in front of the window's lower-left pane, at its height
             ai.prop('ceiling_light', -3, 4, 6, 'south')
             // kitchen (east): fridge, a counter with a phone on it (the counter's top is y = 2), a clock on the room wall
             ai.prop('fridge', 4, 1, 10, 'west')
@@ -1435,8 +1435,8 @@ public class AiController {
               ai.door(x, y, z, facing) | ai.door(x, y, z, facing, wood)            // a door in the wall block (x, y, z); facing = the way the outside looks
               ai.window(x, y, z, width, height, facing) | ai.window(..., frameWood) | ai.window(..., frameWood, glassBlock)
                 // panes in the wall from (x, y, z) along the wall toward +x or +z; sill and open shutters on the outside (facing)
-              ai.wallMix(x, y, z, height, length, direction, ['stone_bricks': 60, 'cobblestone': 25, 'mossy_stone_bricks': 15])
-                // like placeWall, of several blocks mixed by weight
+              ai.wallMix(x, y, z, height, length, direction, ['stone_bricks': 70, 'cracked_stone_bricks': 30])
+                // like placeWall, of several blocks mixed by weight: ONLY for ruins and worn-out walls the request asks for
             """;
 
     /** The furniture library, for the API list. */
@@ -1448,6 +1448,8 @@ public class AiController {
             + "    // A prop N blocks wide takes N blocks from x toward +x (facing north/south) or from z toward +z (facing east/west).\n"
             + "    // 'top' props stand on a table: y = the table's top (e.g. y of the table block + 1, or + 0.5 on a bottom slab).\n"
             + "    // 'ceiling' props: (x, y, z) = the air block just under the ceiling. Lamps light the room themselves.\n"
+            + "    // 'window' props (the curtain) cover a 2 x 2 window: (x, y, z) = the room's air block in front of the window's\n"
+            + "    //   lower-left pane (lowest x or z), y = that pane's height; facing = into the room. Make curtained windows 2 x 2.\n"
             + "    // Place no blocks where a prop is. At most " + com.example.ai.api.MinecraftAI.MAX_PROPS + " per building. Ids:\n"
             + com.example.ai.build.PropLibrary.catalog()
             + "    // Beds, chests, doors, tables, chairs, shelves, stoves and the like stay real blocks.\n";
@@ -1459,7 +1461,7 @@ public class AiController {
         prompt.append("You are a Minecraft architect. Write ONLY executable Groovy using the `ai` API.\n\n");
 
         prompt.append("Absolute instructions:\n");
-        prompt.append("1. Prioritize building quality above all else. (Never build flat. Focus on depth, 3D layering, overhangs, and mixing blocks for realistic texture).\n");
+        prompt.append("1. Prioritize building quality above all else. (Never build flat. Focus on depth, 3D layering, overhangs, and a clear contrast between the one-block walls and their trim).\n");
         prompt.append("2. Base your designs on real-world structures and architecture rather than abstract concepts. Build with physical logic (foundations, pillars, beams).\n");
         if (webSearchEnabled) {
             prompt.append("3. Web search is ON: use it whenever you need design inspiration or block information.\n");

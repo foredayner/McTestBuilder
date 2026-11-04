@@ -71,7 +71,12 @@ public class AibClientGameTest implements FabricClientGameTest {
                 AiClientState.setMode(1);
             });
             shot(context, () -> AiPromptScreen.open("CREATE", null), "03_create_object_mode");
-            context.runOnClient(client -> AiClientState.setMode(0));
+            context.runOnClient(client -> AiPromptScreen.showPresetsForTests(true));
+            shot(context, () -> AiPromptScreen.open("CREATE", null), "03b_object_presets");
+            context.runOnClient(client -> {
+                AiPromptScreen.showPresetsForTests(false);
+                AiClientState.setMode(0);
+            });
 
             String houseId = BuildRecord.fromJson(records.get(0)).id;
             String appleId = BuildRecord.fromJson(records.get(1)).id;

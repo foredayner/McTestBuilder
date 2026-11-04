@@ -22,6 +22,17 @@ public class ObjectItem extends Item {
 
     @Override
     public ActionResult useOnBlock(ItemUsageContext context) {
+        if (ObjectItems.propOf(context.getStack()) != null) {
+            // A furniture preset: on a block's top, a wall, a ceiling or a window, as the prop is mounted.
+            if (context.getWorld().isClient()) {
+                return ActionResult.SUCCESS;
+            }
+            if (!(context.getPlayer() instanceof ServerPlayerEntity player)) {
+                return ActionResult.PASS;
+            }
+            return ObjectItems.useProp(player, context.getStack(), context.getBlockPos(), context.getSide(), context.getHitPos())
+                ? ActionResult.SUCCESS : ActionResult.FAIL;
+        }
         if (context.getSide() != Direction.UP) {
             if (!context.getWorld().isClient() && context.getPlayer() != null) {
                 context.getPlayer().sendMessage(Text.literal("블록 윗면을 클릭하면 그 위에 놓여요").formatted(Formatting.GRAY), true);
