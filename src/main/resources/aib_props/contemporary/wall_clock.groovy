@@ -1,10 +1,16 @@
 // round wall clock, 0.6 across, its middle 2.2 above the floor; the wall is at z = 0
 def cy = 2.2
-// a round disc out of four squares turned in steps of 22.5 degrees
-for (int i = 0; i < 4; i++) {
-    def a = i * 22.5
-    ai.addPart('#2e2e2e', -0.3, cy - 0.3, -0.07, 0.6, 0.6, 0.07, 0, 0, a)      // rim
-    ai.addPart('#f6f3ea', -0.26, cy - 0.26, -0.075, 0.52, 0.52, 0.01, 0, 0, a) // face
+// a round disc out of thin rows, each as wide as the circle at its height
+int rows = 16
+for (int j = 0; j < rows; j++) {
+    def y0 = -0.3 + j * 0.6 / rows
+    def ym = y0 + 0.3 / rows
+    def half = Math.sqrt(Math.max(0, 0.09 - ym * ym))
+    ai.addPart('#2e2e2e', -half, cy + y0, -0.07, 2 * half, 0.6 / rows + 0.002, 0.07)                 // rim
+    def yf = -0.26 + j * 0.52 / rows
+    def yfm = yf + 0.26 / rows
+    def hf = Math.sqrt(Math.max(0, 0.0676 - yfm * yfm))
+    ai.addPart('#f6f3ea', -hf, cy + yf, -0.075, 2 * hf, 0.52 / rows + 0.002, 0.01)                 // face
 }
 for (int i = 0; i < 12; i++) {
     def t = Math.toRadians(i * 30)
