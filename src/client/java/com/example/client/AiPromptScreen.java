@@ -486,8 +486,8 @@ public class AiPromptScreen extends Screen {
             }
             boolean hover = mouseX >= cx && mouseX < cx + CELL && mouseY >= cy && mouseY < cy + CELL;
             inset(ctx, cx, cy, cx + CELL, cy + CELL, hover ? 0xFFFFE9BC : 0xFFE8C48A);
-            BuildPreview p = BuildPreview.of(rec);
-            BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, cx + 3, cy + 3, CELL - 6, CELL - 6);
+            // The prop itself in 3D, seen from the front-left and above.
+            GearModelRenderer.drawIn3d(ctx, rec.plan, cx + 3, cy + 3, CELL - 6);
             if (hover) {
                 outline(ctx, cx, cy, cx + CELL, cy + CELL, TAG);
                 hovered = rec;
