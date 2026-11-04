@@ -129,6 +129,7 @@ public class AiPromptScreen extends Screen {
         chatScroll = 0;
         listScroll = 0;
         detailScroll = 0;
+        resetModelView();
         return new AiPromptScreen();
     }
 
@@ -486,8 +487,8 @@ public class AiPromptScreen extends Screen {
             }
             boolean hover = mouseX >= cx && mouseX < cx + CELL && mouseY >= cy && mouseY < cy + CELL;
             inset(ctx, cx, cy, cx + CELL, cy + CELL, hover ? 0xFFFFE9BC : 0xFFE8C48A);
-            // The prop itself in 3D, seen from the front-left and above.
-            GearModelRenderer.drawIn3d(ctx, rec.plan, cx + 3, cy + 3, CELL - 6);
+            // The prop itself in 3D, seen from the front-left and above (its picture is made once).
+            draw3d(ctx, rec, cx + 3, cy + 3, CELL - 6, Preview3d.THUMB);
             if (hover) {
                 outline(ctx, cx, cy, cx + CELL, cy + CELL, TAG);
                 hovered = rec;
@@ -830,8 +831,7 @@ public class AiPromptScreen extends Screen {
             boolean object = "object".equals(rec.kind);
             boolean gear = "gear".equals(rec.kind);
             inset(ctx, cx, cy, cx + CELL, cy + CELL, hover ? 0xFFFFE9BC : 0xFFE8C48A);
-            BuildPreview p = BuildPreview.of(rec);
-            BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, cx + 3, cy + 3, CELL - 6, CELL - 6);
+            draw3d(ctx, rec, cx + 3, cy + 3, CELL - 6, Preview3d.THUMB);
             // The kind at a glance: a coloured corner (건물 brown, 소품 green, 장비 blue) and, for gear, its item.
             int kindColor = gear ? 0xFF4F7FA8 : object ? LEAF : TAG;
             ctx.fill(cx + 1, cy + 1, cx + 6, cy + 3, kindColor);
@@ -982,6 +982,39 @@ public class AiPromptScreen extends Screen {
         return null;
     }
 
+    /** The kept 3D picture of a design, or its flat picture until the 3D one is made (a frame or two). */
+    private static void draw3d(DrawContext ctx, BuildRecord rec, int x, int y, int size, int px) {
+        if (!Preview3d.drawKept(ctx, rec, x, y, size, px)) {
+            BuildPreview p = BuildPreview.of(rec);
+            BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, x, y, size, size);
+        }
+    }
+
+    /** The detail view's model: how it is turned (degrees) and zoomed, and where it is on screen. */
+    private static float detailYaw = Preview3d.YAW;
+    private static float detailPitch = Preview3d.PITCH;
+    private static float detailZoom = 1;
+    private int[] modelBox;
+    private boolean turning;
+
+    /** Tests: the detail model turned and zoomed. */
+    public static void turnModelForTests(float yaw, float pitch, float zoom) {
+        detailYaw = yaw;
+        detailPitch = pitch;
+        detailZoom = zoom;
+    }
+
+    private static void resetModelView() {
+        detailYaw = Preview3d.YAW;
+        detailPitch = Preview3d.PITCH;
+        detailZoom = 1;
+    }
+
+    private boolean overModel(double mx, double my) {
+        return this.modelBox != null && page == Page.HISTORY && selected() != null
+            && mx >= this.modelBox[0] && mx < this.modelBox[2] && my >= this.modelBox[1] && my < this.modelBox[3];
+    }
+
     private void renderDetail(DrawContext ctx, BuildRecord r) {
         int l = left(), rr = right(), t = top(), b = bottom() - 24;
         inset(ctx, l, t, rr, b, PARCHMENT_DEEP);
@@ -1001,14 +1034,20 @@ public class AiPromptScreen extends Screen {
         }
         y += 6;
         int room = b - (y + detailScroll) - (LINE + 3) - 8 - 3 * LINE - 4;
-        int img = Math.max(48, Math.min(Math.min(140, (width - 8) / 2), room));
-        ctx.drawText(this.textRenderer, ellipsize("정면", img), x, y, INK_SOFT, false);
-        ctx.drawText(this.textRenderer, ellipsize("위에서", img), x + img + 8, y, INK_SOFT, false);
+        int img = Math.max(64, Math.min(Math.min(220, width - 8), room));
+        ctx.drawText(this.textRenderer, ellipsize(object ? "우클릭으로 끌어 돌리기 · 휠로 확대" : "앞쪽 왼편 위에서", width), x, y, INK_SOFT, false);
         y += LINE + 3;
         inset(ctx, x, y, x + img, y + img, 0xFFE8C48A);
-        inset(ctx, x + img + 8, y, x + 2 * img + 8, y + img, 0xFFE8C48A);
-        BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, x + 3, y + 3, img - 6, img - 6);
-        BuildPreview.draw(ctx, p.top, p.topW, p.topH, x + img + 11, y + 3, img - 6, img - 6);
+        if (object) {
+            // Objects and equipment: the model itself, turned with the right mouse button.
+            ctx.enableScissor(x + 1, Math.max(y + 1, t + 1), x + img - 1, Math.min(y + img - 1, b - 1));
+            Preview3d.drawLive(ctx, r.plan, x + 3, y + 3, img - 6, detailYaw, detailPitch, detailZoom);
+            ctx.disableScissor();
+            ctx.enableScissor(l + 1, t + 1, rr - 1, b - 1);
+        } else {
+            draw3d(ctx, r, x + 3, y + 3, img - 6, Preview3d.BIG);
+        }
+        this.modelBox = new int[] { x, y, x + img, y + img };
         y += img + 8;
         java.util.List<String> info = new java.util.ArrayList<>(java.util.List.of(
             "크기 " + p.sizeX + " × " + p.sizeY + " × " + p.sizeZ + " (가로 × 높이 × 세로) · "
@@ -1307,6 +1346,7 @@ public class AiPromptScreen extends Screen {
         layout();
         this.hoveredRecord = null;
         this.hoveredPreset = null;
+        this.modelBox = null;
         this.mouseNowX = mouseX;
         this.mouseNowY = mouseY;
         renderFrame(ctx, mouseX, mouseY);
@@ -1339,6 +1379,8 @@ public class AiPromptScreen extends Screen {
         if (this.hoveredRecord != null && page == Page.HISTORY) {
             renderRecordTooltip(ctx, this.hoveredRecord, this.hoverX, this.hoverY);
         }
+        // 3D pictures asked for this frame are made now (a few per frame), and show from the next one.
+        Preview3d.work(ctx);
         if (this.hoveredPreset != null && page == Page.CREATE) {
             String name = this.hoveredPreset.prompt;
             int tw = this.textRenderer.getWidth(name) + 8;
@@ -1354,7 +1396,30 @@ public class AiPromptScreen extends Screen {
     // ---------------------------------------------------------------- input
 
     @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        if (this.turning && button == 1) {
+            detailYaw += (float) deltaX * 1.2F;
+            detailPitch = Math.max(-10, Math.min(85, detailPitch + (float) deltaY * 1.2F));
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 1 && this.turning) {
+            this.turning = false;
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 1 && overModel(mouseX, mouseY) && !"build".equals(selected().kind)) {
+            this.turning = true; // right button held on the model: dragging turns it
+            return true;
+        }
         int tab = tabAt(mouseX, mouseY);
         if (button == 0 && tab >= 0) {
             if (TABS[tab].page() == null) {
@@ -1398,6 +1463,7 @@ public class AiPromptScreen extends Screen {
             if (hit != null) {
                 selectedId = hit.id;
                 detailScroll = 0;
+                resetModelView();
                 this.confirmDelete = false;
                 rebuild();
                 return true;
@@ -1438,7 +1504,9 @@ public class AiPromptScreen extends Screen {
                 }
             }
             case HISTORY -> {
-                if (selected() != null) {
+                if (selected() != null && overModel(mouseX, mouseY) && !"build".equals(selected().kind)) {
+                    detailZoom = Math.max(0.5F, Math.min(4F, detailZoom * (step > 0 ? 1.15F : 1 / 1.15F)));
+                } else if (selected() != null) {
                     detailScroll = Math.max(0, detailScroll - step * 20);
                 } else {
                     listScroll = Math.max(0, listScroll - step);

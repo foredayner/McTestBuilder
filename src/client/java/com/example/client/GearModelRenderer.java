@@ -164,35 +164,13 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     private static final Model EMPTY = new Model(List.of(), List.of(), new float[4], false, Map.of(), null, 0, false, null, 0,
         new int[0], new boolean[0], List.of());
 
-    /**
-     * An object drawn in 3D in a screen box (x, y, size in GUI pixels), seen from the front-left
-     * and above (30 degrees down, 45 to the side), fitted into the box. For the 소품 프리셋 pictures.
-     */
-    public static void drawIn3d(net.minecraft.client.gui.DrawContext ctx, BuildPlan plan, int x, int y, int size) {
-        if (plan == null || plan.parts.isEmpty()) {
-            return;
+    /** A plan's pieces (an object, equipment, a library prop) as they stand, in the current matrix: for the 3D pictures. */
+    public static void drawPlan(MatrixStack matrices, VertexConsumerProvider vertexConsumers, BuildPlan plan, int light, int overlay) {
+        Model model;
+        synchronized (OBJECT_MODELS) {
+            model = OBJECT_MODELS.computeIfAbsent(plan, p -> decode(p, true, false));
         }
-        Model model = OBJECT_MODELS.computeIfAbsent(plan, p -> decode(p, true, false));
-        double[] b = plan.partBounds();
-        double cx = (b[0] + b[3]) / 2, cy = (b[1] + b[4]) / 2, cz = (b[2] + b[5]) / 2;
-        // Turned 45 degrees and seen from 30 degrees above, the widest it can look is about its diagonal.
-        double w = b[3] - b[0], h = b[4] - b[1], d = b[5] - b[2];
-        double across = Math.sqrt(w * w + d * d);
-        double span = Math.max(across, h * 0.87 + across * 0.5);
-        float scale = (float) (size * 0.9 / Math.max(0.3, span));
-        MatrixStack m = ctx.getMatrices();
-        m.push();
-        m.translate(x + size / 2.0F, y + size / 2.0F, 150);
-        m.scale(scale, -scale, scale);
-        m.multiply(new Quaternionf().rotateX((float) Math.toRadians(30)));
-        m.multiply(new Quaternionf().rotateY((float) Math.toRadians(180 + 35)));
-        m.translate((float) -cx, (float) -cy, (float) -cz);
-        net.minecraft.client.render.DiffuseLighting.enableGuiDepthLighting();
-        ctx.draw(vertexConsumers -> draw(m, vertexConsumers, TexturedRenderLayers.getEntityCutout(), model,
-            net.minecraft.client.render.LightmapTextureManager.MAX_LIGHT_COORDINATE, net.minecraft.client.render.OverlayTexture.DEFAULT_UV));
-        ctx.draw();
-        net.minecraft.client.render.DiffuseLighting.disableGuiDepthLighting();
-        m.pop();
+        draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), model, light, overlay);
     }
 
     private static final Map<BuildPlan, Model> OBJECT_MODELS = new java.util.WeakHashMap<>();

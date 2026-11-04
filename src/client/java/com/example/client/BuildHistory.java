@@ -134,6 +134,7 @@ public final class BuildHistory {
             }
         }
         BuildPreview.forget(record);
+        Preview3d.forget(record.id);
         cache = null;
     }
 }

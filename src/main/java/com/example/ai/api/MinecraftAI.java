@@ -1453,6 +1453,11 @@ public class MinecraftAI {
     }
 
     /** Turn stairs, doors, logs... with the structure. Unknown or stateless blocks pass through. */
+    /** A block state written as text, turned by quarter turns clockwise (stairs, doors... face the new way). */
+    public static String turnBlockState(String block, int turns) {
+        return rotateBlockState(block, turns);
+    }
+
     static String rotateBlockState(String block, int turns) {
         int t = Math.floorMod(turns, 4);
         if (t == 0 || block == null) {

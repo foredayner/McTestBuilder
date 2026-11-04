@@ -83,6 +83,11 @@ public class AibClientGameTest implements FabricClientGameTest {
             shot(context, () -> AiPromptScreen.open("HISTORY", null), "04_history_list");
             shot(context, () -> AiPromptScreen.open("HISTORY", houseId), "05_history_house");
             shot(context, () -> AiPromptScreen.open("HISTORY", appleId), "06_history_apple");
+            shot(context, () -> {
+                AiPromptScreen s = AiPromptScreen.open("HISTORY", appleId);
+                AiPromptScreen.turnModelForTests(150, 60, 1.6F); // as if turned with the right button and zoomed
+                return s;
+            }, "06c_history_apple_turned");
             // The shared 보관함: a friend's designs come from the server and sit with mine, as pictures.
             context.runOnClient(client -> {
                 for (int i = 0; i < 14; i++) {
@@ -648,7 +653,7 @@ public class AibClientGameTest implements FabricClientGameTest {
 
     private static void shot(ClientGameTestContext context, java.util.function.Supplier<net.minecraft.client.gui.screen.Screen> screen, String name) {
         context.setScreen(screen);
-        context.waitTicks(3);
+        context.waitTicks(12); // 3D pictures are made a few per frame
         context.takeScreenshot(name);
     }
 }
