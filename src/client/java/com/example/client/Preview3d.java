@@ -92,9 +92,9 @@ public final class Preview3d {
         while (!QUEUE.isEmpty() && (first || System.nanoTime() - start < FRAME_BUDGET_NS)) {
             Pending p = QUEUE.poll();
             QUEUED.remove(p.key());
-            boolean building = !p.record().plan.isObject();
-            if (building && !first) {
-                QUEUE.addFirst(p); // a building takes a frame of its own
+            boolean big = !p.record().plan.isObject() && p.record().plan.ops.size() > 400;
+            if (big && !first) {
+                QUEUE.addFirst(p); // a big building takes a frame of its own
                 QUEUED.add(p.key());
                 break;
             }
