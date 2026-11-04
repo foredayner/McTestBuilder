@@ -653,7 +653,10 @@ public class AibClientGameTest implements FabricClientGameTest {
 
     private static void shot(ClientGameTestContext context, java.util.function.Supplier<net.minecraft.client.gui.screen.Screen> screen, String name) {
         context.setScreen(screen);
-        context.waitTicks(12); // 3D pictures are made a few per frame
+        context.waitTicks(3);
+        // 3D pictures are made a few per frame: the test machine draws few frames, so finish them now.
+        context.runOnClient(client -> com.example.client.Preview3d.finishForTests());
+        context.waitTicks(2);
         context.takeScreenshot(name);
     }
 }

@@ -72,6 +72,7 @@ public final class Preview3d {
         String key = record.id + "@" + px;
         Identifier id = KEPT.get(key);
         if (id == null) {
+            // Asked for this frame: made at its end (pictures of pages no longer shown are not made).
             if (QUEUED.add(key)) {
                 QUEUE.add(new Pending(key, record, px));
             }
@@ -81,7 +82,10 @@ public final class Preview3d {
         return true;
     }
 
-    /** Make queued pictures within this frame's time (at least one); call once per frame before drawing. */
+    /**
+     * Make the pictures this frame asked for, within its time (at least one); call once per frame
+     * after drawing. The rest are asked for again by the next frame if they are still on screen.
+     */
     public static void work(DrawContext ctx) {
         if (QUEUE.isEmpty()) {
             return;
@@ -106,6 +110,8 @@ public final class Preview3d {
                 keep(p.key(), null);
             }
         }
+        QUEUE.clear();
+        QUEUED.clear();
     }
 
     /** Forget a design's pictures (deleted or changed). */
