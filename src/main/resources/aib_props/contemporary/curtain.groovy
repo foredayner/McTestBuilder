@@ -29,11 +29,11 @@ for (int k = 0; k < n; k++) {
 // pleats: a shadow fold and a light ridge, from the top down to where the inner edge crosses them
 for (int i = 0; i < 6; i++) {
     def x = -0.9 + i * 0.15
-    def reach = Math.pow(Math.abs(x), 0.4) * h
+    def reach = Math.pow(x < 0 ? -x : x, 0.4) * h
     ai.addPart(fold, x - 0.012, top - reach, -0.118, 0.024, reach, 0.01)
     if (i < 5) {
         def xr = x + 0.075
-        def reachR = Math.pow(Math.abs(xr), 0.4) * h
+        def reachR = Math.pow(xr < 0 ? -xr : xr, 0.4) * h
         ai.addPart(ridge, xr - 0.015, top - reachR, -0.122, 0.03, reachR, 0.012)
     }
 }

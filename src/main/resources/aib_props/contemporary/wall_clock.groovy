@@ -5,11 +5,13 @@ int rows = 16
 for (int j = 0; j < rows; j++) {
     def y0 = -0.3 + j * 0.6 / rows
     def ym = y0 + 0.3 / rows
-    def half = Math.sqrt(Math.max(0, 0.09 - ym * ym))
+    def v = 0.09 - ym * ym
+    def half = Math.sqrt(v < 0 ? 0 : v)
     ai.addPart('#2e2e2e', -half, cy + y0, -0.07, 2 * half, 0.6 / rows + 0.002, 0.07)                 // rim
     def yf = -0.26 + j * 0.52 / rows
     def yfm = yf + 0.26 / rows
-    def hf = Math.sqrt(Math.max(0, 0.0676 - yfm * yfm))
+    def vf = 0.0676 - yfm * yfm
+    def hf = Math.sqrt(vf < 0 ? 0 : vf)
     ai.addPart('#f6f3ea', -hf, cy + yf, -0.075, 2 * hf, 0.52 / rows + 0.002, 0.01)                 // face
 }
 for (int i = 0; i < 12; i++) {
