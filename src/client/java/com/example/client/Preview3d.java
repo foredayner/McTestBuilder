@@ -140,6 +140,9 @@ public final class Preview3d {
     static NativeImage render(BuildPlan plan, int px) {
         MinecraftClient client = MinecraftClient.getInstance();
         SimpleFramebuffer fb = new SimpleFramebuffer(px, px, true);
+        net.minecraft.client.gl.Framebuffer main = client.framebuffer;
+        // The game's render layers draw into "the main buffer": for this picture, that is ours.
+        client.framebuffer = fb;
         try {
             fb.setClearColor(0, 0, 0, 0);
             fb.clear();
@@ -169,8 +172,9 @@ public final class Preview3d {
             image.mirrorVertically();
             return image;
         } finally {
+            client.framebuffer = main;
             fb.delete();
-            client.getFramebuffer().beginWrite(true);
+            main.beginWrite(true);
         }
     }
 

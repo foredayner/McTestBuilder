@@ -1,3 +1,6 @@
 accessWidener v2 named
 # Let the client add the object item's picture renderer to the game's special item models.
 accessible field net/minecraft/client/render/item/model/special/SpecialModelTypes ID_MAPPER Lnet/minecraft/util/dynamic/Codecs$IdMapper;
+# 3D pictures of designs are drawn into a picture of their own: the game's render layers draw into its main buffer.
+accessible field net/minecraft/client/MinecraftClient framebuffer Lnet/minecraft/client/gl/Framebuffer;
+mutable field net/minecraft/client/MinecraftClient framebuffer Lnet/minecraft/client/gl/Framebuffer;
