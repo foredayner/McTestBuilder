@@ -261,6 +261,18 @@ public class MinecraftAI {
      * recording in progress.
      */
     public static BuildPlan recordDetached(String code) {
+        synchronized (SCRIPT_LOCK) {
+            return recordDetachedLocked(code);
+        }
+    }
+
+    /**
+     * Scripts record into shared state: one at a time (the game's server and its own window both
+     * run them in single player, e.g. the preset pictures).
+     */
+    public static final Object SCRIPT_LOCK = new Object();
+
+    private static BuildPlan recordDetachedLocked(String code) {
         BuildPlan savedRecorder = recorder;
         ShapeCanvas savedCanvas = canvas;
         Double savedMirror = mirrorX;

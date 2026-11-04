@@ -59,7 +59,6 @@ public class AiPromptScreen extends Screen {
     private static boolean rawLog = false;
     /** 소품 mode: the furniture presets (ready-made, no AI order) instead of the order chat. */
     private static boolean presetView = false;
-    private static final int PRESET_ROW = 22;
     private static int journalScroll = 0;  // rows in the list, pixels in the detail
     private static final int JROW = 16;
     private static final SimpleDateFormat TIME = new SimpleDateFormat("MM-dd HH:mm");
@@ -96,6 +95,8 @@ public class AiPromptScreen extends Screen {
     private List<String> days = List.of();
     /** The design under the mouse in the grid (its tooltip is drawn last). */
     private BuildRecord hoveredRecord;
+    private int mouseNowX;
+    private int mouseNowY;
     private int hoverX;
     private int hoverY;
 
@@ -424,48 +425,79 @@ public class AiPromptScreen extends Screen {
         presetView = on;
     }
 
-    /** The presets in two columns, each with 받기 (the item goes to the inventory). */
+    /** The presets: nothing to set up (the grid is drawn and clicked like the 보관함's). */
     private void buildPresets() {
         this.promptField = null;
         this.hitField = null;
         this.idleField = null;
-        List<com.example.ai.build.PropLibrary.Def> all = com.example.ai.build.PropLibrary.all();
-        int colW = (right() - left() - 12) / 2;
-        for (int i = 0; i < all.size(); i++) {
-            com.example.ai.build.PropLibrary.Def def = all.get(i);
-            int cx = left() + 4 + (i % 2) * (colW + 4);
-            int cy = chatTop() + 3 + (i / 2) * PRESET_ROW;
-            if (cy + PRESET_ROW > bottom()) {
-                break;
-            }
-            button("받기", cx + colW - 44, cy + 1, 40, b -> {
-                if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(
-                    com.example.network.AiNetworkPayloads.PropGiveC2SPayload.ID)) {
-                    net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
-                        new com.example.network.AiNetworkPayloads.PropGiveC2SPayload(def.id()));
-                }
-            });
-        }
     }
 
-    private void renderPresets(DrawContext ctx) {
-        ctx.drawText(this.textRenderer, ellipsize("미리 만들어 둔 소품이에요. 받아서 바로 놓을 수 있어요 (AI 주문 없음)", right() - left() - 190),
-            left() + 2, top() + 5, INK_SOFT, false);
-        inset(ctx, left(), chatTop(), right(), bottom() - 2, PARCHMENT_DEEP);
-        List<com.example.ai.build.PropLibrary.Def> all = com.example.ai.build.PropLibrary.all();
-        int colW = (right() - left() - 12) / 2;
+    /** Each preset as a record, so it is drawn like a kept object (its picture worked out once). */
+    private static List<BuildRecord> presetRecords;
+
+    private static List<BuildRecord> presetRecords() {
+        if (presetRecords == null) {
+            List<BuildRecord> out = new ArrayList<>();
+            for (com.example.ai.build.PropLibrary.Def def : com.example.ai.build.PropLibrary.all()) {
+                try {
+                    BuildRecord rec = new BuildRecord();
+                    rec.id = "preset_" + def.id();
+                    rec.kind = "object";
+                    rec.prompt = def.name();
+                    rec.plan = com.example.ai.build.PropLibrary.plan(def);
+                    out.add(rec);
+                } catch (RuntimeException e) {
+                    System.out.println("[ERROR] Preset " + def.id() + " could not be drawn: " + e.getMessage());
+                }
+            }
+            presetRecords = out;
+        }
+        return presetRecords;
+    }
+
+    /** The preset under the mouse, or null. */
+    private BuildRecord presetAt(double mx, double my) {
+        List<BuildRecord> all = presetRecords();
+        int cols = gridCols();
+        int gx = gridLeft();
         for (int i = 0; i < all.size(); i++) {
-            com.example.ai.build.PropLibrary.Def def = all.get(i);
-            int cx = left() + 4 + (i % 2) * (colW + 4);
-            int cy = chatTop() + 3 + (i / 2) * PRESET_ROW;
-            if (cy + PRESET_ROW > bottom()) {
+            int cx = gx + (i % cols) * (CELL + GAP);
+            int cy = chatTop() + 4 + (i / cols) * (CELL + GAP);
+            if (mx >= cx && mx < cx + CELL && my >= cy && my < cy + CELL) {
+                return all.get(i);
+            }
+        }
+        return null;
+    }
+
+    private void renderPresets(DrawContext ctx, int mouseX, int mouseY) {
+        ctx.drawText(this.textRenderer, "눌러서 받기", left() + 2, top() + 5, INK_SOFT, false);
+        inset(ctx, left(), chatTop(), right(), bottom() - 2, PARCHMENT_DEEP);
+        List<BuildRecord> all = presetRecords();
+        int cols = gridCols();
+        int gx = gridLeft();
+        BuildRecord hovered = null;
+        for (int i = 0; i < all.size(); i++) {
+            BuildRecord rec = all.get(i);
+            int cx = gx + (i % cols) * (CELL + GAP);
+            int cy = chatTop() + 4 + (i / cols) * (CELL + GAP);
+            if (cy + CELL > bottom() - 2) {
                 break;
             }
-            inset(ctx, cx, cy, cx + colW, cy + PRESET_ROW - 2, PARCHMENT);
-            ctx.drawText(this.textRenderer, def.name() + " · " + def.w() + "칸", cx + 5, cy + 2, INK, false);
-            ctx.drawText(this.textRenderer, ellipsize(com.example.ai.build.ObjectItems.howToPlace(def), colW - 54), cx + 5, cy + 11, INK_SOFT, false);
+            boolean hover = mouseX >= cx && mouseX < cx + CELL && mouseY >= cy && mouseY < cy + CELL;
+            inset(ctx, cx, cy, cx + CELL, cy + CELL, hover ? 0xFFFFE9BC : 0xFFE8C48A);
+            BuildPreview p = BuildPreview.of(rec);
+            BuildPreview.draw(ctx, p.front, p.frontW, p.frontH, cx + 3, cy + 3, CELL - 6, CELL - 6);
+            if (hover) {
+                outline(ctx, cx, cy, cx + CELL, cy + CELL, TAG);
+                hovered = rec;
+            }
         }
+        this.hoveredPreset = hovered;
     }
+
+    /** The preset under the mouse (its name is shown over everything). */
+    private BuildRecord hoveredPreset;
 
     private void sendBuild() {
         if (this.promptField == null) {
@@ -506,7 +538,7 @@ public class AiPromptScreen extends Screen {
         boolean object = AiClientState.isObjectMode();
         boolean gear = AiClientState.isGearMode();
         if (object && presetView) {
-            renderPresets(ctx);
+            renderPresets(ctx, this.mouseNowX, this.mouseNowY);
             return;
         }
         String header = gear ? "종류를 고르고 원하는 장비를 이야기해 주세요"
@@ -1274,6 +1306,9 @@ public class AiPromptScreen extends Screen {
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         layout();
         this.hoveredRecord = null;
+        this.hoveredPreset = null;
+        this.mouseNowX = mouseX;
+        this.mouseNowY = mouseY;
         renderFrame(ctx, mouseX, mouseY);
         switch (page) {
             case GUIDE -> renderGuide(ctx, mouseX, mouseY);
@@ -1304,6 +1339,13 @@ public class AiPromptScreen extends Screen {
         if (this.hoveredRecord != null && page == Page.HISTORY) {
             renderRecordTooltip(ctx, this.hoveredRecord, this.hoverX, this.hoverY);
         }
+        if (this.hoveredPreset != null && page == Page.CREATE) {
+            String name = this.hoveredPreset.prompt;
+            int tw = this.textRenderer.getWidth(name) + 8;
+            int tx = mouseX + 8, ty = mouseY - 14;
+            bevel(ctx, tx, ty, tx + tw, ty + 14, PAPER, 0xFFFFFBEF, PARCHMENT_LINE, 1);
+            ctx.drawText(this.textRenderer, name, tx + 4, ty + 3, INK, false);
+        }
     }
 
     // ---------------------------------------------------------------- input
@@ -1326,6 +1368,18 @@ public class AiPromptScreen extends Screen {
         }
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
+        }
+        if (page == Page.CREATE && presetView && AiClientState.isObjectMode() && button == 0) {
+            BuildRecord hit = presetAt(mouseX, mouseY);
+            if (hit != null) {
+                String id = hit.id.substring("preset_".length());
+                if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(
+                    com.example.network.AiNetworkPayloads.PropGiveC2SPayload.ID)) {
+                    net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+                        new com.example.network.AiNetworkPayloads.PropGiveC2SPayload(id));
+                }
+                return true;
+            }
         }
         if (page == Page.GUIDE && button == 0) {
             int row = guideRowAt(mouseX, mouseY);

@@ -87,7 +87,16 @@ public final class PropLibrary {
 
     /** The prop's pieces as designed (front toward -Z, back at z = 0). */
     public static BuildPlan plan(Def def) {
-        return PLANS.computeIfAbsent(def.id(), k -> MinecraftAI.recordDetached(script(def)));
+        // Not computeIfAbsent: the script waits for MinecraftAI.SCRIPT_LOCK, which must not be awaited inside the map's lock.
+        BuildPlan plan = PLANS.get(def.id());
+        if (plan == null) {
+            plan = MinecraftAI.recordDetached(script(def));
+            BuildPlan before = PLANS.putIfAbsent(def.id(), plan);
+            if (before != null) {
+                plan = before;
+            }
+        }
+        return plan;
     }
 
     /** For the building prompt: one line per prop. */

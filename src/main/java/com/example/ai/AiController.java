@@ -452,11 +452,13 @@ public class AiController {
         if (!review.isEmpty()) {
             failure = "Code review found problems:\n- " + String.join("\n- ", review);
         } else {
-            MinecraftAI.startRecording(plan, gear);
-            try {
-                result = ScriptExecutor.executeScript(aiCode);
-            } finally {
-                MinecraftAI.stopRecording();
+            synchronized (MinecraftAI.SCRIPT_LOCK) {
+                MinecraftAI.startRecording(plan, gear);
+                try {
+                    result = ScriptExecutor.executeScript(aiCode);
+                } finally {
+                    MinecraftAI.stopRecording();
+                }
             }
             plan.useObjectFrame();
             failure = !result.success() ? result.message()

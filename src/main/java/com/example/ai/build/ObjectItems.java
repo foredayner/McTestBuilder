@@ -72,9 +72,7 @@ public final class ObjectItems {
         stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(def.name()).setStyle(Style.EMPTY.withItalic(false).withColor(Formatting.WHITE)));
         Style lore = Style.EMPTY.withItalic(false).withColor(Formatting.GRAY);
         stack.set(DataComponentTypes.LORE, new LoreComponent(List.of(
-            Text.literal("소품 프리셋 · " + def.w() + "칸").setStyle(lore),
-            Text.literal(howToPlace(def)).setStyle(lore),
-            Text.literal("돌처럼 캐면 다시 아이템이 돼요").setStyle(lore))));
+            Text.literal("소품 프리셋 · " + def.w() + "칸").setStyle(lore))));
         return stack;
     }
 

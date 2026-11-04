@@ -81,7 +81,7 @@ public final class AiNetworking {
                 com.example.ai.build.PropLibrary.Def def = com.example.ai.build.PropLibrary.get(payload.id());
                 if (def != null && allowed(context.player())) {
                     context.player().getInventory().offerOrDrop(com.example.ai.build.ObjectItems.propStack(def));
-                    sendLog(context.player(), "[프리셋] \"" + def.name() + "\"을(를) 받았어요. " + com.example.ai.build.ObjectItems.howToPlace(def) + ".");
+                    sendLog(context.player(), "[프리셋] \"" + def.name() + "\"을(를) 받았어요.");
                 }
             });
         });
