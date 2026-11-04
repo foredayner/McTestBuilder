@@ -52,7 +52,7 @@ public final class ObjectService {
             }
         }
         for (String t : entity.getCommandTags()) {
-            if (!t.equals("aib_obj") && !t.equals("aib_box") && TAG.matcher(t).matches()) {
+            if (!t.equals("aib_obj") && !t.equals("aib_box") && !t.equals(com.example.ai.api.MinecraftAI.PASS_TAG) && TAG.matcher(t).matches()) {
                 return t;
             }
         }

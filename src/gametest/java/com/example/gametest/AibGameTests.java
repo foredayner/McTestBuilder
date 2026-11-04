@@ -144,7 +144,9 @@ public class AibGameTests implements FabricGameTest {
                 check(box.passable() && !box.isCollidable(), "the curtain is walked through");
             }
             String tag = com.example.ai.build.ObjectService.objectTag(curtain.get(0));
-            var pieces = world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag));
+            java.util.List<net.minecraft.entity.Entity> pieces = new java.util.ArrayList<>(
+                world.getEntitiesByType(EntityType.BLOCK_DISPLAY, area, e -> e.getCommandTags().contains(tag)));
+            pieces.addAll(world.getEntitiesByType(EntityType.ITEM_DISPLAY, area, e -> e.getCommandTags().contains(tag))); // painted
             check(!pieces.isEmpty(), "the curtain's pieces");
             for (var e : pieces) {
                 double x = e.getX() - origin.getX(), y = e.getY() - origin.getY(), z = e.getZ() - origin.getZ();
