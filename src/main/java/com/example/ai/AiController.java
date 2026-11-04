@@ -1407,7 +1407,7 @@ public class AiController {
             ai.window(2, 2, 3, 2, 2, 'north', 'spruce')
             ai.window(-5, 2, 6, 2, 2, 'west', 'spruce')
             ai.window(5, 2, 6, 2, 2, 'east', 'spruce')
-            ai.window(-3, 2, 11, 2, 2, 'south', 'spruce')
+            ai.window(-3, 2, 11, 2, 1, 'south', 'spruce')                    // 1 high: the curtain in front covers it
             ai.roofGable(-5, 6, 3, 11, 9, 'dark_oak', 'x', 'spruce_planks')  // roof, ridge along x, gable ends filled
             ai.placePillar(3, 6, 9, 6, 'bricks')                             // chimney
             // living room (west): sofa against the west wall facing the TV on the room wall, a lamp, curtains at the back window

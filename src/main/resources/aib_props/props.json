@@ -18,7 +18,7 @@
   { "id": "ceiling_light", "name": "천장 LED 전등", "era": "contemporary", "mount": "ceiling", "align": "center", "w": 2, "d": 1, "light": 15,
     "about": "flat LED panel on the ceiling that lights the room; give the air block just under the ceiling" },
   { "id": "curtain", "name": "커튼", "era": "contemporary", "mount": "wall", "align": "back", "w": 2, "d": 1, "light": 0,
-    "about": "beige curtains on a rod, 2 wide and 2 high, open in the middle: put it in front of a 2-wide window, standing on the floor" },
+    "about": "beige curtains on a rod, 2 wide and 2 high, open in the middle; it stands on the floor in front of a 2-wide window that is 1 high with its bottom 1 block above the floor" },
   { "id": "partition", "name": "파티션", "era": "contemporary", "mount": "floor", "align": "center", "w": 2, "d": 1, "light": 0,
     "about": "sky-blue office partition 2 wide, 1.75 high, standing in the middle of its blocks" }
 ]
