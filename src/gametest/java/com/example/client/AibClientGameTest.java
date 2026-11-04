@@ -655,7 +655,16 @@ public class AibClientGameTest implements FabricClientGameTest {
         context.setScreen(screen);
         context.waitTicks(3);
         // 3D pictures are made a few per frame: the test machine draws few frames, so finish them now.
-        context.runOnClient(client -> com.example.client.Preview3d.finishForTests());
+        context.runOnClient(client -> {
+            if (client.currentScreen != null) {
+                // Draw the screen once so it asks for its pictures (the test machine draws few frames).
+                net.minecraft.client.gui.DrawContext ctx = new net.minecraft.client.gui.DrawContext(client,
+                    client.getBufferBuilders().getEntityVertexConsumers());
+                client.currentScreen.render(ctx, 0, 0, 0);
+                ctx.draw();
+            }
+            com.example.client.Preview3d.finishForTests();
+        });
         context.waitTicks(2);
         context.takeScreenshot(name);
     }
