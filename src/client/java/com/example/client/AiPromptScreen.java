@@ -59,7 +59,7 @@ public class AiPromptScreen extends Screen {
     private static boolean rawLog = false;
     /** 소품 mode: the furniture presets (ready-made, no AI order) instead of the order chat. */
     private static boolean presetView = false;
-    private static final int PRESET_ROW = 26;
+    private static final int PRESET_ROW = 22;
     private static int journalScroll = 0;  // rows in the list, pixels in the detail
     private static final int JROW = 16;
     private static final SimpleDateFormat TIME = new SimpleDateFormat("MM-dd HH:mm");
@@ -434,11 +434,11 @@ public class AiPromptScreen extends Screen {
         for (int i = 0; i < all.size(); i++) {
             com.example.ai.build.PropLibrary.Def def = all.get(i);
             int cx = left() + 4 + (i % 2) * (colW + 4);
-            int cy = chatTop() + 4 + (i / 2) * PRESET_ROW;
-            if (cy + PRESET_ROW > bottom() - 2) {
+            int cy = chatTop() + 3 + (i / 2) * PRESET_ROW;
+            if (cy + PRESET_ROW > bottom()) {
                 break;
             }
-            button("받기", cx + colW - 44, cy + 3, 40, b -> {
+            button("받기", cx + colW - 44, cy + 1, 40, b -> {
                 if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(
                     com.example.network.AiNetworkPayloads.PropGiveC2SPayload.ID)) {
                     net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
@@ -457,13 +457,13 @@ public class AiPromptScreen extends Screen {
         for (int i = 0; i < all.size(); i++) {
             com.example.ai.build.PropLibrary.Def def = all.get(i);
             int cx = left() + 4 + (i % 2) * (colW + 4);
-            int cy = chatTop() + 4 + (i / 2) * PRESET_ROW;
-            if (cy + PRESET_ROW > bottom() - 2) {
+            int cy = chatTop() + 3 + (i / 2) * PRESET_ROW;
+            if (cy + PRESET_ROW > bottom()) {
                 break;
             }
             inset(ctx, cx, cy, cx + colW, cy + PRESET_ROW - 2, PARCHMENT);
-            ctx.drawText(this.textRenderer, def.name() + " · " + def.w() + "칸", cx + 5, cy + 3, INK, false);
-            ctx.drawText(this.textRenderer, ellipsize(com.example.ai.build.ObjectItems.howToPlace(def), colW - 54), cx + 5, cy + 13, INK_SOFT, false);
+            ctx.drawText(this.textRenderer, def.name() + " · " + def.w() + "칸", cx + 5, cy + 2, INK, false);
+            ctx.drawText(this.textRenderer, ellipsize(com.example.ai.build.ObjectItems.howToPlace(def), colW - 54), cx + 5, cy + 11, INK_SOFT, false);
         }
     }
 
