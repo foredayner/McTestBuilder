@@ -110,9 +110,14 @@ public final class Preview3d {
                 keep(p.key(), null);
             }
         }
+        // Left for the next frame to ask again (kept here only so tests can finish them).
+        MISSED.clear();
+        MISSED.addAll(QUEUE);
         QUEUE.clear();
         QUEUED.clear();
     }
+
+    private static final List<Pending> MISSED = new ArrayList<>();
 
     /** Forget a design's pictures (deleted or changed). */
     public static void forget(String recordId) {
@@ -370,7 +375,9 @@ public final class Preview3d {
 
     /** Tests: make every waiting picture now. */
     public static void finishForTests() {
-        List<Pending> all = new ArrayList<>(QUEUE);
+        List<Pending> all = new ArrayList<>(MISSED);
+        all.addAll(QUEUE);
+        MISSED.clear();
         QUEUE.clear();
         QUEUED.clear();
         for (Pending p : all) {
