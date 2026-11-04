@@ -1343,8 +1343,11 @@ public class AiPromptScreen extends Screen {
             String name = this.hoveredPreset.prompt;
             int tw = this.textRenderer.getWidth(name) + 8;
             int tx = mouseX + 8, ty = mouseY - 14;
+            ctx.getMatrices().push();
+            ctx.getMatrices().translate(0, 0, 400); // over the 3D pictures
             bevel(ctx, tx, ty, tx + tw, ty + 14, PAPER, 0xFFFFFBEF, PARCHMENT_LINE, 1);
             ctx.drawText(this.textRenderer, name, tx + 4, ty + 3, INK, false);
+            ctx.getMatrices().pop();
         }
     }
 
