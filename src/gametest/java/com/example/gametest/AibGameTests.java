@@ -47,7 +47,8 @@ public class AibGameTests implements FabricGameTest {
     @GameTest(templateName = EMPTY_STRUCTURE)
     public void everyLibraryPropFitsItsBlocks(TestContext context) {
         var all = com.example.ai.build.PropLibrary.all();
-        check(all.size() == 11, "11 props in the library, got " + all.size());
+        check(all.size() >= 21, "the library's props, got " + all.size());
+        check(com.example.ai.build.PropLibrary.all("1920s").size() == 10, "ten 1920s props");
         for (var def : all) {
             BuildPlan plan = com.example.ai.build.PropLibrary.plan(def);
             check(plan.ops.isEmpty() && !plan.parts.isEmpty(), def.id() + ": pieces only");
@@ -169,6 +170,32 @@ public class AibGameTests implements FabricGameTest {
                 context.complete();
             });
         });
+    }
+
+    /** Props in a block or of another period are taken out; an empty inside gets its period's basics along the walls. */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void propsAreCheckedAndEmptyRoomsFurnished(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 180f);
+        String shell = "ai.placeBox(0, 0, -9, 9, 6, 9, 'stone_bricks')\n"
+            + "ai.placeBlock(4, 1, -1, 'oak_door[facing=south]')\n";
+        BuildPlan a = Demo.plan(world, origin, player, shell
+            + "ai.prop('sofa', 1, 1, -1, 'north')\n"          // in the front wall
+            + "ai.prop('armchair', 1, 1, -8, 'south')\n"      // fine: its back on the back wall
+            + "ai.prop('gramophone', 5, 1, -8, 'south')\n");  // a 1920s prop in a contemporary house
+        var notes = com.example.ai.build.PropFitter.fit(a, "contemporary", false, null);
+        check(a.props.size() == 1 && "armchair".equals(a.props.get(0).id), "only the armchair stays: " + notes);
+        BuildPlan b = Demo.plan(world, origin, player, shell);
+        b.props.clear();
+        com.example.ai.build.PropFitter.fit(b, "1920s", true, null);
+        check(b.props.size() >= 2, "an empty 1920s inside is furnished: " + b.props.size());
+        for (BuildPlan.Prop p : b.props) {
+            var def = com.example.ai.build.PropLibrary.get(p.id);
+            check(def != null && "1920s".equals(def.era()) && def.fill(), "a 1920s basic: " + p.id);
+            check(p.x >= 1 && p.x <= 7 && p.z >= -8 && p.z <= -2 && p.y == 1, "inside, on the floor: " + p.x + "," + p.y + "," + p.z);
+        }
+        context.complete();
     }
 
     /** The building parts set stairs, doors and shutters the right way round. */

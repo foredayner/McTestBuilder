@@ -27,7 +27,41 @@ public final class PropLibrary {
      * How a prop is listed: mount floor | top (on a table) | wall | ceiling | window (over a window, from its
      * lowest pane up); align back (against the wall behind) | center; pass: players walk through it (a curtain).
      */
-    public record Def(String id, String name, String era, String mount, String align, int w, int d, int light, String about, boolean pass) {
+    public record Def(String id, String name, String era, String mount, String align, int w, int d, int light, String about, boolean pass,
+                      boolean fill) {
+    }
+
+    /** The periods props are made for, and how the AI is told about each. */
+    public static final java.util.Map<String, String> ERAS = new java.util.LinkedHashMap<>();
+
+    static {
+        ERAS.put("1920s", "the 1920s-1930s (Call of Cthulhu's classic era)");
+        ERAS.put("contemporary", "today (the 1990s on)");
+    }
+
+    /** The props of one period. */
+    public static List<Def> all(String era) {
+        List<Def> out = new ArrayList<>();
+        for (Def d : defs().values()) {
+            if (d.era().equals(era)) {
+                out.add(d);
+            }
+        }
+        return out;
+    }
+
+    /** For a request: one line per prop of this period ("" when it has none). */
+    public static String catalog(String era) {
+        StringBuilder sb = new StringBuilder();
+        for (Def d : all(era)) {
+            line(sb, d);
+        }
+        return sb.toString();
+    }
+
+    private static void line(StringBuilder sb, Def d) {
+        sb.append("  ").append(d.id()).append(" (").append(d.w()).append(d.w() == 1 ? " block" : " blocks").append(" wide, ")
+            .append(d.mount()).append("): ").append(d.about()).append('\n');
     }
 
     /** A prop ready to place in the building's frame, which and its name, its light {x, y, z, level} or null, whether it is walked through. */
@@ -99,12 +133,18 @@ public final class PropLibrary {
         return plan;
     }
 
-    /** For the building prompt: one line per prop. */
+    /** For the building prompt: every prop, grouped by period. */
     public static String catalog() {
         StringBuilder sb = new StringBuilder();
-        for (Def d : defs().values()) {
-            sb.append("  ").append(d.id()).append(" (").append(d.w()).append(d.w() == 1 ? " block" : " blocks").append(" wide, ")
-                .append(d.mount()).append("): ").append(d.about()).append('\n');
+        for (Map.Entry<String, String> era : ERAS.entrySet()) {
+            List<Def> list = all(era.getKey());
+            if (list.isEmpty()) {
+                continue;
+            }
+            sb.append("  -- ").append(era.getKey()).append(": ").append(era.getValue()).append('\n');
+            for (Def d : list) {
+                line(sb, d);
+            }
         }
         return sb.toString();
     }

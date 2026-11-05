@@ -397,6 +397,12 @@ public class AiController {
                 AiNetworking.sendLog(player, "[Review] " + failure);
             }
         }
+        if (failure == null && gear == null && !"object".equals(req.mode()) && !plan.props.isEmpty()) {
+            // Furniture presets standing in a block or with no wall behind them are taken out.
+            for (String note : com.example.ai.build.PropFitter.fit(plan, null, false, null)) {
+                AiNetworking.sendLog(player, note);
+            }
+        }
         if (failure == null && gear != null) {
             failure = gearProblem(plan, gear);
             if (failure == null) {
@@ -1482,7 +1488,8 @@ public class AiController {
 
     /** The furniture library, for the API list. */
     static String propsDoc() {
-        return "Ready-made furniture (modern and contemporary buildings only; never in old-period buildings):\n"
+        return "Ready-made furniture, by period: use only the props of the building's own period (a 1920s house gets 1920s props;\n"
+            + "  a period with none listed gets none; a building with no clear period takes the one its request suggests):\n"
             + "  ai.prop(id, x, y, z, facing)\n"
             + "    // (x, y, z) = the air block it stands in, just above the floor; facing = the way its front looks (into the room).\n"
             + "    // Its back lies against the far side of that block: put it in the block right in front of a wall, facing away from it.\n"
@@ -1493,7 +1500,8 @@ public class AiController {
             + "    //   lower-left pane (lowest x or z), y = that pane's height; facing = into the room. Make curtained windows 2 x 2.\n"
             + "    // Place no blocks where a prop is. At most " + com.example.ai.api.MinecraftAI.MAX_PROPS + " per building. Ids:\n"
             + com.example.ai.build.PropLibrary.catalog()
-            + "    // Beds, chests, doors, tables, chairs, shelves, stoves and the like stay real blocks.\n";
+            + "    // Beds, chests, doors, tables, chairs, shelves, stoves and the like stay real blocks.\n"
+            + "    // After building, props that stand in a block or have no wall behind them are taken out.\n";
     }
 
     static String buildingSystem(boolean webSearchEnabled) {

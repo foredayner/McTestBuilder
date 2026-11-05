@@ -112,7 +112,27 @@ public final class AiBuildApi {
      * extra instructions. {@code model} may name another model of the provider (null = configured).
      */
     public record BuildingRequest(String description, String style, List<String> rooms, List<String> marks, String extra,
-                                  String model) {
+                                  String model, String propEra, boolean room) {
+
+        /** Without furniture presets in mind (any period's may be used; nothing is added). */
+        public BuildingRequest(String description, String style, List<String> rooms, List<String> marks, String extra, String model) {
+            this(description, style, rooms, marks, extra, model, null, false);
+        }
+    }
+
+    /**
+     * The furniture-preset period for a town of this period name (the scenario builder's periods:
+     * west_modern → 1920s, west/east_contemporary → contemporary), or "" when there are none for it.
+     */
+    public static String propEraFor(String period) {
+        if (period == null) {
+            return "";
+        }
+        return switch (period) {
+            case "west_modern" -> "1920s";
+            case "west_contemporary", "east_contemporary" -> "contemporary";
+            default -> "";
+        };
     }
 
     /**
@@ -154,6 +174,16 @@ public final class AiBuildApi {
         if (req.extra() != null && !req.extra().isBlank()) {
             user.append("\n").append(req.extra().trim()).append("\n");
         }
+        boolean blocksOnly = req.extra() != null && req.extra().contains(BLOCKS_ONLY);
+        if (req.propEra() != null && !blocksOnly) {
+            String catalog = com.example.ai.build.PropLibrary.catalog(req.propEra());
+            if (catalog.isEmpty()) {
+                user.append("\nFURNITURE PRESETS: none for this period; do not use ai.prop (furnish with blocks).\n");
+            } else {
+                user.append("\nFURNITURE PRESETS for this town's period (use them where they fit the rooms, with ai.prop; no other ids):\n")
+                    .append(catalog);
+            }
+        }
         user.append("\nWrite the Groovy script for it now.");
         AiPrompt base = AiController.buildingPromptWith(user.toString());
         List<String> wanted = new ArrayList<>();
@@ -171,8 +201,18 @@ public final class AiBuildApi {
             if (problem == null) {
                 problem = missingMarks(eval.plan(), wanted);
             }
-            if (problem == null && req.extra() != null && req.extra().contains(BLOCKS_ONLY)) {
+            if (problem == null && blocksOnly) {
                 problem = AiController.blocksOnlyProblemForTests(eval.plan());
+            }
+            if (problem == null && !blocksOnly) {
+                // Furniture presets: wrong ones out, and an empty inside furnished with the period's basics.
+                List<String> notes = com.example.ai.build.PropFitter.fit(eval.plan(), req.propEra(), req.propEra() != null,
+                    req.room() ? new int[] { 0, -site.depth(), site.width() - 1, -1 } : null);
+                if (log != null) {
+                    for (String n : notes) {
+                        log.accept(n);
+                    }
+                }
             }
             return problem == null ? eval.plan() : problem;
         });
