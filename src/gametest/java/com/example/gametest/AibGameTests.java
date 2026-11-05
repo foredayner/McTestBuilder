@@ -922,6 +922,23 @@ public class AibGameTests implements FabricGameTest {
         context.complete();
     }
 
+    /** 소품: 안함 — a design with colours or library furniture is sent back; one of blocks passes. */
+    @GameTest(templateName = EMPTY_STRUCTURE)
+    public void blocksOnlyOrdersRefuseColoursAndFurniture(TestContext context) {
+        ServerWorld world = context.getWorld();
+        BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
+        ServerPlayerEntity player = opPlayer(context, origin, 0f);
+        BuildPlan painted = Demo.plan(world, origin, player, Demo.PAINTED);
+        check(com.example.ai.AiController.blocksOnlyProblemForTests(painted) != null, "colours are refused");
+        BuildPlan room = Demo.plan(world, origin, player, "ai.placeFloor(0, -1, 0, 4, 4, 'stone')\nai.prop('sofa', 0, 0, 2, 'north')\n");
+        check(com.example.ai.AiController.blocksOnlyProblemForTests(room) != null, "library furniture is refused");
+        BuildPlan blocks = Demo.plan(world, origin, player, Demo.APPLE);
+        check(com.example.ai.AiController.blocksOnlyProblemForTests(blocks) == null, "a design of blocks passes");
+        com.example.ai.AiOrder order = com.example.ai.AiOrder.fromJson("{\"prompt\":\"x\",\"blocksOnly\":true}");
+        check(order != null && order.blocksOnly, "the order carries 소품: 안함");
+        context.complete();
+    }
+
     @GameTest(templateName = EMPTY_STRUCTURE)
     public void reviewRejectsBadScriptsBeforeRunning(TestContext context) {
         ServerWorld world = context.getWorld();

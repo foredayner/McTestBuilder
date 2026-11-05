@@ -37,6 +37,8 @@ public final class AiBuilderConfig {
     public boolean screenShake = true;
     /** This game has opened the AI 공방 before (the 가이드 opens first only the very first time). */
     public boolean guideSeen = false;
+    /** 소품: 사용 — buildings and objects may use colours, smooth pieces and the furniture library (off: blocks only). */
+    public boolean useProps = true;
     /** Last model typed for each provider, so switching provider does not lose it. */
     public java.util.Map<String, String> modelByProvider = new java.util.HashMap<>();
 
@@ -179,6 +181,7 @@ public final class AiBuilderConfig {
         copy.keepAliveMinutes = keepAliveMinutes;
         copy.screenShake = screenShake;
         copy.guideSeen = guideSeen;
+        copy.useProps = useProps;
         copy.modelByProvider = new java.util.HashMap<>(modelByProvider);
         return copy;
     }

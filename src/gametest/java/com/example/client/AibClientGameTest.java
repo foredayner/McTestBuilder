@@ -71,6 +71,9 @@ public class AibClientGameTest implements FabricClientGameTest {
                 AiClientState.setMode(1);
             });
             shot(context, () -> AiPromptScreen.open("CREATE", null), "03_create_object_mode");
+            context.runOnClient(client -> com.example.config.AiBuilderConfig.get().useProps = false);
+            shot(context, () -> AiPromptScreen.open("CREATE", null), "03c_object_blocks_only");
+            context.runOnClient(client -> com.example.config.AiBuilderConfig.get().useProps = true);
             context.runOnClient(client -> AiPromptScreen.showPresetsForTests(true));
             shot(context, () -> AiPromptScreen.open("CREATE", null), "03b_object_presets");
             context.runOnClient(client -> {

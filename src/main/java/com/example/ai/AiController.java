@@ -28,7 +28,32 @@ public class AiController {
 
     /** One build request, kept across automatic retries. */
     private record BuildRequest(String userPrompt, AiPrompt basePrompt, boolean webSearch, long startTime, String mode,
-                                String fxHit, String fxIdle, String motion) {
+                                String fxHit, String fxIdle, String motion, boolean blocksOnly) {
+    }
+
+    /** 소품: 안함 — what the AI is told: blocks only, so the build stays whole in a world without the mod. */
+    static final String BLOCKS_ONLY_NOTE = """
+
+            BLOCKS ONLY (the keeper will open this world without the mod): every piece is a real Minecraft block. NEVER a
+            colour ('#rrggbb' or '#rrggbb/50') anywhere, and never ai.prop (the furniture library). Pick the block whose colour
+            is closest (concrete, wool, terracotta, planks...). Round things are built of blocks too.
+            """;
+
+    public static String blocksOnlyProblemForTests(BuildPlan plan) {
+        return blocksOnlyProblem(plan);
+    }
+
+    /** Why a design does not keep to 소품: 안함 (blocks only), or null. */
+    static String blocksOnlyProblem(BuildPlan plan) {
+        if (plan.props != null && !plan.props.isEmpty()) {
+            return "BLOCKS ONLY: do not use ai.prop (the furniture library); build the furniture of blocks.";
+        }
+        for (BuildPlan.Part p : plan.parts) {
+            if (com.example.ai.build.Paint.valid(p.block)) {
+                return "BLOCKS ONLY: a piece is a colour (" + p.block + "); use the real block of the closest colour instead.";
+            }
+        }
+        return null;
     }
 
     /** 고쳐서 주문: what the AI is told after the usual order, with the earlier script. */
@@ -282,12 +307,17 @@ public class AiController {
                 promptText = revisePrompt(promptText, order.baseScript, order.prompt);
                 AiNetworking.sendLog(player, "[AI] 이전 설계를 고치는 중이에요: " + order.prompt);
             }
+            boolean blocksOnly = order.blocksOnly && gearOf(mode) == null;
+            if (blocksOnly) {
+                promptText = new AiPrompt(promptText.system(), promptText.user() + BLOCKS_ONLY_NOTE);
+                AiNetworking.sendLog(player, "[AI] 소품 안함: 블록으로만 만들어요 (모드 없는 월드에서도 남아요).");
+            }
 
             debug("[DEBUG] Sending to AI provider...");
             AiNetworking.sendDebugLog(player, "[AI] Requesting from AI model (" + config.provider.getDisplayName() + ")...");
 
             sendToAi(player, new BuildRequest(prompt, promptText, webSearch, startTime, mode, hitText, idleText,
-                com.example.content.GearMotions.normalize(motion)), promptText, 0);
+                com.example.content.GearMotions.normalize(motion), blocksOnly), promptText, 0);
 
         } catch (Exception exception) {
             debug("[ERROR] Fatal error: " + exception.getMessage());
@@ -361,6 +391,12 @@ public class AiController {
         BuildPlan plan = eval.plan();
         ScriptExecutor.ExecutionResult result = eval.result();
         String failure = eval.failure();
+        if (failure == null && req.blocksOnly()) {
+            failure = blocksOnlyProblem(plan);
+            if (failure != null) {
+                AiNetworking.sendLog(player, "[Review] " + failure);
+            }
+        }
         if (failure == null && gear != null) {
             failure = gearProblem(plan, gear);
             if (failure == null) {

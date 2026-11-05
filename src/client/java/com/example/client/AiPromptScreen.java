@@ -337,6 +337,19 @@ public class AiPromptScreen extends Screen {
         boolean object = AiClientState.isObjectMode();
         boolean gear = AiClientState.isGearMode();
         button(gear ? "모드: 장비" : object ? "모드: 소품" : "모드: 건물", right() - 84, top(), 84, b -> AiClientState.cycleMode());
+        if (!gear && !(object && presetView)) {
+            // 소품: 사용 / 안함 — off: blocks only, so what is made stays whole in a world without the mod.
+            boolean use = com.example.config.AiBuilderConfig.get().useProps;
+            int px = right() - 84 - 4 - (object ? 88 + 4 : 0) - 72;
+            WoodButton props = button(use ? "소품: 사용" : "소품: 안함", px, top(), 72, b -> {
+                com.example.config.AiBuilderConfig.get().useProps = !com.example.config.AiBuilderConfig.get().useProps;
+                com.example.config.AiBuilderConfig.save();
+                rebuild();
+            });
+            props.setTooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal(use
+                ? "색칠·매끈한 조각과 가구 프리셋을 써요. 모드 없는 월드에서는 그 부분이 사라져요."
+                : "블록으로만 만들어요. 모드 없는 월드(바닐라)로 옮겨도 그대로 남아요.")));
+        }
         if (object) {
             // 기본 소품 (an AI order) <-> 소품 프리셋 (ready-made furniture).
             button(presetView ? "← 기본 소품" : "소품 프리셋", right() - 84 - 4 - 88, top(), 88, b -> {
@@ -546,7 +559,7 @@ public class AiPromptScreen extends Screen {
             : object ? "원하는 소품을 이야기해 주세요" : "원하는 건물을 이야기해 주세요";
         if (!gear) {
             // In 장비 mode the order's buttons take the whole row.
-            ctx.drawText(this.textRenderer, ellipsize(header, right() - left() - 96), left() + 2, top() + 5, INK_SOFT, false);
+            ctx.drawText(this.textRenderer, ellipsize(header, right() - left() - (object ? 260 : 168)), left() + 2, top() + 5, INK_SOFT, false);
         }
 
         int l = left(), r = right(), t = chatTop(), b = chatBottom();

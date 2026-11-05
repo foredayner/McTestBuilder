@@ -360,6 +360,7 @@ public final class AiClientState {
         order.web = willUseWebSearch();
         // Orders are always blocks now (the pixel art choice is hidden; its code stays).
         order.mode = mode == 1 ? "object" : mode == 2 ? "gear:" + gearKind.id() : "build";
+        order.blocksOnly = mode != 2 && !com.example.config.AiBuilderConfig.get().useProps;
         if (mode == 2) {
             order.fxHit = gearKind.worn() ? "" : clean(fxHit);
             order.fxIdle = clean(fxIdle);

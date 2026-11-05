@@ -23,6 +23,8 @@ public final class AiOrder {
     public String fxHit = "";
     public String fxIdle = "";
     public String motion = "";
+    /** 소품: 안함 — blocks only (no painted or smooth pieces, no library furniture), so it all stays in a world without the mod. */
+    public boolean blocksOnly;
     /** 고쳐서 주문: the record being changed (its id, script and first description). */
     public String baseId = "";
     public String baseScript = "";
