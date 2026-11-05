@@ -1276,6 +1276,9 @@ public class AiController {
             - Never more than 4 blocks in any direction unless the request asks for it.
 
             SMOOTH SHAPES (on the grid; a later shape paints over earlier ones where they overlap):
+              In a solid colour ('#rrggbb') a sphere, ellipsoid, cylinder, cone or capsule is drawn perfectly smooth (one round
+              piece, not steps); overlapping round pieces simply show together (the one further out is seen). In a block or a
+              see-through colour it is built of small steps. Use colours for round, toy-like things (fruit, balls, ducks).
               ai.addSphere(block, cx, cy, cz, r)
               ai.addEllipsoid(block, cx, cy, cz, rx, ry, rz)
               ai.addCylinder(block, cx, bottomY, cz, r, height)                 // upright

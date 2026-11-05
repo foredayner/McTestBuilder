@@ -65,6 +65,23 @@ public final class BuildPlan {
         public double roll;
         /** Animation group (index into the plan's groups, 1-based); 0 = does not move. */
         public int group;
+        /**
+         * Painted round pieces drawn smooth by the mod: "sphere" (an ellipsoid filling sx, sy, sz),
+         * "cylinder" or "cone" (upright along the part's y, top radius = taper x bottom radius);
+         * null = a box. One piece instead of many small boxes.
+         */
+        public String shape;
+        public double taper = 1;
+
+        public static final java.util.Set<String> SHAPES = java.util.Set.of("sphere", "cylinder", "cone");
+
+        /** Copy the round shape of another piece onto this one (for copies that move, scale or turn it). */
+        public Part shapeOf(Part other) {
+            this.shape = other.shape;
+            this.taper = other.taper;
+            this.group = other.group;
+            return this;
+        }
 
         public Part() {
         }
@@ -257,8 +274,7 @@ public final class BuildPlan {
         for (Part p : parts) {
             out.parts.add(new Part(p.block,
                 px + (p.x - px) * s, py + (p.y - py) * s, pz + (p.z - pz) * s,
-                p.sx * s, p.sy * s, p.sz * s, p.yaw, p.pitch, p.roll));
-            out.parts.get(out.parts.size() - 1).group = p.group;
+                p.sx * s, p.sy * s, p.sz * s, p.yaw, p.pitch, p.roll).shapeOf(p));
         }
         return out;
     }
@@ -292,8 +308,7 @@ public final class BuildPlan {
         out.facing = facing;
         out.ops = new ArrayList<>(ops);
         for (Part p : parts) {
-            out.parts.add(new Part(p.block, p.x + dx, p.y + dy, p.z + dz, p.sx, p.sy, p.sz, p.yaw, p.pitch, p.roll));
-            out.parts.get(out.parts.size() - 1).group = p.group;
+            out.parts.add(new Part(p.block, p.x + dx, p.y + dy, p.z + dz, p.sx, p.sy, p.sz, p.yaw, p.pitch, p.roll).shapeOf(p));
         }
         return out;
     }

@@ -310,8 +310,7 @@ public class MinecraftAI {
             }
             String block = com.example.ai.build.Paint.valid(p.block) ? p.block : rotateBlockState(p.block, turns);
             BuildPlan.Part q = new BuildPlan.Part(block, cx, p.y, cz, p.sx, p.sy, p.sz, p.yaw - 90.0 * turns, p.pitch, p.roll);
-            q.group = p.group;
-            out.parts.add(q);
+            out.parts.add(q.shapeOf(p));
         }
         return out;
     }
@@ -966,6 +965,44 @@ public class MinecraftAI {
         canvas.add(pieceMaterial(blockName), shape, mirrorX, group, mirrorX != null && group != 0 ? mirrorGroup() : 0);
     }
 
+    /** Whether a round shape of this material is drawn smooth: solid colours ('#rrggbb'), not blocks or see-through paint. */
+    private static boolean smoothable(String blockName) {
+        if (recorder == null || blockName == null || !com.example.ai.build.Paint.is(blockName)) {
+            return false;
+        }
+        String paint = com.example.ai.build.Paint.parse(blockName);
+        return paint != null && com.example.ai.build.Paint.opacity(paint) >= 100;
+    }
+
+    /**
+     * A painted round shape as one smooth piece (drawn by the mod), centred on (x, y, z) with its
+     * size and turn; its mirrored twin too. False when the material is not a solid colour: then it
+     * is built of small boxes as before.
+     */
+    private static boolean smooth(String blockName, String shape, double x, double y, double z, double sx, double sy, double sz,
+                                  double taper, double yaw, double pitch) {
+        if (!smoothable(blockName) || ForbiddenBlockRegistry.isForbidden(blockName)) {
+            return false;
+        }
+        if (!(sx > 0 && sy > 0 && sz > 0)) {
+            return true; // nothing to draw
+        }
+        String paint = pieceMaterial(blockName);
+        BuildPlan.Part part = new BuildPlan.Part(paint, x, y, z, sx, sy, sz, yaw, pitch, 0);
+        part.shape = shape;
+        part.taper = Math.max(0, Math.min(1, taper));
+        part.group = group;
+        recorder.parts.add(part);
+        if (mirrorX != null && Math.abs(x - mirrorX) > 1e-6) {
+            BuildPlan.Part twin = new BuildPlan.Part(paint, 2 * mirrorX - x, y, z, sx, sy, sz, -yaw, pitch, 0);
+            twin.shape = shape;
+            twin.taper = part.taper;
+            twin.group = group != 0 ? mirrorGroup() : 0;
+            recorder.parts.add(twin);
+        }
+        return true;
+    }
+
     /** What an object or equipment piece is made of: a block id, or a colour ('#rrggbb', see-through '#rrggbb/50'). */
     private static String pieceMaterial(String blockName) {
         if (com.example.ai.build.Paint.is(blockName)) {
@@ -981,27 +1018,44 @@ public class MinecraftAI {
     /** Upright cylinder: centre (cx, cz), bottom at y. */
     public static void addCylinder(String blockName, Number cx, Number y, Number cz, Number radius, Number height) {
         double r = toDouble(radius);
-        shape(blockName, ShapeCanvas.frustum(toDouble(cx), toDouble(y), toDouble(cz), r, r, toDouble(height)));
+        double h = toDouble(height);
+        if (smooth(blockName, "cylinder", toDouble(cx), toDouble(y) + h / 2, toDouble(cz), 2 * r, h, 2 * r, 1, 0, 0)) {
+            return;
+        }
+        shape(blockName, ShapeCanvas.frustum(toDouble(cx), toDouble(y), toDouble(cz), r, r, h));
     }
 
     /** Ball of radius r around (cx, cy, cz). */
     public static void addSphere(String blockName, Number cx, Number cy, Number cz, Number radius) {
         double r = toDouble(radius);
+        if (smooth(blockName, "sphere", toDouble(cx), toDouble(cy), toDouble(cz), 2 * r, 2 * r, 2 * r, 1, 0, 0)) {
+            return;
+        }
         shape(blockName, ShapeCanvas.ellipsoid(toDouble(cx), toDouble(cy), toDouble(cz), r, r, r));
     }
 
     public static void addEllipsoid(String blockName, Number cx, Number cy, Number cz, Number rx, Number ry, Number rz) {
+        if (smooth(blockName, "sphere", toDouble(cx), toDouble(cy), toDouble(cz), 2 * toDouble(rx), 2 * toDouble(ry), 2 * toDouble(rz), 1, 0, 0)) {
+            return;
+        }
         shape(blockName, ShapeCanvas.ellipsoid(toDouble(cx), toDouble(cy), toDouble(cz), toDouble(rx), toDouble(ry), toDouble(rz)));
     }
 
     /** Upright cone, point on top. */
     public static void addCone(String blockName, Number cx, Number y, Number cz, Number radius, Number height) {
-        shape(blockName, ShapeCanvas.frustum(toDouble(cx), toDouble(y), toDouble(cz), toDouble(radius), 0, toDouble(height)));
+        addCone(blockName, cx, y, cz, radius, 0, height);
     }
 
     /** Upright cut cone: bottom radius, top radius. */
     public static void addCone(String blockName, Number cx, Number y, Number cz, Number bottomRadius, Number topRadius, Number height) {
-        shape(blockName, ShapeCanvas.frustum(toDouble(cx), toDouble(y), toDouble(cz), toDouble(bottomRadius), toDouble(topRadius), toDouble(height)));
+        double r1 = toDouble(bottomRadius), r2 = toDouble(topRadius), h = toDouble(height);
+        double big = Math.max(r1, r2);
+        // Wider at the top: the same cone turned upside down.
+        if (big > 0 && smooth(blockName, "cone", toDouble(cx), toDouble(y) + h / 2, toDouble(cz), 2 * big, Math.abs(h), 2 * big,
+            Math.min(r1, r2) / big, 0, (r2 > r1) != (h < 0) ? 180 : 0)) {
+            return;
+        }
+        shape(blockName, ShapeCanvas.frustum(toDouble(cx), toDouble(y), toDouble(cz), r1, r2, h));
     }
 
     public static void addCapsule(String blockName, Number x1, Number y1, Number z1, Number x2, Number y2, Number z2, Number radius) {
@@ -1011,6 +1065,31 @@ public class MinecraftAI {
     /** Rounded rod from (x1,y1,z1) with radius r1 to (x2,y2,z2) with radius r2. */
     public static void addCapsule(String blockName, Number x1, Number y1, Number z1, Number x2, Number y2, Number z2,
                                   Number r1, Number r2) {
+        if (smoothable(blockName)) {
+            // Smooth: a rod (a cylinder, or a cut cone when the ends differ) and a ball at each end.
+            double ax = toDouble(x1), ay = toDouble(y1), az = toDouble(z1), bx = toDouble(x2), by = toDouble(y2), bz = toDouble(z2);
+            double ra = toDouble(r1), rb = toDouble(r2);
+            if (rb > ra) {
+                double t;
+                t = ax; ax = bx; bx = t;
+                t = ay; ay = by; by = t;
+                t = az; az = bz; bz = t;
+                t = ra; ra = rb; rb = t;
+            }
+            double dx = bx - ax, dy = by - ay, dz = bz - az;
+            double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (len > 1e-6 && ra > 0) {
+                double pitch = Math.toDegrees(Math.acos(Math.max(-1, Math.min(1, dy / len))));
+                double yaw = Math.toDegrees(Math.atan2(dx, dz));
+                smooth(blockName, ra == rb ? "cylinder" : "cone", (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, 2 * ra, len, 2 * ra,
+                    rb / ra, yaw, pitch);
+            }
+            smooth(blockName, "sphere", ax, ay, az, 2 * ra, 2 * ra, 2 * ra, 1, 0, 0);
+            if (rb > 0) {
+                smooth(blockName, "sphere", bx, by, bz, 2 * rb, 2 * rb, 2 * rb, 1, 0, 0);
+            }
+            return;
+        }
         List<double[]> points = List.of(
             new double[] { toDouble(x1), toDouble(y1), toDouble(z1) },
             new double[] { toDouble(x2), toDouble(y2), toDouble(z2) });
@@ -1112,6 +1191,17 @@ public class MinecraftAI {
         double base = Math.min(part.y, Math.max(part.y - r, floor));
         double drop = part.y - base;
         double boxH = part.y + r - base;
+        if (paint && part.shape != null) {
+            // A smooth round piece: the mod's own display item, which draws the shape (sphere, cylinder, cone).
+            return String.format(Locale.ROOT,
+                "summon minecraft:item_display %.4f %.4f %.4f {item:{id:\"minecraft-ai-build-assistant:smooth\",count:1,components:{"
+                    + "\"minecraft:dyed_color\":{rgb:%d},\"minecraft:custom_data\":{aib_shape:\"%s\",aib_taper:%.4ff}}},"
+                    + "transformation:{left_rotation:[%.6ff,%.6ff,%.6ff,%.6ff],"
+                    + "right_rotation:[0f,0f,0f,1f],translation:[0f,%.4ff,0f],scale:[%.4ff,%.4ff,%.4ff]},"
+                    + "width:%.4ff,height:%.4ff,Tags:[\"aib\",\"%s\"]}",
+                at.getX() + cx, at.getY() + base, at.getZ() + cz, com.example.ai.build.Paint.rgb(part.block), part.shape, part.taper,
+                q.x, q.y, q.z, q.w, drop, part.sx, part.sy, part.sz, 2 * r, boxH, tag);
+        }
         if (paint) {
             // A painted piece: an item display of a white cube dyed in its colour (the item's
             // texture carries the opacity). Its model is centred on the entity, not cornered.

@@ -29,6 +29,8 @@ public class AiBuildAssistantClient implements ClientModInitializer {
             ObjectIconRenderer.TYPE_ID, ObjectIconRenderer.Unbaked.CODEC);
         net.minecraft.client.render.item.model.special.SpecialModelTypes.ID_MAPPER.put(
             GearModelRenderer.TYPE_ID, GearModelRenderer.Unbaked.CODEC);
+        net.minecraft.client.render.item.model.special.SpecialModelTypes.ID_MAPPER.put(
+            SmoothShapes.TYPE_ID, SmoothShapes.Unbaked.CODEC);
         WearRenderer.register();
         net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(
             (context, tickCounter) -> ObjectBreaking.renderHud(context));

@@ -126,6 +126,22 @@ public final class BuildPreview {
      * Objects: rasterise each rotated part into a fine grid (r cells per block) so pieces smaller
      * than a block still show.
      */
+    /** Whether a point in a piece's own frame is inside it: its box, or its round shape. */
+    private static boolean inside(BuildPlan.Part p, Vector3f l, double hx, double hy, double hz) {
+        if (Math.abs(l.x) > hx || Math.abs(l.y) > hy || Math.abs(l.z) > hz) {
+            return false;
+        }
+        if (p.shape == null) {
+            return true;
+        }
+        double x = l.x / hx, y = l.y / hy, z = l.z / hz;
+        if ("sphere".equals(p.shape)) {
+            return x * x + y * y + z * z <= 1;
+        }
+        double r = "cone".equals(p.shape) ? 1 - (1 - p.taper) * (y + 1) / 2 : 1; // radius at this height
+        return x * x + z * z <= r * r;
+    }
+
     static BuildPreview computeObject(BuildPlan plan) {
         int turns = BuildPlan.turnsBetween(plan.facing, "north");
         Map<String, Integer> colors = new HashMap<>();
@@ -168,7 +184,7 @@ public final class BuildPreview {
                     for (int iz = (int) Math.floor((cz - reach) * r); iz <= (int) Math.ceil((cz + reach) * r); iz++) {
                         local.set((float) ((ix + 0.5) / r - cx), (float) ((iy + 0.5) / r - p.y), (float) ((iz + 0.5) / r - cz));
                         inverse.transform(local);
-                        if (Math.abs(local.x) <= hx && Math.abs(local.y) <= hy && Math.abs(local.z) <= hz) {
+                        if (inside(p, local, hx, hy, hz)) {
                             voxels.put(key(ix, iy, iz), color);
                         }
                     }

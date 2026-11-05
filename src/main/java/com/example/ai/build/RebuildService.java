@@ -236,6 +236,10 @@ public final class RebuildService {
             return "too many object parts (" + plan.parts.size() + ")";
         }
         for (BuildPlan.Part part : plan.parts) {
+            if (part.shape != null && (!BuildPlan.Part.SHAPES.contains(part.shape) || !Paint.valid(part.block)
+                || !(part.taper >= 0 && part.taper <= 1))) {
+                return "bad round piece " + part.shape;
+            }
             if (Paint.valid(part.block)) {
                 // A painted piece: nothing to check but its size and place (below).
             } else if (part.block == null || !BLOCK.matcher(part.block).matches()) {

@@ -609,6 +609,12 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             .rotateZ((float) Math.toRadians(p.roll));
         matrices.multiply(turn);
         MatrixStack.Entry e = matrices.peek();
+        if (p.shape != null) {
+            // A smooth round piece: the mesh instead of a box.
+            SmoothShapes.draw(e, buffer, p.shape, (float) p.taper, (float) p.sx, (float) p.sy, (float) p.sz, color, light, overlay);
+            matrices.pop();
+            return;
+        }
         float hx = (float) p.sx / 2, hy = (float) p.sy / 2, hz = (float) p.sz / 2;
         Vector3f[] corner = new Vector3f[8];
         for (int i = 0; i < 8; i++) {

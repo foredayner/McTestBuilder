@@ -38,6 +38,49 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
         ai.prop('partition', 11, 0, 34, 'north')
         """;
 
+    /** Smooth round pieces: solid colours instead of blocks. */
+    static final String SMOOTH_DUCK = com.example.ai.AiController.EXAMPLE_DUCK
+        .replace("'yellow_concrete'", "'#f4d03f'").replace("'yellow_terracotta'", "'#d9a520'")
+        .replace("'orange_concrete'", "'#e67e22'").replace("'black_concrete'", "'#1e1e1e'")
+        .replace("'red_concrete'", "'#c0392b'").replace("'white_concrete'", "'#ffffff'");
+
+    static final String SMOOTH_APPLE = """
+        def z = 2.6
+        ai.addSphere('#c0392b', 0, 0.42, z, 0.4)                           // apple
+        ai.addEllipsoid('#a93226', 0, 0.8, z, 0.14, 0.05, 0.14)           // the hollow at the top
+        ai.addCylinder('#6e4b2a', 0, 0.78, z, 0.03, 0.2)                   // stem
+        ai.addCapsule('#3c9a3c', 0.02, 0.92, z, 0.2, 1.0, z - 0.05, 0.05, 0.02) // leaf
+        """;
+
+    static final String SMOOTH_SNOWMAN = """
+        def z = 2.6
+        ai.addSphere('#f4f6f7', 0, 0.42, z, 0.42)                          // bottom
+        ai.addSphere('#f4f6f7', 0, 1.05, z, 0.3)                           // middle
+        ai.addSphere('#f4f6f7', 0, 1.52, z, 0.22)                          // head
+        ai.addCapsule('#e67e22', 0, 1.52, z - 0.2, 0, 1.5, z - 0.5, 0.05, 0.0) // carrot nose
+        ai.addCylinder('#1e1e1e', 0, 1.7, z, 0.24, 0.03)                   // hat brim
+        ai.addCylinder('#1e1e1e', 0, 1.72, z, 0.15, 0.25)                  // hat
+        ai.addSphere('#1e1e1e', 0, 1.13, z - 0.29, 0.035)                  // buttons
+        ai.addSphere('#1e1e1e', 0, 0.98, z - 0.3, 0.035)
+        ai.mirrorOn()
+        ai.addSphere('#1e1e1e', 0.08, 1.6, z - 0.19, 0.03)                 // eyes
+        ai.addCapsule('#6e4b2a', 0.27, 1.1, z, 0.6, 1.35, z, 0.025, 0.02)  // stick arms
+        ai.mirrorOff()
+        """;
+
+    static final String SMOOTH_MUSHROOM = """
+        def z = 2.6
+        ai.addCylinder('#f2ead3', 0, 0, z, 0.16, 0.55)                     // stem
+        ai.addEllipsoid('#c0392b', 0, 0.6, z, 0.45, 0.28, 0.45)            // cap
+        ai.addEllipsoid('#f2ead3', 0, 0.5, z, 0.4, 0.1, 0.4)               // underside
+        ai.addSphere('#ffffff', 0, 0.87, z, 0.07)                          // spots
+        ai.addSphere('#ffffff', 0.25, 0.73, z - 0.22, 0.06)
+        ai.addSphere('#ffffff', -0.28, 0.7, z - 0.15, 0.05)
+        ai.addSphere('#ffffff', 0.05, 0.75, z - 0.33, 0.055)
+        ai.addCone('#3c9a3c', 0.4, 0, z - 0.2, 0.08, 0.25)                 // grass
+        ai.addCone('#3c9a3c', 0.5, 0, z - 0.1, 0.06, 0.18)
+        """;
+
     @Override
     public void runTest(ClientGameTestContext context) {
         if (System.getenv("AIB_BENCH_ONLY") != null) {
@@ -62,6 +105,12 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
                 Demo.place(player, origin, house, 0, "예시 집");
                 BuildPlan gallery = Demo.plan(world, origin, player, GALLERY);
                 Demo.place(player, origin, gallery, 0, "소품 모음");
+                // Round things: the duck of blocks, then smooth ones in colours.
+                String[] round = { com.example.ai.AiController.EXAMPLE_DUCK, SMOOTH_DUCK, SMOOTH_APPLE, SMOOTH_SNOWMAN, SMOOTH_MUSHROOM };
+                for (int i = 0; i < round.length; i++) {
+                    BlockPos at = origin.add(20 + (i < 2 ? i * 2 : 1 + i * 2), 0, 0);
+                    Demo.place(player, at, Demo.plan(world, at, player, round[i]), 0, "둥근 소품 " + i);
+                }
                 player.getAbilities().flying = true; // the camera stays where it is put
                 player.sendAbilitiesUpdate();
                 return origin;
@@ -74,6 +123,8 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
             view(context, game, o, 2.5, 1, 4.6, -25, 15, "34_house_kitchen");
             view(context, game, o, -8, 1, 28.5, 0, 10, "35_props_left");
             view(context, game, o, 5, 1, 28.5, 0, 10, "36_props_right");
+            view(context, game, o, 21, 1.6, 0.4, 0, 12, "37_duck_blocks_and_smooth");
+            view(context, game, o, 28, 1.8, -0.6, 0, 12, "38_smooth_apple_snowman_mushroom");
         }
     }
 

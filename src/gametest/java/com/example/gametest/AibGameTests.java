@@ -291,6 +291,9 @@ public class AibGameTests implements FabricGameTest {
         BuildPlan plan = Demo.plan(world, origin, player, Demo.PAINTED);
         check(plan.parts.stream().allMatch(p -> com.example.ai.build.Paint.valid(p.block)), "every piece is a stored colour");
         check(plan.parts.stream().anyMatch(p -> p.block.equals("#eef2ff/50")), "the ghost keeps its opacity");
+        check(plan.parts.stream().anyMatch(p -> "sphere".equals(p.shape) && p.block.equals("#1c1c2e")),
+            "a sphere in a solid colour is one smooth piece");
+        check(plan.parts.stream().noneMatch(p -> p.shape != null && p.block.contains("/")), "see-through colours stay in steps");
         check(com.example.ai.build.RebuildService.validate(plan) == null, "a painted design can be placed again from the 보관함");
         BuildRecord record = Demo.place(player, origin, plan, 1, "painted");
         String tag = "aib_" + record.id;
@@ -299,6 +302,8 @@ public class AibGameTests implements FabricGameTest {
         check(shown.size() == plan.parts.size(), plan.parts.size() + " painted pieces, got " + shown.size());
         java.util.List<net.minecraft.nbt.NbtCompound> items = shown.stream()
             .map(e -> e.writeNbt(new net.minecraft.nbt.NbtCompound()).getCompound("item")).toList();
+        check(items.stream().anyMatch(i -> "minecraft-ai-build-assistant:smooth".equals(i.getString("id"))),
+            "smooth pieces are the mod's smooth item: " + items);
         check(items.stream().anyMatch(i -> "minecraft-ai-build-assistant:paint_50".equals(i.getString("id"))),
             "see-through pieces show the 50% item: " + items.get(0));
         check(items.stream().anyMatch(i -> {

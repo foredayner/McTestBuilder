@@ -52,7 +52,7 @@ public final class AibContent {
                 .build(arrowKey));
 
         // Painted object pieces are item displays of these: a white cube, dyed; the texture holds the opacity.
-        for (String paint : new String[] { "paint", "paint_75", "paint_50", "paint_25" }) {
+        for (String paint : new String[] { "paint", "paint_75", "paint_50", "paint_25", "smooth" }) {
             RegistryKey<Item> key = RegistryKey.of(RegistryKeys.ITEM, Identifier.of(AiBuildAssistantMod.MOD_ID, paint));
             Registry.register(Registries.ITEM, key, new Item(new Item.Settings().registryKey(key)));
         }
