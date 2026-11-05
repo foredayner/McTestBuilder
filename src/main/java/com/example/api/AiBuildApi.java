@@ -115,6 +115,13 @@ public final class AiBuildApi {
                                   String model) {
     }
 
+    /**
+     * Put this in a request's {@code extra} for blocks only (소품: 안함): no colours, smooth pieces or
+     * library furniture, so the building stays whole in a world without this mod; a design that
+     * still uses them is sent back to be fixed.
+     */
+    public static final String BLOCKS_ONLY = AiController.BLOCKS_ONLY_NOTE.strip();
+
     /** Design frame of a building: the designer stands at (0, 0, 0) looking north (-Z). */
     private static final float DESIGN_YAW = 180f;
 
@@ -163,6 +170,9 @@ public final class AiBuildApi {
             String problem = siteProblem(eval.plan(), site);
             if (problem == null) {
                 problem = missingMarks(eval.plan(), wanted);
+            }
+            if (problem == null && req.extra() != null && req.extra().contains(BLOCKS_ONLY)) {
+                problem = AiController.blocksOnlyProblemForTests(eval.plan());
             }
             return problem == null ? eval.plan() : problem;
         });

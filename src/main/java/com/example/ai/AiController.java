@@ -32,7 +32,7 @@ public class AiController {
     }
 
     /** 소품: 안함 — what the AI is told: blocks only, so the build stays whole in a world without the mod. */
-    static final String BLOCKS_ONLY_NOTE = """
+    public static final String BLOCKS_ONLY_NOTE = """
 
             BLOCKS ONLY (the keeper will open this world without the mod): every piece is a real Minecraft block. NEVER a
             colour ('#rrggbb' or '#rrggbb/50') anywhere, and never ai.prop (the furniture library). Pick the block whose colour
