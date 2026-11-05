@@ -36,6 +36,7 @@ public final class PropLibrary {
 
     static {
         ERAS.put("1920s", "the 1920s-1930s (Call of Cthulhu's classic era)");
+        ERAS.put("joseon", "Joseon Korea, before 1900 (hanok, floor sitting)");
         ERAS.put("contemporary", "today (the 1990s on)");
     }
 

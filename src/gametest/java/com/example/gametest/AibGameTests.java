@@ -49,6 +49,7 @@ public class AibGameTests implements FabricGameTest {
         var all = com.example.ai.build.PropLibrary.all();
         check(all.size() >= 21, "the library's props, got " + all.size());
         check(com.example.ai.build.PropLibrary.all("1920s").size() == 10, "ten 1920s props");
+        check(com.example.ai.build.PropLibrary.all("joseon").size() == 10, "ten Joseon props");
         for (var def : all) {
             BuildPlan plan = com.example.ai.build.PropLibrary.plan(def);
             check(plan.ops.isEmpty() && !plan.parts.isEmpty(), def.id() + ": pieces only");

@@ -122,7 +122,7 @@ public final class AiBuildApi {
 
     /**
      * The furniture-preset period for a town of this period name (the scenario builder's periods:
-     * west_modern → 1920s, west/east_contemporary → contemporary), or "" when there are none for it.
+     * west_modern → 1920s, east_medieval → joseon, west/east_contemporary → contemporary), or "" when there are none for it.
      */
     public static String propEraFor(String period) {
         if (period == null) {
@@ -130,6 +130,7 @@ public final class AiBuildApi {
         }
         return switch (period) {
             case "west_modern" -> "1920s";
+            case "east_medieval" -> "joseon";
             case "west_contemporary", "east_contemporary" -> "contemporary";
             default -> "";
         };

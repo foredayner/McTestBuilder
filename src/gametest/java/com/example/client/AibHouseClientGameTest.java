@@ -56,6 +56,24 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
         ai.prop('candelabra', 5, 1, 45, 'north')
         """;
 
+    /** The Joseon props in a row before a white wall, with a low table for those that stand on one. */
+    static final String GALLERY_JOSEON = """
+        ai.clearArea(-15, 0, 52, 31, 5, 6)
+        ai.placeFloor(-15, -1, 52, 31, 5, 'spruce_planks')
+        ai.placeWall(-15, 0, 56, 4, 31, 'x', 'white_terracotta')
+        ai.prop('byeongpung', -13, 0, 55, 'north')
+        ai.prop('deungjan', -10, 0, 55, 'north')
+        ai.prop('soban', -9, 0, 55, 'north')
+        ai.prop('hwaro', -8, 0, 55, 'north')
+        ai.prop('janggu', -7, 0, 55, 'north')
+        ai.prop('buk', -5, 0, 55, 'north')
+        ai.prop('maetdol', -3, 0, 55, 'north')
+        ai.prop('gat_peg', -1, 0, 55, 'north')
+        ai.placeFloor(1, 0, 55, 3, 1, 'spruce_slab')
+        ai.prop('horong', 1, 0.5, 55, 'north')
+        ai.prop('munbang', 2, 0.5, 55, 'north')
+        """;
+
     /** Smooth round pieces: solid colours instead of blocks. */
     static final String SMOOTH_DUCK = com.example.ai.AiController.EXAMPLE_DUCK
         .replace("'yellow_concrete'", "'#f4d03f'").replace("'yellow_terracotta'", "'#d9a520'")
@@ -124,6 +142,7 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
                 BuildPlan gallery = Demo.plan(world, origin, player, GALLERY);
                 Demo.place(player, origin, gallery, 0, "소품 모음");
                 Demo.place(player, origin, Demo.plan(world, origin, player, GALLERY_1920S), 0, "1920년대 소품");
+                Demo.place(player, origin, Demo.plan(world, origin, player, GALLERY_JOSEON), 0, "조선 소품");
                 // Round things: the duck of blocks, then smooth ones in colours.
                 String[] round = { com.example.ai.AiController.EXAMPLE_DUCK, SMOOTH_DUCK, SMOOTH_APPLE, SMOOTH_SNOWMAN, SMOOTH_MUSHROOM };
                 for (int i = 0; i < round.length; i++) {
@@ -144,6 +163,8 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
             view(context, game, o, 5, 1, 28.5, 0, 10, "36_props_right");
             view(context, game, o, -7.5, 1.2, 39.5, 0, 12, "39_props_1920s_left");
             view(context, game, o, 1, 1.4, 41.2, 0, 22, "40_props_1920s_right");
+            view(context, game, o, -9.5, 1.3, 50, 0, 15, "41_props_joseon_left");
+            view(context, game, o, -1, 1.3, 51, 0, 18, "42_props_joseon_right");
             view(context, game, o, 21, 1.6, 0.4, 0, 12, "37_duck_blocks_and_smooth");
             view(context, game, o, 28, 1.8, -0.6, 0, 12, "38_smooth_apple_snowman_mushroom");
         }
