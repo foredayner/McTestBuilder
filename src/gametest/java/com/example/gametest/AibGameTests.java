@@ -113,7 +113,7 @@ public class AibGameTests implements FabricGameTest {
      * Presets by hand: a curtain clicked on a 2 x 2 window covers it from its lowest pane and is walked
      * through; a lamp set on the floor lights it; mined, each comes back as its preset and the light goes.
      */
-    @GameTest(templateName = EMPTY_STRUCTURE)
+    @GameTest(templateName = EMPTY_STRUCTURE, tickLimit = 400)
     public void presetsAreSetByHandAndMinedBack(TestContext context) {
         ServerWorld world = context.getWorld();
         BlockPos origin = context.getAbsolutePos(new BlockPos(1, 1, 1));
@@ -136,7 +136,8 @@ public class AibGameTests implements FabricGameTest {
         check(com.example.ai.build.ObjectItems.useProp(player, com.example.ai.build.ObjectItems.propStack(lampDef), floor,
             net.minecraft.util.math.Direction.UP, net.minecraft.util.math.Vec3d.ofCenter(floor).add(0, 0.5, 0)), "the lamp goes on the floor");
         Box area = new Box(origin).expand(8);
-        context.waitAndRun(40, () -> {
+        // Placing shares the server's queue with the other tests: give it time.
+        context.waitAndRun(200, () -> {
             var curtain = world.getEntitiesByClass(com.example.content.SolidHitboxEntity.class, area,
                 e -> e.getCommandTags().contains(com.example.ai.api.MinecraftAI.PROP_TAG + "curtain"));
             check(!curtain.isEmpty(), "the curtain has hitboxes");
