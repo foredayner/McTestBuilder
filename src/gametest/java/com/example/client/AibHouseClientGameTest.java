@@ -188,7 +188,10 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
                 Demo.place(player, origin, gallery, 0, "소품 모음");
                 Demo.place(player, origin, Demo.plan(world, origin, player, GALLERY_1920S), 0, "1920년대 소품");
                 Demo.place(player, origin, Demo.plan(world, origin, player, GALLERY_JOSEON), 0, "조선 소품");
-                Demo.place(player, origin, Demo.plan(world, origin, player, GALLERY_MORE), 0, "중세·전후·현대 소품");
+                // A building holds at most 30 props: each row is built on its own.
+                for (String row : GALLERY_MORE.split("(?=ai\\.placeWall)")) {
+                    Demo.place(player, origin, Demo.plan(world, origin, player, row), 0, "중세·전후·현대 소품");
+                }
                 // Round things: the duck of blocks, then smooth ones in colours.
                 String[] round = { com.example.ai.AiController.EXAMPLE_DUCK, SMOOTH_DUCK, SMOOTH_APPLE, SMOOTH_SNOWMAN, SMOOTH_MUSHROOM };
                 for (int i = 0; i < round.length; i++) {
