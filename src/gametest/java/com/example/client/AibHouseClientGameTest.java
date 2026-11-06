@@ -74,6 +74,51 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
         ai.prop('munbang', 2, 0.5, 55, 'north')
         """;
 
+    /** The medieval props, then the postwar Korean ones, then today's western and Korean ones, each row before a wall. */
+    static final String GALLERY_MORE = """
+        ai.clearArea(-15, 0, 62, 31, 5, 36)
+        ai.placeFloor(-15, -1, 62, 31, 36, 'spruce_planks')
+        ai.placeWall(-15, 0, 66, 4, 31, 'x', 'stone_bricks')
+        ai.prop('candle_stand', -12, 0, 65, 'north')
+        ai.prop('high_chair', -11, 0, 65, 'north')
+        ai.prop('weapon_rack', -10, 0, 65, 'north')
+        ai.prop('spinning_wheel', -9, 0, 65, 'north')
+        ai.prop('wall_shield', -8, 0, 65, 'north')
+        ai.prop('tapestry', -6, 0, 65, 'north')
+        ai.placeFloor(-4, 0, 65, 3, 1, 'spruce_slab[type=top]')
+        ai.prop('tankards', -4, 1, 65, 'north')
+        ai.prop('scroll_map', -3, 1, 65, 'north')
+        ai.prop('skull_books', -2, 1, 65, 'north')
+        ai.prop('chandelier', -8, 3, 63, 'north')
+        ai.placeWall(-15, 0, 76, 4, 31, 'x', 'white_terracotta')
+        ai.prop('legged_tv', -12, 0, 75, 'north')
+        ai.prop('yeontan_stove', -11, 0, 75, 'north')
+        ai.prop('kerosene_stove', -10, 0, 75, 'north')
+        ai.prop('old_fan', -9, 0, 75, 'north')
+        ai.prop('brass_washbasin', -8, 0, 75, 'north')
+        ai.prop('wall_calendar', -7, 0, 75, 'north')
+        ai.prop('wall_pendulum_clock', -6, 0, 75, 'north')
+        ai.placeFloor(-5, 0, 75, 3, 1, 'spruce_slab')
+        ai.prop('tube_radio', -5, 0.5, 75, 'north')
+        ai.prop('dial_phone', -4, 0.5, 75, 'north')
+        ai.prop('thermos', -3, 0.5, 75, 'north')
+        ai.placeWall(-15, 0, 86, 4, 31, 'x', 'smooth_quartz')
+        ai.prop('coat_rack', -12, 0, 85, 'north')
+        ai.prop('umbrella_stand', -11, 0, 85, 'north')
+        ai.prop('bar_stool', -10, 0, 85, 'north')
+        ai.prop('wall_picture', -9, 0, 85, 'north')
+        ai.placeBlock(-8, 0, 85, 'smooth_quartz')
+        ai.prop('espresso_machine', -8, 1, 85, 'north')
+        ai.prop('low_table', -6, 0, 85, 'north')
+        ai.prop('floor_cushion', -5, 0, 85, 'north')
+        ai.prop('kimchi_fridge', -4, 0, 85, 'north')
+        ai.prop('shoe_cabinet', -3, 0, 85, 'north')
+        ai.prop('laundry_rack', -2, 0, 85, 'north')
+        ai.placeBlock(-1, 0, 85, 'smooth_quartz')
+        ai.prop('rice_cooker', -1, 1, 85, 'north')
+        ai.prop('wall_aircon', 1, 0, 85, 'north')
+        """;
+
     /** Smooth round pieces: solid colours instead of blocks. */
     static final String SMOOTH_DUCK = com.example.ai.AiController.EXAMPLE_DUCK
         .replace("'yellow_concrete'", "'#f4d03f'").replace("'yellow_terracotta'", "'#d9a520'")
@@ -143,6 +188,7 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
                 Demo.place(player, origin, gallery, 0, "소품 모음");
                 Demo.place(player, origin, Demo.plan(world, origin, player, GALLERY_1920S), 0, "1920년대 소품");
                 Demo.place(player, origin, Demo.plan(world, origin, player, GALLERY_JOSEON), 0, "조선 소품");
+                Demo.place(player, origin, Demo.plan(world, origin, player, GALLERY_MORE), 0, "중세·전후·현대 소품");
                 // Round things: the duck of blocks, then smooth ones in colours.
                 String[] round = { com.example.ai.AiController.EXAMPLE_DUCK, SMOOTH_DUCK, SMOOTH_APPLE, SMOOTH_SNOWMAN, SMOOTH_MUSHROOM };
                 for (int i = 0; i < round.length; i++) {
@@ -165,6 +211,9 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
             view(context, game, o, 1, 1.4, 41.2, 0, 22, "40_props_1920s_right");
             view(context, game, o, -9.5, 1.3, 50, 0, 15, "41_props_joseon_left");
             view(context, game, o, -1, 1.3, 51, 0, 18, "42_props_joseon_right");
+            view(context, game, o, -6.5, 1.8, 58.5, 0, 12, "43_props_medieval");
+            view(context, game, o, -7, 1.6, 69.5, 0, 12, "44_props_postwar");
+            view(context, game, o, -5.5, 1.6, 79, 0, 12, "45_props_today_west_east");
             view(context, game, o, 21, 1.6, 0.4, 0, 12, "37_duck_blocks_and_smooth");
             view(context, game, o, 28, 1.8, -0.6, 0, 12, "38_smooth_apple_snowman_mushroom");
         }

@@ -32,13 +32,14 @@ public final class PropFitter {
         if (plan == null) {
             return notes;
         }
+        // era may list several periods ("contemporary,contemporary_east"); "" = none belong.
+        List<String> eras = era == null ? null : PropLibrary.eraList(era);
         Map<Long, String> blocks = blocks(plan);
         List<BuildPlan.Prop> kept = new ArrayList<>();
         java.util.Set<Long> taken = new java.util.HashSet<>();
         for (BuildPlan.Prop prop : plan.props) {
             PropLibrary.Def def = PropLibrary.get(prop.id);
-            // era "": the period has no presets, so none belong.
-            String why = def == null ? "unknown" : era != null && !def.era().equals(era) ? "another period"
+            String why = def == null ? "unknown" : eras != null && !eras.contains(def.era()) ? "another period"
                 : problem(prop, def, blocks, room, taken);
             if (why != null) {
                 notes.add("[가구] " + (def == null ? prop.id : def.name()) + " 뺐어요 (" + korean(why) + ")");
@@ -48,10 +49,28 @@ public final class PropFitter {
             kept.add(prop);
         }
         plan.props = kept;
-        if (fill && kept.isEmpty() && era != null && !era.isEmpty()) {
-            int added = furnish(plan, era, blocks, room);
-            if (added > 0) {
-                notes.add("[가구] 빈 실내에 " + added + "개를 놓았어요");
+        if (fill && eras != null && !eras.isEmpty()) {
+            if (kept.isEmpty()) {
+                int added = furnish(plan, eras, blocks, room, taken);
+                if (added > 0) {
+                    notes.add("[가구] 빈 실내에 " + added + "개를 놓았어요");
+                }
+            }
+            // Props the period uses in most houses (a folding screen): one along an inside wall when missing.
+            for (String e : eras) {
+                for (PropLibrary.Def d : PropLibrary.all(e)) {
+                    if (!d.often() || plan.props.stream().anyMatch(p -> p.id.equals(d.id()))) {
+                        continue;
+                    }
+                    List<int[]> spots = spots(blocks, room, taken, d.w(), "floor".equals(d.mount()) && "back".equals(d.align()));
+                    if (!spots.isEmpty()) {
+                        int[] s = spots.get(spots.size() / 2);
+                        BuildPlan.Prop p = new BuildPlan.Prop(d.id(), s[0], s[3], s[1], FACINGS[s[2]]);
+                        plan.props.add(p);
+                        taken.addAll(cells(p, d));
+                        notes.add("[가구] " + d.name() + "을(를) 세웠어요");
+                    }
+                }
             }
         }
         return notes;
@@ -165,20 +184,61 @@ public final class PropFitter {
         };
     }
 
+    static final String[] FACINGS = { "north", "south", "east", "west" };
+
     /**
-     * The period's basics along inside walls of the lowest floor that has room: air with air above,
-     * a floor under it, a wall behind, open floor in front, inside (blocks on all four sides
-     * further out), not next to a door; spaced apart.
+     * The period's basics (those of the last listed period that has any: its own over the shared
+     * ones) along inside walls of the lowest floor with room, spaced apart.
      */
-    static int furnish(BuildPlan plan, String era, Map<Long, String> blocks, int[] room) {
+    static int furnish(BuildPlan plan, List<String> eras, Map<Long, String> blocks, int[] room, java.util.Set<Long> taken) {
         List<PropLibrary.Def> basics = new ArrayList<>();
-        for (PropLibrary.Def d : PropLibrary.all(era)) {
-            if (d.fill() && d.w() == 1 && "floor".equals(d.mount())) {
-                basics.add(d);
+        for (String e : eras) {
+            List<PropLibrary.Def> these = new ArrayList<>();
+            for (PropLibrary.Def d : PropLibrary.all(e)) {
+                if (d.fill() && d.w() == 1 && "floor".equals(d.mount())) {
+                    these.add(d);
+                }
+            }
+            if (!these.isEmpty()) {
+                basics = these;
             }
         }
-        if (basics.isEmpty() || blocks.isEmpty()) {
+        if (basics.isEmpty()) {
             return 0;
+        }
+        List<int[]> spots = spots(blocks, room, taken, 1, true);
+        // Spread out: take spots at least 3 blocks from those taken.
+        List<int[]> chosen = new ArrayList<>();
+        for (int[] s : spots) {
+            if (chosen.size() >= Math.min(FILL, basics.size())) {
+                break;
+            }
+            boolean far = true;
+            for (int[] c : chosen) {
+                far &= Math.abs(c[0] - s[0]) + Math.abs(c[1] - s[1]) >= 3;
+            }
+            if (far) {
+                chosen.add(s);
+            }
+        }
+        for (int i = 0; i < chosen.size(); i++) {
+            int[] s = chosen.get(i);
+            BuildPlan.Prop p = new BuildPlan.Prop(basics.get(i % basics.size()).id(), s[0], s[3], s[1], FACINGS[s[2]]);
+            plan.props.add(p);
+            taken.addAll(cells(p, basics.get(i % basics.size())));
+        }
+        return chosen.size();
+    }
+
+    /**
+     * Places along inside walls on the lowest floor that has at least two: {x, z, facing, y}, w blocks
+     * wide (along the wall from x or z), each with air for 2 blocks up, a floor under it, the wall
+     * behind (when needed), open floor in front, inside the building, not by a door, not taken.
+     */
+    static List<int[]> spots(Map<Long, String> blocks, int[] room, java.util.Set<Long> taken, int w, boolean wallBehind) {
+        List<int[]> out = new ArrayList<>();
+        if (blocks.isEmpty()) {
+            return out;
         }
         int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
@@ -190,55 +250,52 @@ public final class PropFitter {
         if (room != null) {
             minX = room[0]; maxX = room[2]; minZ = room[1]; maxZ = room[3];
         }
-        String[] facings = { "north", "south", "east", "west" };
         for (int y = Math.max(minY + 1, 0); y <= maxY; y++) {
-            List<int[]> spots = new ArrayList<>();
+            out.clear();
             for (int x = minX; x <= maxX; x++) {
                 for (int z = minZ; z <= maxZ; z++) {
-                    if (blocks.containsKey(key(x, y, z)) || blocks.containsKey(key(x, y + 1, z)) || !solid(blocks, null, x, y - 1, z)) {
-                        continue;
-                    }
-                    if (room == null && !enclosed(blocks, x, y, z, minX, maxX, minZ, maxZ)) {
-                        continue;
-                    }
-                    if (nearDoor(blocks, x, y, z)) {
-                        continue;
-                    }
                     for (int f = 0; f < 4; f++) {
-                        int[] back = step(opposite(facings[f]));
-                        int[] front = step(facings[f]);
-                        if (solid(blocks, room, x + back[0], y, z + back[1]) && !blocks.containsKey(key(x + front[0], y, z + front[1]))
-                            && !blocks.containsKey(key(x + front[0], y + 1, z + front[1]))) {
-                            spots.add(new int[] { x, z, f });
+                        if (fits(blocks, room, taken, x, y, z, f, w, wallBehind, minX, maxX, minZ, maxZ)) {
+                            out.add(new int[] { x, z, f, y });
                             break;
                         }
                     }
                 }
             }
-            if (spots.size() < 2) {
-                continue;
+            if (out.size() >= 2) {
+                return out;
             }
-            // Spread out: take spots at least 3 blocks from those taken.
-            List<int[]> chosen = new ArrayList<>();
-            for (int[] s : spots) {
-                boolean far = true;
-                for (int[] c : chosen) {
-                    far &= Math.abs(c[0] - s[0]) + Math.abs(c[1] - s[1]) >= 3;
-                }
-                if (far) {
-                    chosen.add(s);
-                }
-                if (chosen.size() >= Math.min(FILL, basics.size())) {
-                    break;
-                }
-            }
-            for (int i = 0; i < chosen.size(); i++) {
-                int[] s = chosen.get(i);
-                plan.props.add(new BuildPlan.Prop(basics.get(i % basics.size()).id(), s[0], y, s[1], facings[s[2]]));
-            }
-            return chosen.size();
         }
-        return 0;
+        out.clear();
+        return out;
+    }
+
+    private static boolean fits(Map<Long, String> blocks, int[] room, java.util.Set<Long> taken, int x0, int y, int z0, int f, int w,
+                                boolean wallBehind, int minX, int maxX, int minZ, int maxZ) {
+        String facing = FACINGS[f];
+        int[] along = "north".equals(facing) || "south".equals(facing) ? new int[] { 1, 0 } : new int[] { 0, 1 };
+        int[] back = step(opposite(facing));
+        int[] front = step(facing);
+        for (int i = 0; i < w; i++) {
+            int x = x0 + along[0] * i, z = z0 + along[1] * i;
+            if (blocks.containsKey(key(x, y, z)) || blocks.containsKey(key(x, y + 1, z)) || !solid(blocks, null, x, y - 1, z)
+                || taken.contains(key(x, y, z)) || taken.contains(key(x, y + 1, z))) {
+                return false;
+            }
+            if (room == null && !enclosed(blocks, x, y, z, minX, maxX, minZ, maxZ)) {
+                return false;
+            }
+            if (nearDoor(blocks, x, y, z)) {
+                return false;
+            }
+            if (wallBehind && !solid(blocks, room, x + back[0], y, z + back[1])) {
+                return false;
+            }
+            if (blocks.containsKey(key(x + front[0], y, z + front[1])) || blocks.containsKey(key(x + front[0], y + 1, z + front[1]))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Blocks further out on all four sides, on this floor: inside the building, not in the yard. */

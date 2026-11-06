@@ -28,16 +28,31 @@ public final class PropLibrary {
      * lowest pane up); align back (against the wall behind) | center; pass: players walk through it (a curtain).
      */
     public record Def(String id, String name, String era, String mount, String align, int w, int d, int light, String about, boolean pass,
-                      boolean fill) {
+                      boolean fill, boolean often) {
+    }
+
+    /** "a,b" → [a, b] ("" → none). */
+    public static List<String> eraList(String eras) {
+        List<String> out = new ArrayList<>();
+        for (String e : eras.split(",")) {
+            if (!e.isBlank()) {
+                out.add(e.trim());
+            }
+        }
+        return out;
     }
 
     /** The periods props are made for, and how the AI is told about each. */
     public static final java.util.Map<String, String> ERAS = new java.util.LinkedHashMap<>();
 
     static {
-        ERAS.put("1920s", "the 1920s-1930s (Call of Cthulhu's classic era)");
-        ERAS.put("joseon", "Joseon Korea, before 1900 (hanok, floor sitting)");
-        ERAS.put("contemporary", "today (the 1990s on)");
+        ERAS.put("medieval", "the European Middle Ages (castles, taverns, villages)");
+        ERAS.put("1920s", "the 1920s-1930s in the West (Call of Cthulhu's classic era)");
+        ERAS.put("joseon", "Korea before 1945: Joseon and the colonial years (hanok, floor sitting)");
+        ERAS.put("postwar", "Korea 1950s-1980s (floor sitting, coal briquettes, legged TVs)");
+        ERAS.put("contemporary", "today (the 1990s on), anywhere");
+        ERAS.put("contemporary_west", "today in the West (chairs, shoes indoors)");
+        ERAS.put("contemporary_east", "today in Korea (floor sitting, shoes off at the door)");
     }
 
     /** The props of one period. */
@@ -51,18 +66,20 @@ public final class PropLibrary {
         return out;
     }
 
-    /** For a request: one line per prop of this period ("" when it has none). */
+    /** For a request: one line per prop of these periods ("a,b"; "" when they have none). */
     public static String catalog(String era) {
         StringBuilder sb = new StringBuilder();
-        for (Def d : all(era)) {
-            line(sb, d);
+        for (String e : eraList(era)) {
+            for (Def d : all(e)) {
+                line(sb, d);
+            }
         }
         return sb.toString();
     }
 
     private static void line(StringBuilder sb, Def d) {
         sb.append("  ").append(d.id()).append(" (").append(d.w()).append(d.w() == 1 ? " block" : " blocks").append(" wide, ")
-            .append(d.mount()).append("): ").append(d.about()).append('\n');
+            .append(d.mount()).append("): ").append(d.about()).append(d.often() ? " (USE IN MOST ROOMS)" : "").append('\n');
     }
 
     /** A prop ready to place in the building's frame, which and its name, its light {x, y, z, level} or null, whether it is walked through. */

@@ -50,6 +50,10 @@ public class AibGameTests implements FabricGameTest {
         check(all.size() >= 21, "the library's props, got " + all.size());
         check(com.example.ai.build.PropLibrary.all("1920s").size() == 10, "ten 1920s props");
         check(com.example.ai.build.PropLibrary.all("joseon").size() == 10, "ten Joseon props");
+        check(com.example.ai.build.PropLibrary.all("medieval").size() == 10, "ten medieval props");
+        check(com.example.ai.build.PropLibrary.all("postwar").size() == 10, "ten postwar props");
+        check(com.example.ai.build.PropLibrary.all("contemporary_west").size() == 5, "five western props of today");
+        check(com.example.ai.build.PropLibrary.all("contemporary_east").size() == 7, "seven Korean props of today");
         for (var def : all) {
             BuildPlan plan = com.example.ai.build.PropLibrary.plan(def);
             check(plan.ops.isEmpty() && !plan.parts.isEmpty(), def.id() + ": pieces only");
@@ -191,6 +195,17 @@ public class AibGameTests implements FabricGameTest {
         b.props.clear();
         com.example.ai.build.PropFitter.fit(b, "1920s", true, null);
         check(b.props.size() >= 2, "an empty 1920s inside is furnished: " + b.props.size());
+        // Korea today: its own basics (low table, cushions), not the shared armchair.
+        BuildPlan east = Demo.plan(world, origin, player, shell);
+        com.example.ai.build.PropFitter.fit(east, "contemporary,contemporary_east", true, null);
+        check(!east.props.isEmpty() && east.props.stream().allMatch(p -> p.id.equals("low_table") || p.id.equals("floor_cushion")),
+            "Korean basics: " + east.props.stream().map(p -> p.id).toList());
+        // Joseon: a folding screen goes in even when the AI furnished the room with something else.
+        BuildPlan joseon = Demo.plan(world, origin, player, shell + "ai.prop('deungjan', 2, 1, -5, 'north')\n");
+        com.example.ai.build.PropFitter.fit(joseon, "joseon", true, null);
+        check(joseon.props.stream().anyMatch(p -> p.id.equals("byeongpung")), "a 병풍 is set: "
+            + joseon.props.stream().map(p -> p.id).toList());
+        check(joseon.props.stream().anyMatch(p -> p.id.equals("deungjan")), "the AI's lamp stays");
         for (BuildPlan.Prop p : b.props) {
             var def = com.example.ai.build.PropLibrary.get(p.id);
             check(def != null && "1920s".equals(def.era()) && def.fill(), "a 1920s basic: " + p.id);
