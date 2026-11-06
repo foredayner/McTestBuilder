@@ -2,8 +2,8 @@
 def z = -0.5
 def steel = '#d8dadc'
 ai.mirrorOn()
-ai.addCapsule(steel, 0.4, 0.0, z - 0.3, 0.4, 0.9, z, 0.012)          // X legs at each end
-ai.addCapsule(steel, 0.4, 0.0, z + 0.3, 0.4, 0.9, z, 0.012)
+ai.addCapsule(steel, 0.4, 0.012, z - 0.3, 0.4, 0.9, z, 0.012)          // X legs at each end
+ai.addCapsule(steel, 0.4, 0.012, z + 0.3, 0.4, 0.9, z, 0.012)
 ai.mirrorOff()
 for (int i = 0; i < 5; i++) {                                       // the drying rails
     def t = -0.2 + i * 0.1

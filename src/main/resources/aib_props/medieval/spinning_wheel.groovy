@@ -2,9 +2,9 @@
 def z = -0.5
 def wood = '#7a4a26'
 ai.addRoundBox(wood, -0.38, 0.32, z - 0.08, 0.76, 0.05, 0.16, 0.02)    // bench
-ai.addCapsule(wood, -0.32, 0.32, z - 0.06, -0.36, 0.0, z - 0.14, 0.018)  // legs
-ai.addCapsule(wood, -0.32, 0.32, z + 0.06, -0.36, 0.0, z + 0.14, 0.018)
-ai.addCapsule(wood, 0.32, 0.32, z, 0.36, 0.0, z, 0.018)
+ai.addCapsule(wood, -0.32, 0.32, z - 0.06, -0.36, 0.018, z - 0.14, 0.018)  // legs
+ai.addCapsule(wood, -0.32, 0.32, z + 0.06, -0.36, 0.018, z + 0.14, 0.018)
+ai.addCapsule(wood, 0.32, 0.32, z, 0.36, 0.018, z, 0.018)
 // the big wheel standing on the left end, spokes and rim in the x-y plane
 def cx = -0.12
 def cy = 0.72

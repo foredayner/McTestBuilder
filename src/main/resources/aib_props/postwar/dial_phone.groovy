@@ -11,4 +11,4 @@ for (int i = 0; i < 10; i++) {
 ai.addCapsule(black, -0.12, 0.15, z + 0.02, 0.12, 0.15, z + 0.02, 0.022)   // handset
 ai.addSphere(black, -0.12, 0.14, z + 0.02, 0.035)                          // ear and mouth cups
 ai.addSphere(black, 0.12, 0.14, z + 0.02, 0.035)
-ai.addTube(black, [[0.12, 0.02, z + 0.1], [0.2, 0.01, z + 0.15], [0.24, 0.0, z + 0.05]], 0.006)   // curly cord
+ai.addTube(black, [[0.12, 0.02, z + 0.1], [0.2, 0.01, z + 0.15], [0.24, 0.006, z + 0.05]], 0.006)   // curly cord

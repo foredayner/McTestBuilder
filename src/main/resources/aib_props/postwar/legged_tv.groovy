@@ -1,8 +1,8 @@
 // 다리 달린 흑백 TV: a wooden cabinet TV on four legs with sliding doors open, back at z = 0
 def wood = '#6b3a1c'
 ai.mirrorOn()
-ai.addCapsule(wood, 0.3, 0.32, -0.62, 0.34, 0.0, -0.68, 0.018)     // splayed legs
-ai.addCapsule(wood, 0.3, 0.32, -0.22, 0.34, 0.0, -0.16, 0.018)
+ai.addCapsule(wood, 0.3, 0.32, -0.62, 0.34, 0.018, -0.68, 0.018)     // splayed legs
+ai.addCapsule(wood, 0.3, 0.32, -0.22, 0.34, 0.018, -0.16, 0.018)
 ai.addPart(wood, 0.38, 0.4, -0.71, 0.06, 0.55, 0.02)              // the sliding doors pushed aside
 ai.mirrorOff()
 ai.addRoundBox(wood, -0.38, 0.32, -0.7, 0.76, 0.66, 0.56, 0.03)   // cabinet
