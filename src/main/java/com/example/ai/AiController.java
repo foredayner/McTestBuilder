@@ -1484,6 +1484,16 @@ public class AiController {
                 // panes in the wall from (x, y, z) along the wall toward +x or +z; sill and open shutters on the outside (facing)
               ai.wallMix(x, y, z, height, length, direction, ['stone_bricks': 70, 'cracked_stone_bricks': 30])
                 // like placeWall, of several blocks mixed by weight: ONLY for ruins and worn-out walls the request asks for
+            Outdoor pieces (use these instead of placing trees, rocks and bushes block by block):
+              ai.tree(x, y, z, height, kind) | ai.tree(x, y, z, height, kind, trunkWidth)
+                // a whole tree standing on (x, y, z) (y = the first block above the ground): trunk (1-3 thick, thicker = older),
+                // roots, branches and a full crown of leaf blobs about 0.7 x height across; kind = oak, birch, spruce, pine,
+                // dark_oak, jungle, acacia, cherry, mangrove, willow (hanging leaves) or dead (bare branches). Height 4-30.
+              ai.rock(x, y, z, width, height, length) | ai.rock(..., kind)
+                // a rough boulder of mixed stone filling about that box from (x, y, z) up; kind = stone, mossy, granite,
+                // sandstone or dark. Several overlapping rocks of different sizes make a rock pile, a crag or a cliff.
+              ai.bush(x, y, z, width, height, length) | ai.bush(..., leavesBlock)   // a rounded bush of leaves
+              ai.mound(x, y, z, width, height, length) | ai.mound(..., topBlock)    // a rounded heap of earth (a hill, a burial mound)
             """;
 
     /** The furniture library, for the API list. */

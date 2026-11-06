@@ -231,6 +231,33 @@ public class MinecraftAI {
         placeCells("wallMix", BuildingHelpers.wallMix(toInt(x), toInt(y), toInt(z), Math.max(1, toInt(h)), Math.max(1, toInt(l)), direction, w));
     }
 
+    // ---------------------------------------------------------------- outdoor pieces (NatureHelpers)
+
+    private static List<BuildingHelpers.Cell> cells(List<Map.Entry<int[], String>> list) {
+        List<BuildingHelpers.Cell> out = new ArrayList<>(list.size());
+        for (Map.Entry<int[], String> e : list) {
+            int[] p = e.getKey();
+            out.add(new BuildingHelpers.Cell(p[0], p[1], p[2], e.getValue()));
+        }
+        return out;
+    }
+
+    public static void tree(Number x, Number y, Number z, Number height, String kind, Number trunk) {
+        placeCells("tree", cells(NatureHelpers.tree(toInt(x), toInt(y), toInt(z), toInt(height), kind, trunk == null ? 0 : toInt(trunk))));
+    }
+
+    public static void rock(Number x, Number y, Number z, Number w, Number h, Number l, String kind) {
+        placeCells("rock", cells(NatureHelpers.rock(toInt(x), toInt(y), toInt(z), toInt(w), toInt(h), toInt(l), kind)));
+    }
+
+    public static void bush(Number x, Number y, Number z, Number w, Number h, Number l, String leaves) {
+        placeCells("bush", cells(NatureHelpers.bush(toInt(x), toInt(y), toInt(z), toInt(w), toInt(h), toInt(l), leaves)));
+    }
+
+    public static void mound(Number x, Number y, Number z, Number w, Number h, Number l, String top) {
+        placeCells("mound", cells(NatureHelpers.mound(toInt(x), toInt(y), toInt(z), toInt(w), toInt(h), toInt(l), top)));
+    }
+
     /** Most library props one building may have (each is a few dozen display pieces). */
     public static final int MAX_PROPS = 30;
 

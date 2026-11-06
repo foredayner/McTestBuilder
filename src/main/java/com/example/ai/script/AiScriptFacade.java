@@ -319,6 +319,38 @@ public final class AiScriptFacade {
         MinecraftAI.wallMix(x, y, z, h, l, direction, weights);
     }
 
+    public void tree(Number x, Number y, Number z, Number height, String kind) {
+        MinecraftAI.tree(x, y, z, height, kind, 0);
+    }
+
+    public void tree(Number x, Number y, Number z, Number height, String kind, Number trunk) {
+        MinecraftAI.tree(x, y, z, height, kind, trunk);
+    }
+
+    public void rock(Number x, Number y, Number z, Number w, Number h, Number l) {
+        MinecraftAI.rock(x, y, z, w, h, l, "stone");
+    }
+
+    public void rock(Number x, Number y, Number z, Number w, Number h, Number l, String kind) {
+        MinecraftAI.rock(x, y, z, w, h, l, kind);
+    }
+
+    public void bush(Number x, Number y, Number z, Number w, Number h, Number l) {
+        MinecraftAI.bush(x, y, z, w, h, l, "oak_leaves");
+    }
+
+    public void bush(Number x, Number y, Number z, Number w, Number h, Number l, String leaves) {
+        MinecraftAI.bush(x, y, z, w, h, l, leaves);
+    }
+
+    public void mound(Number x, Number y, Number z, Number w, Number h, Number l) {
+        MinecraftAI.mound(x, y, z, w, h, l, "grass_block");
+    }
+
+    public void mound(Number x, Number y, Number z, Number w, Number h, Number l, String top) {
+        MinecraftAI.mound(x, y, z, w, h, l, top);
+    }
+
     public void arrowStart() {
         MinecraftAI.arrowStart();
     }

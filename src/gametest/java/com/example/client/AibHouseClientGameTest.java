@@ -162,6 +162,23 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
         ai.addCone('#3c9a3c', 0.5, 0, z - 0.1, 0.06, 0.18)
         """;
 
+    /** Trees, rocks, bushes and a mound from the outdoor helpers. */
+    static final String NATURE = """
+        ai.tree(0, 0, 4, 14, 'oak')
+        ai.tree(16, 0, 4, 15, 'spruce')
+        ai.tree(30, 0, 4, 12, 'willow')
+        ai.tree(42, 0, 4, 9, 'dead')
+        ai.tree(0, 0, 22, 8, 'cherry')
+        ai.tree(10, 0, 22, 10, 'birch')
+        ai.tree(20, 0, 24, 18, 'pine')
+        ai.rock(28, 0, 16, 6, 4, 5, 'mossy')
+        ai.rock(34, 0, 18, 4, 3, 4)
+        ai.rock(30, 0, 21, 3, 2, 3, 'granite')
+        ai.bush(39, 0, 16, 3, 2, 3)
+        ai.bush(41, 0, 19, 2, 1, 2, 'azalea_leaves')
+        ai.mound(44, 0, 13, 7, 3, 7, 'grass_block')
+        """;
+
     @Override
     public void runTest(ClientGameTestContext context) {
         if (System.getenv("AIB_BENCH_ONLY") != null) {
@@ -198,6 +215,8 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
                     BlockPos at = origin.add(20 + (i < 2 ? i * 2 : 1 + i * 2), 0, 0);
                     Demo.place(player, at, Demo.plan(world, at, player, round[i]), 0, "둥근 소품 " + i);
                 }
+                BlockPos wild = origin.add(-70, 0, 0);
+                Demo.place(player, wild, Demo.plan(world, wild, player, NATURE), 0, "나무와 바위");
                 player.getAbilities().flying = true; // the camera stays where it is put
                 player.sendAbilitiesUpdate();
                 return origin;
@@ -218,6 +237,7 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
             view(context, game, o, -7, 1.6, 69.5, 0, 12, "44_props_postwar");
             view(context, game, o, -5.5, 1.6, 79, 0, 12, "45_props_today_west_east");
             view(context, game, o, 21, 1.6, 0.4, 0, 12, "37_duck_blocks_and_smooth");
+            view(context, game, o, -47, 9, -24, 0, 12, "46_nature_trees_rocks");
             view(context, game, o, 28, 1.8, -0.6, 0, 12, "38_smooth_apple_snowman_mushroom");
         }
     }
