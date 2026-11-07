@@ -1056,7 +1056,7 @@ public class AiPromptScreen extends Screen {
             ctx.enableScissor(x + 1, Math.max(y + 1, t + 1), x + img - 1, Math.min(y + img - 1, b - 1));
             Preview3d.drawLive(ctx, r.plan, x + 3, y + 3, img - 6, detailYaw, detailPitch, detailZoom);
             ctx.disableScissor();
-            ctx.enableScissor(l + 1, t + 1, rr - 1, b - 1);
+           
         } else {
             draw3d(ctx, r, x + 3, y + 3, img - 6, Preview3d.BIG);
         }
