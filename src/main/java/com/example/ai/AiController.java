@@ -1562,7 +1562,10 @@ public class AiController {
             + "    // Place no blocks where a prop is. At most " + com.example.ai.api.MinecraftAI.MAX_PROPS + " per building. Ids:\n"
             + com.example.ai.build.PropLibrary.catalog()
             + "    // Beds, chests, doors, tables, chairs, shelves, stoves and the like stay real blocks.\n"
-            + "    // After building, props that stand in a block or have no wall behind them are taken out.\n";
+            + "    // Keep the 2 blocks in front of and behind every door free of props. A curtain only over glass; a 'top' prop only\n"
+            + "    //   on a table or counter; nothing floating.\n"
+            + "    // After building, props that stand in a block, have no wall behind them, float, stand by a door or hang\n"
+            + "    //   where there is no window are taken out.\n";
     }
 
     static String buildingSystem(boolean webSearchEnabled) {

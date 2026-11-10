@@ -35,12 +35,21 @@ public final class PropFitter {
         // era may list several periods ("contemporary,contemporary_east"); "" = none belong.
         List<String> eras = era == null ? null : PropLibrary.eraList(era);
         Map<Long, String> blocks = blocks(plan);
+        java.util.Set<Long> doors = doorZone(blocks);
+        // Every prop's blocks, so a pot can stand on a table prop.
+        java.util.Set<Long> under = new java.util.HashSet<>();
+        for (BuildPlan.Prop prop : plan.props) {
+            PropLibrary.Def def = PropLibrary.get(prop.id);
+            if (def != null && !"top".equals(def.mount())) {
+                under.addAll(cells(prop, def));
+            }
+        }
         List<BuildPlan.Prop> kept = new ArrayList<>();
         java.util.Set<Long> taken = new java.util.HashSet<>();
         for (BuildPlan.Prop prop : plan.props) {
             PropLibrary.Def def = PropLibrary.get(prop.id);
             String why = def == null ? "unknown" : eras != null && !eras.contains(def.era()) ? "another period"
-                : problem(prop, def, blocks, room, taken);
+                : problem(prop, def, blocks, room, taken, doors, under);
             if (why != null) {
                 notes.add("[가구] " + (def == null ? prop.id : def.name()) + " 뺐어요 (" + korean(why) + ")");
                 continue;
@@ -83,12 +92,20 @@ public final class PropFitter {
             case "no wall" -> "뒤에 벽 없음";
             case "no ceiling" -> "위에 천장 없음";
             case "on another" -> "다른 가구와 겹침";
+            case "by a door" -> "문 앞뒤";
+            case "in the air" -> "공중에 뜸";
+            case "no window" -> "뒤에 창문 없음";
             default -> "모르는 가구";
         };
     }
 
     /** Why a prop cannot stand where it is, or null. */
     static String problem(BuildPlan.Prop prop, PropLibrary.Def def, Map<Long, String> blocks, int[] room, java.util.Set<Long> taken) {
+        return problem(prop, def, blocks, room, taken, java.util.Set.of(), java.util.Set.of());
+    }
+
+    static String problem(BuildPlan.Prop prop, PropLibrary.Def def, Map<Long, String> blocks, int[] room, java.util.Set<Long> taken,
+                          java.util.Set<Long> doors, java.util.Set<Long> under) {
         List<Long> cells = cells(prop, def);
         for (long c : cells) {
             String b = blocks.get(c);
@@ -98,9 +115,49 @@ public final class PropFitter {
             if (taken.contains(c)) {
                 return "on another";
             }
+            if (doors.contains(c)) {
+                return "by a door";
+            }
         }
         String f = BuildPlan.normalizeFacing(prop.facing);
         int y = (int) Math.floor(prop.y + 1e-6);
+        int[] o0 = origin(prop);
+        int[] along0 = "north".equals(f) || "south".equals(f) ? new int[] { 1, 0 } : new int[] { 0, 1 };
+        String mount = def.mount();
+        if ("floor".equals(mount) || "top".equals(mount)) {
+            // Something under it: the floor (or, on top, a table of blocks or a table prop).
+            int below = "top".equals(mount) ? (int) Math.floor(prop.y - 0.05) : y - 1;
+            int held = 0;
+            for (int i = 0; i < def.w(); i++) {
+                int x = o0[0] + along0[0] * i, z = o0[1] + along0[1] * i;
+                long k = key(x, below, z);
+                String b = blocks.get(k);
+                boolean floorOfRoom = below < 0; // the ground (or a room's floor) under the design
+                if (b != null && !b.contains("door") || under.contains(k) || floorOfRoom) {
+                    held++;
+                }
+            }
+            if (held * 2 < def.w()) {
+                return "in the air";
+            }
+        }
+        if ("window".equals(mount)) {
+            // A curtain hangs over glass: most of the blocks behind it are glass or panes.
+            int[] back0 = step(opposite(f));
+            int glass = 0, all = 0;
+            for (int i = 0; i < def.w(); i++) {
+                for (int k = 0; k < 2; k++) {
+                    String b = blocks.get(key(o0[0] + along0[0] * i + back0[0], y + k, o0[1] + along0[1] * i + back0[1]));
+                    all++;
+                    if (b != null && (b.contains("glass") || b.contains("pane"))) {
+                        glass++;
+                    }
+                }
+            }
+            if (glass * 2 < all) {
+                return "no window";
+            }
+        }
         if ("ceiling".equals(def.mount())) {
             int[] o = origin(prop);
             return solid(blocks, room, o[0], y + 1, o[1]) ? null : "no ceiling";
@@ -285,7 +342,7 @@ public final class PropFitter {
             if (room == null && !enclosed(blocks, x, y, z, minX, maxX, minZ, maxZ)) {
                 return false;
             }
-            if (nearDoor(blocks, x, y, z)) {
+            if (nearDoor(blocks, x, y, z) || doorZone(blocks).contains(key(x, y, z))) {
                 return false;
             }
             if (wallBehind && !solid(blocks, room, x + back[0], y, z + back[1])) {
@@ -321,6 +378,36 @@ public final class PropFitter {
             }
         }
         return false;
+    }
+
+    /** The 2 blocks in front of and behind every door (3 wide, door high): kept free for walking in. */
+    static java.util.Set<Long> doorZone(Map<Long, String> blocks) {
+        java.util.Set<Long> zone = new java.util.HashSet<>();
+        for (Map.Entry<Long, String> e : blocks.entrySet()) {
+            String b = e.getValue();
+            if (!b.contains("_door") || b.contains("trapdoor") || b.contains("half=upper")) {
+                continue;
+            }
+            int x = kx(e.getKey()), y = ky(e.getKey()), z = kz(e.getKey());
+            if (blocks.containsKey(key(x, y - 1, z)) && blocks.get(key(x, y - 1, z)).contains("_door")) {
+                continue; // the upper half (counted from the lower)
+            }
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("facing=(north|south|east|west)").matcher(b);
+            List<String> ways = m.find() ? List.of(m.group(1)) : List.of("north", "east");
+            for (String w : ways) {
+                int[] d = step(w);
+                int[] side = { d[1], d[0] };
+                for (int k = 1; k <= 2; k++) {
+                    for (int s = -1; s <= 1; s++) {
+                        for (int up = 0; up <= 1; up++) {
+                            zone.add(key(x + d[0] * k + side[0] * s, y + up, z + d[1] * k + side[1] * s));
+                            zone.add(key(x - d[0] * k + side[0] * s, y + up, z - d[1] * k + side[1] * s));
+                        }
+                    }
+                }
+            }
+        }
+        return zone;
     }
 
     private static boolean nearDoor(Map<Long, String> blocks, int x, int y, int z) {
