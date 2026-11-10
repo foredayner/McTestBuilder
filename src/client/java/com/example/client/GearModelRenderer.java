@@ -42,7 +42,34 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
     /** A decoded model: parts with their textures, and its outline after the sword tilt. */
     public record Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn,
                         Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura, float reach, boolean bow, Model arrow,
-                        float length, int[] colors, boolean[] clear, List<Model> arrows) {
+                        float length, int[] colors, boolean[] clear, List<Model> arrows, Object[] cache) {
+
+        public Model(List<BuildPlan.Part> parts, List<Sprite> sprites, float[] tilted, boolean worn,
+                     Map<Integer, List<BuildPlan.Anim>> anims, BuildPlan.Aura aura, float reach, boolean bow, Model arrow,
+                     float length, int[] colors, boolean[] clear, List<Model> arrows) {
+            this(parts, sprites, tilted, worn, anims, aura, reach, bow, arrow, length, colors, clear, arrows, new Object[2]);
+        }
+
+        /** Its still pieces' faces, worked out once (GearBaked). */
+        GearBaked baked() {
+            synchronized (cache) {
+                if (cache[0] == null) {
+                    cache[0] = GearBaked.of(this, waves());
+                }
+                return (GearBaked) cache[0];
+            }
+        }
+
+        /** Its colour waves (worked out once), or null when it has none. */
+        Waves waves() {
+            synchronized (cache) {
+                if (cache[1] == null) {
+                    Waves w = Waves.of(this);
+                    cache[1] = w == null ? Boolean.FALSE : w;
+                }
+                return cache[1] instanceof Waves w ? w : null;
+            }
+        }
 
         /** A bow's arrow shape number i (shapes shot in turn or at random); the first if there is no such one. */
         public Model arrow(int i) {
@@ -323,7 +350,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             matrices.translate(0.5F, 0.5F, 0.5F);
             matrices.scale(scale, scale, scale);
             matrices.translate(-(t[0] + t[2]) / 2, -(t[1] + t[3]) / 2, 0);
-            draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), model, light, overlay);
+            draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), model, light, overlay,
+                mode != ModelTransformationMode.GUI && mode != ModelTransformationMode.FIXED);
             matrices.pop();
             return;
         }
@@ -351,7 +379,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
             matrices.multiply(new Quaternionf().rotateZ((float) Math.toRadians(FIRST_PERSON_LONG_TILT)));
             matrices.translate(0, -(model.length() - 1.6F) * FIRST_PERSON_LONG_SLIDE, 0);
         }
-        draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), model, light, overlay);
+        draw(matrices, vertexConsumers, TexturedRenderLayers.getEntityCutout(), model, light, overlay,
+                mode != ModelTransformationMode.GUI && mode != ModelTransformationMode.FIXED);
         if (mode != ModelTransformationMode.GUI && mode != ModelTransformationMode.FIXED) {
             drawAura(matrices, vertexConsumers, model, overlay);
         }
@@ -366,8 +395,8 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
      */
     static void drawAura(MatrixStack matrices, VertexConsumerProvider vertexConsumers, Model model, int overlay) {
         BuildPlan.Aura aura = model.aura();
-        if (aura == null || model.parts().isEmpty()) {
-            return;
+        if (aura == null || model.parts().isEmpty() || far(matrices)) {
+            return; // far away the halo is not drawn
         }
         VertexConsumer buffer = vertexConsumers.getBuffer(net.minecraft.client.render.RenderLayer.getEntityTranslucentEmissive(WHITE));
         double seconds = seconds();
@@ -419,11 +448,27 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
      */
     static void draw(MatrixStack matrices, VertexConsumerProvider vertexConsumers, net.minecraft.client.render.RenderLayer solid,
                      Model model, int light, int overlay) {
-        draw(matrices, vertexConsumers.getBuffer(solid), model, light, overlay, false);
+        draw(matrices, vertexConsumers, solid, model, light, overlay, false);
+    }
+
+    /** lod: in the world (not a slot or a picture): far away, the small details are left out. */
+    static void draw(MatrixStack matrices, VertexConsumerProvider vertexConsumers, net.minecraft.client.render.RenderLayer solid,
+                     Model model, int light, int overlay, boolean lod) {
+        boolean far = lod && far(matrices);
+        draw(matrices, vertexConsumers.getBuffer(solid), model, light, overlay, false, far);
         if (hasClear(model)) {
             draw(matrices, vertexConsumers.getBuffer(net.minecraft.client.render.RenderLayer.getEntityTranslucent(
-                net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)), model, light, overlay, true);
+                net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)), model, light, overlay, true, far);
         }
+    }
+
+    /** Beyond this many blocks from the camera, small details of worn and held equipment are not drawn. */
+    static final float FAR = 20.0F;
+
+    /** Whether the current matrix (camera-relative in the world) is far from the camera. */
+    static boolean far(MatrixStack matrices) {
+        org.joml.Vector3f at = matrices.peek().getPositionMatrix().getTranslation(new org.joml.Vector3f());
+        return at.lengthSquared() > FAR * FAR;
     }
 
     private static boolean hasClear(Model model) {
@@ -435,11 +480,15 @@ public final class GearModelRenderer implements SpecialModelRenderer<GearModelRe
         return false;
     }
 
-    private static void draw(MatrixStack matrices, VertexConsumer buffer, Model model, int light, int overlay, boolean clear) {
+    private static void draw(MatrixStack matrices, VertexConsumer buffer, Model model, int light, int overlay, boolean clear,
+                             boolean far) {
         double seconds = seconds();
-        Waves waves = Waves.of(model);
+        Waves waves = model.waves();
+        GearBaked baked = model.baked();
+        // Still pieces: their faces were worked out once (hidden ones left out); only drawn here.
+        baked.draw(matrices.peek(), buffer, light, overlay, clear, far);
         for (int i = 0; i < model.parts().size(); i++) {
-            if (model.clear()[i] != clear) {
+            if (model.clear()[i] != clear || !baked.moving[i] || far && baked.small[i]) {
                 continue;
             }
             BuildPlan.Part part = model.parts().get(i);
