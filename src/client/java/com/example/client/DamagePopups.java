@@ -108,7 +108,7 @@ public final class DamagePopups {
                 }
             }
             double jitter = ((entityId * 31 + POPUPS.size() * 17) % 7 - 3) * 0.06;
-            POPUPS.add(new Popup(entityId, e.getX() + jitter, e.getY() + e.getHeight() + 0.45 + stacked * 0.32, e.getZ(),
+            POPUPS.add(new Popup(entityId, e.getX() + jitter, e.getY() + e.getHeight() + 0.45 + stacked * 0.42, e.getZ(),
                 (String) look[0], roll > 0 ? Integer.toString(roll) : "", (Integer) look[1], (Float) look[2]));
             if (POPUPS.size() > 64) {
                 POPUPS.remove(0);
