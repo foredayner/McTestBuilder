@@ -29,6 +29,7 @@ public final class AiNetworking {
         payloadsRegistered = true;
 
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.AiLogS2CPayload.ID, AiNetworkPayloads.AiLogS2CPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.DamageNumberS2CPayload.ID, AiNetworkPayloads.DamageNumberS2CPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.ApprovalPendingS2CPayload.ID, AiNetworkPayloads.ApprovalPendingS2CPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AiNetworkPayloads.ApprovalClearS2CPayload.ID, AiNetworkPayloads.ApprovalClearS2CPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AiNetworkPayloads.ApprovalAcceptC2SPayload.ID, AiNetworkPayloads.ApprovalAcceptC2SPayload.CODEC);

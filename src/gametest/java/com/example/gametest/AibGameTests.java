@@ -45,6 +45,40 @@ public class AibGameTests implements FabricGameTest {
 
     /** Every library prop runs, is made of pieces only, and fits the blocks it says it takes. */
     @GameTest(templateName = EMPTY_STRUCTURE)
+    public void randomDamageRollsEveryHit(TestContext context) {
+        var world = context.getWorld();
+        var attacker = context.spawnEntity(net.minecraft.entity.EntityType.ZOMBIE, 1, 2, 1);
+        var target = context.spawnEntity(net.minecraft.entity.EntityType.IRON_GOLEM, 3, 2, 3);
+        attacker.setAiDisabled(true);
+        target.setAiDisabled(true);
+        net.minecraft.item.ItemStack sword = new net.minecraft.item.ItemStack(net.minecraft.item.Items.STICK);
+        net.minecraft.nbt.NbtCompound nbt = new net.minecraft.nbt.NbtCompound();
+        nbt.putString(com.example.ai.build.GearEffects.KEY, "{\"randomDamage\":true,\"damageNumbers\":true}");
+        sword.set(net.minecraft.component.DataComponentTypes.CUSTOM_DATA, net.minecraft.component.type.NbtComponent.of(nbt));
+        attacker.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, sword);
+        check(com.example.ai.build.GearEffects.of(sword).randomDamage, "the stick has random damage");
+        java.util.Set<Integer> seen = new java.util.TreeSet<>();
+        for (int i = 0; i < 60; i++) {
+            target.setHealth(target.getMaxHealth());
+            target.timeUntilRegen = 0;
+            float before = target.getHealth();
+            target.damage(world, world.getDamageSources().mobAttack(attacker), 9f);
+            float taken = before - target.getHealth();
+            int roll = Math.round(taken);
+            check(Math.abs(taken - roll) < 0.01 && roll >= 0 && roll <= 9, "a hit of 9 does a whole 0-9: " + taken);
+            seen.add(roll);
+        }
+        check(seen.size() >= 5, "the rolls vary: " + seen);
+        // A hit with an ordinary stick is not rolled.
+        attacker.setStackInHand(net.minecraft.util.Hand.MAIN_HAND, new net.minecraft.item.ItemStack(net.minecraft.item.Items.STICK));
+        target.setHealth(target.getMaxHealth());
+        target.timeUntilRegen = 0;
+        target.damage(world, world.getDamageSources().mobAttack(attacker), 9f);
+        check(Math.abs(target.getMaxHealth() - target.getHealth() - 9f) < 0.01, "a plain hit does all its damage");
+        context.complete();
+    }
+
+    @GameTest(templateName = EMPTY_STRUCTURE)
     public void everyLibraryPropFitsItsBlocks(TestContext context) {
         var all = com.example.ai.build.PropLibrary.all();
         check(all.size() >= 21, "the library's props, got " + all.size());

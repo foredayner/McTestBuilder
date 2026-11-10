@@ -238,6 +238,38 @@ public class AibHouseClientGameTest implements FabricClientGameTest {
             view(context, game, o, -5.5, 1.6, 79, 0, 12, "45_props_today_west_east");
             view(context, game, o, 21, 1.6, 0.4, 0, 12, "37_duck_blocks_and_smooth");
             view(context, game, o, -47, 9, -24, 0, 12, "46_nature_trees_rocks");
+            // Damage numbers over a mob: rolls 9, 6, 2 and a miss, and one without a roll.
+            game.getServer().runCommand(String.format(java.util.Locale.ROOT, "summon zombie %d %d %d {NoAI:1b,Silent:1b,PersistenceRequired:1b}",
+                o.getX() - 80, o.getY(), o.getZ() - 30));
+            game.getServer().runCommand(String.format(java.util.Locale.ROOT, "tp @a %.2f %.2f %.2f 0 8",
+                o.getX() - 79.5, o.getY() + 1.0, o.getZ() - 34.5));
+            context.waitTicks(20);
+            try {
+                game.getClientWorld().waitForChunksRender();
+            } catch (AssertionError slow) {
+                context.waitTicks(60);
+            }
+            context.runOnClient(client -> {
+                net.minecraft.entity.Entity zombie = null;
+                for (net.minecraft.entity.Entity e : client.world.getEntities()) {
+                    if (e instanceof net.minecraft.entity.mob.ZombieEntity) {
+                        zombie = e;
+                    }
+                }
+                if (zombie == null) {
+                    throw new AssertionError("no zombie to hit");
+                }
+                com.example.client.DamagePopups.addForTests(zombie.getId(), 7.4f, 6);
+                com.example.client.DamagePopups.addForTests(zombie.getId(), 2.2f, 2);
+                com.example.client.DamagePopups.addForTests(zombie.getId(), 0f, 0);
+                com.example.client.DamagePopups.addForTests(zombie.getId(), 11f, 9);
+                if (com.example.client.DamagePopups.countForTests() < 4) {
+                    throw new AssertionError("the numbers are in the air");
+                }
+                client.inGameHud.getChatHud().clear(false);
+            });
+            context.waitTicks(3);
+            context.takeScreenshot("47_damage_numbers");
             view(context, game, o, 28, 1.8, -0.6, 0, 12, "38_smooth_apple_snowman_mushroom");
         }
     }

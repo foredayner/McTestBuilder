@@ -9,6 +9,7 @@
   "environment": "*",
   "accessWidener": "aib.accesswidener",
   "mixins": [
+    "aib.mixins.json",
     {
       "config": "aib.client.mixins.json",
       "environment": "client"

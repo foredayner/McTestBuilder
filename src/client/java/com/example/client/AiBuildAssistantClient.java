@@ -32,6 +32,7 @@ public class AiBuildAssistantClient implements ClientModInitializer {
         net.minecraft.client.render.item.model.special.SpecialModelTypes.ID_MAPPER.put(
             SmoothShapes.TYPE_ID, SmoothShapes.Unbaked.CODEC);
         WearRenderer.register();
+        DamagePopups.register();
         net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(
             (context, tickCounter) -> ObjectBreaking.renderHud(context));
 

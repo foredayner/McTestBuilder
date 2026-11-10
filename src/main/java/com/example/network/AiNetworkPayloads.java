@@ -13,6 +13,21 @@ public final class AiNetworkPayloads {
     private AiNetworkPayloads() {
     }
 
+    /** A hit's damage to float up over the one hit: what it took, and its roll 0-9 (-1 = not rolled). */
+    public record DamageNumberS2CPayload(int entity, float amount, byte roll) implements CustomPayload {
+        public static final CustomPayload.Id<DamageNumberS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "damage_number"));
+        public static final PacketCodec<RegistryByteBuf, DamageNumberS2CPayload> CODEC = PacketCodec.tuple(
+            PacketCodecs.VAR_INT, DamageNumberS2CPayload::entity,
+            PacketCodecs.FLOAT, DamageNumberS2CPayload::amount,
+            PacketCodecs.BYTE, DamageNumberS2CPayload::roll,
+            DamageNumberS2CPayload::new);
+
+        @Override
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     public record AiLogS2CPayload(String message) implements CustomPayload {
         public static final CustomPayload.Id<AiLogS2CPayload> ID = new CustomPayload.Id<>(Identifier.of(AiBuildAssistantMod.MOD_ID, "ai_log"));
         public static final PacketCodec<RegistryByteBuf, AiLogS2CPayload> CODEC =

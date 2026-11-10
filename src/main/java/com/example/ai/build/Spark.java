@@ -133,9 +133,13 @@ public final class Spark {
          * flight), 2 = its x stays side to side and its z up (flat shapes fly flat). New designs are 2.
          */
         public int axes;
+        /** Weapons: the damage each hit does floats up over the one hit (like MapleStory). */
+        public boolean damageNumbers;
+        /** Weapons: every hit rolls 0-9 and does that many ninths of its damage (0 = a miss). */
+        public boolean randomDamage;
 
         public boolean isEmpty() {
-            return attack.isEmpty() && idle.isEmpty() && trail.isEmpty() && shot == null;
+            return attack.isEmpty() && idle.isEmpty() && trail.isEmpty() && shot == null && !damageNumbers && !randomDamage;
         }
 
         public String toJson() {

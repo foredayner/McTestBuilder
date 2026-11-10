@@ -432,7 +432,7 @@ public class AiController {
                 record.kind = "gear";
                 record.gear = gear.id();
                 record.pixel = pixelOf(req.mode());
-                applyEffectRequest(plan, gear, req.fxHit(), req.fxIdle());
+                applyEffectRequest(plan, gear, req.fxHit(), req.fxIdle(), req.userPrompt());
                 plan.motion = com.example.content.GearMotions.applies(gear) ? req.motion() : "";
                 record.motion = plan.motion;
             }
@@ -926,9 +926,18 @@ public class AiController {
      * equipment has no attack effect).
      */
     public static void applyEffectRequest(BuildPlan plan, GearKind kind, String fxHit, String fxIdle) {
+        applyEffectRequest(plan, kind, fxHit, fxIdle, "");
+    }
+
+    /** As above; damage numbers and random damage are switched on when the order (its effect line or text) asks for them. */
+    public static void applyEffectRequest(BuildPlan plan, GearKind kind, String fxHitIn, String fxIdle, String order) {
         if (plan.fx == null) {
             plan.fx = new Spark.Effects();
         }
+        String asked = (fxHitIn == null ? "" : fxHitIn) + " " + (order == null ? "" : order);
+        plan.fx.damageNumbers = !kind.worn() && com.example.ai.build.DamageTraits.numbers(asked);
+        plan.fx.randomDamage = !kind.worn() && com.example.ai.build.DamageTraits.random(asked);
+        String fxHit = com.example.ai.build.DamageTraits.rest(fxHitIn);
         if (fxHit == null || fxHit.isBlank() || kind.worn()) {
             plan.fx.attack.clear();
             plan.fx.trail.clear();
@@ -970,7 +979,8 @@ public class AiController {
      * The order asked for an effect but the script made none for it: send it back. (The other
      * way round, effects that were not asked for, is handled by removing them.)
      */
-    public static String effectProblem(BuildPlan plan, GearKind kind, String fxHit, String fxIdle) {
+    public static String effectProblem(BuildPlan plan, GearKind kind, String fxHitIn, String fxIdle) {
+        String fxHit = com.example.ai.build.DamageTraits.rest(fxHitIn);
         List<String> problems = new java.util.ArrayList<>();
         Spark.Effects fx = plan.fx == null ? new Spark.Effects() : plan.fx;
         if (kind == GearKind.BOW && fxHit != null && !fxHit.isBlank() && fx.attack.isEmpty() && fx.trail.isEmpty()
@@ -1219,7 +1229,9 @@ public class AiController {
     }
 
     /** pixel: the order's "모양: 픽셀" (pixel art instead of block pieces). */
-    public static AiPrompt gearPrompt(String userPrompt, GearKind kind, String fxHit, String fxIdle, boolean pixel) {
+    public static AiPrompt gearPrompt(String userPrompt, GearKind kind, String fxHitIn, String fxIdle, boolean pixel) {
+        // Damage numbers and random damage are switched on by the mod, not drawn by the script.
+        String fxHit = com.example.ai.build.DamageTraits.rest(fxHitIn);
         AiPrompt base = gearPromptBase(userPrompt, kind, pixel);
         String hit = kind.worn() ? "none (worn equipment has no hit effect)" : blankToNone(fxHit);
         String hitLine = kind == GearKind.BOW ? "\nArrow effect (trail in flight and/or where it lands): " : "\nEffect on attack (swing): ";
