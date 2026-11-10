@@ -38,6 +38,7 @@ public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, A
         int axes;
         String model = "";
         float tilt;
+        String orient = "";
         float thickness;
     }
 
@@ -71,6 +72,7 @@ public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, A
         state.axes = entity.axes();
         state.model = shot == null ? "" : shot.model;
         state.tilt = shot == null ? 0 : (float) shot.tilt;
+        state.orient = shot == null || shot.orient == null ? "" : shot.orient;
         state.thickness = shot == null ? 0.06F : (float) shot.thickness;
         state.facing = shot == null ? "flight" : shot.facing;
         state.size = shot == null ? 0 : (float) shot.size;
@@ -149,6 +151,14 @@ public class AibArrowRenderer extends ProjectileEntityRenderer<AibArrowEntity, A
         float roll = state.tilt + ("roll".equals(state.facing) ? state.spin : 0);
         if (roll != 0) {
             matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(roll));
+        }
+        // Facing the way it goes: the shape's forward (y) turned up, so it shows its face from behind (가로);
+        // 세로 turns it a quarter more round its flight, so it spreads up and down.
+        if ("vertical".equals(state.orient)) {
+            matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(90.0F));
+        }
+        if ("horizontal".equals(state.orient) || "vertical".equals(state.orient)) {
+            matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(90.0F));
         }
         if (builtIn) {
             ProjectileShapes.draw(matrices, vertexConsumers, state.model, state.size > 0 ? state.size : 0.8F, state.color, state.color2,

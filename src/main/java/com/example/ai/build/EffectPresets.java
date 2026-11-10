@@ -38,8 +38,8 @@ public final class EffectPresets {
         // ---- attacks (weapons when swung; bows where the arrow lands)
         add("fire_slash", "attack", "a burning blade band, falling sparks and real flames on the target", List.of(
             m("form", "swipe", "colors", List.of("#ffffff", "#ffc040", "#ff3000"), "size", 1.4, "arc", 170, "width", 0.45,
-                "plane", "side", "start", "weapon", "ticks", 9, "sound", "entity.blaze.shoot", "volume", 0.6),
-            m("shape", "slash", "look", "streak", "colors", List.of("#ffffa0", "#ff6000"), "size", 1.3, "count", 36, "plane", "side",
+                "plane", "front", "start", "weapon", "ticks", 9, "sound", "entity.blaze.shoot", "volume", 0.6),
+            m("shape", "slash", "look", "streak", "colors", List.of("#ffffa0", "#ff6000"), "size", 1.3, "count", 36, "plane", "front",
                 "start", "weapon", "moves", List.of("scatter", "fade"), "speed", 4, "gravity", 5, "drag", 0.3, "vary", 0.6, "ticks", 16,
                 "delay", 2),
             m("shape", "burst", "particle", "flame", "size", 0.5, "count", 18, "start", "target", "moves", List.of("scatter"),
@@ -62,20 +62,20 @@ public final class EffectPresets {
                 "moves", List.of("rise", "fade"), "speed", 1, "vary", 0.5, "turbulence", 0.3, "ticks", 24, "delay", 3)));
         add("frost", "attack", "an icy blade band, ice shards bursting off the target and snowflakes", List.of(
             m("form", "swipe", "colors", List.of("#ffffff", "#a0e8ff", "#3080ff"), "size", 1.3, "arc", 160, "width", 0.4,
-                "plane", "side", "start", "weapon", "ticks", 9, "sound", "block.glass.break", "volume", 0.5, "pitch", 1.6),
+                "plane", "front", "start", "weapon", "ticks", 9, "sound", "block.glass.break", "volume", 0.5, "pitch", 1.6),
             m("shape", "burst", "look", "shard", "colors", List.of("#e0f8ff", "#60b0ff"), "size", 0.7, "count", 24, "start", "target",
                 "moves", List.of("scatter", "fade"), "speed", 2.5, "gravity", 3, "drag", 0.4, "vary", 0.6, "ticks", 18, "delay", 2),
             m("shape", "burst", "particle", "snowflake", "size", 0.6, "count", 16, "start", "target", "moves", List.of("scatter"),
                 "speed", 1, "ticks", 12, "delay", 2)));
         add("shadow", "attack", "a dark violet blade band, a swelling cloud of darkness and drifting souls", List.of(
             m("form", "swipe", "colors", List.of("#c080ff", "#401060", "#000000"), "size", 1.4, "arc", 180, "width", 0.5,
-                "plane", "side", "start", "weapon", "ticks", 10, "sound", "entity.wither.shoot", "volume", 0.4, "pitch", 0.7),
+                "plane", "front", "start", "weapon", "ticks", 10, "sound", "entity.wither.shoot", "volume", 0.4, "pitch", 0.7),
             m("shape", "burst", "look", "glow", "colors", List.of("#6020a0", "#100020"), "size", 0.8, "count", 24, "start", "target",
                 "moves", List.of("expand", "fade"), "vary", 0.5, "turbulence", 0.6, "ticks", 22, "delay", 2),
             m("shape", "circle", "particle", "sculk_soul", "size", 0.6, "count", 10, "start", "target", "ticks", 10, "delay", 3)));
         add("sakura", "attack", "a pink blade band, a gust of cherry petals and little rising hearts", List.of(
             m("form", "swipe", "colors", List.of("#ffffff", "#ffc0e0", "#ff70b0"), "size", 1.3, "arc", 160, "width", 0.35,
-                "plane", "side", "start", "weapon", "ticks", 10, "sound", "block.cherry_leaves.break", "volume", 0.8),
+                "plane", "front", "start", "weapon", "ticks", 10, "sound", "block.cherry_leaves.break", "volume", 0.8),
             m("shape", "burst", "particle", "cherry_leaves", "size", 0.8, "count", 20, "start", "weapon", "moves", List.of("scatter"),
                 "speed", 1.5, "ticks", 14, "delay", 2),
             m("shape", "heart", "fill", true, "look", "glow", "color", "#ff90c8", "size", 0.35, "count", 30, "start", "target",
@@ -95,7 +95,7 @@ public final class EffectPresets {
             m("shape", "burst", "particle", "enchant", "size", 1.0, "count", 24, "start", "target", "moves", List.of("gather"),
                 "ticks", 16, "delay", 4)));
         add("wind", "attack", "a wide pale band of wind, a spiral of speed lines and puffs of air", List.of(
-            m("form", "swipe", "colors", List.of("#ffffff", "#d0fff0"), "size", 1.6, "arc", 200, "width", 0.3, "plane", "side",
+            m("form", "swipe", "colors", List.of("#ffffff", "#d0fff0"), "size", 1.6, "arc", 200, "width", 0.3, "plane", "front",
                 "start", "weapon", "ticks", 8, "sound", "entity.player.attack.sweep", "volume", 0.9),
             m("shape", "spiral", "look", "streak", "color", "#e0fff8", "size", 1.0, "count", 30, "plane", "side", "start", "weapon",
                 "moves", List.of("spin", "forward", "fade"), "speed", 3, "drag", 0.4, "vary", 0.4, "ticks", 14, "delay", 1),
@@ -110,8 +110,8 @@ public final class EffectPresets {
                 "moves", List.of("scatter", "fade"), "speed", 3, "gravity", 7, "vary", 0.6, "ticks", 20, "delay", 1)));
         add("water", "attack", "a flowing blue band, a splash of falling drops and a ripple", List.of(
             m("form", "swipe", "colors", List.of("#ffffff", "#80d0ff", "#2060ff"), "size", 1.4, "arc", 170, "width", 0.45,
-                "plane", "side", "start", "weapon", "ticks", 10, "sound", "entity.player.splash", "volume", 0.6),
-            m("shape", "slash", "look", "dot", "colors", List.of("#c0f0ff", "#3080ff"), "size", 1.3, "count", 40, "plane", "side",
+                "plane", "front", "start", "weapon", "ticks", 10, "sound", "entity.player.splash", "volume", 0.6),
+            m("shape", "slash", "look", "dot", "colors", List.of("#c0f0ff", "#3080ff"), "size", 1.3, "count", 40, "plane", "front",
                 "start", "weapon", "moves", List.of("scatter", "fade"), "speed", 2, "gravity", 6, "drag", 0.2, "vary", 0.6, "ticks", 16,
                 "delay", 2),
             m("form", "shockwave", "color", "#80c0ff", "size", 1.6, "width", 0.25, "start", "target", "ticks", 12, "delay", 2)));

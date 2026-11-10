@@ -23,7 +23,7 @@ public final class Spark {
     public static final List<String> MOVES = List.of(
         "forward", "back", "rise", "fall", "expand", "shrink", "spin", "orbit", "pulse", "scatter", "gather",
         "wave", "reveal", "fade", "flicker");
-    public static final List<String> PLANES = List.of("front", "flat", "side");
+    public static final List<String> PLANES = List.of("front", "vertical", "flat", "side");
     /** Where an attack or landing effect starts. */
     public static final List<String> STARTS = List.of("weapon", "target", "ground", "above", "self");
     /** Where an effect while held or worn sits. */
@@ -418,6 +418,13 @@ public final class Spark {
         public String model = "";
         /** Degrees the shape is turned round its flight: 0 = lying flat (a sideways wave), 90 = standing up. */
         public double tilt = 0;
+        /**
+         * How a flat shape faces as it flies: 'horizontal' (가로: it faces the way it goes, spread left and right, so a
+         * crescent is a wide arc seen from behind), 'vertical' (세로: the same, spread up and down), or 'flat' / ""
+         * (lying flat like a skimming stone; tilt turns it round its flight).
+         */
+        public String orient = "";
+        public static final List<String> ORIENTS = List.of("horizontal", "vertical", "flat");
         /** Built-in shapes: how thick (0.02-0.3 of its size). */
         public double thickness = 0.06;
         /** More projectiles with each shot (or each swing of a melee weapon), each hurting half as much. */
@@ -469,6 +476,7 @@ public final class Spark {
             order = ORDERS.contains(order) ? order : "random";
             model = model != null && MODELS.contains(model) ? model : "";
             tilt = clamp(tilt, -90, 90);
+            orient = orient != null && ORIENTS.contains(orient) ? orient : "";
             thickness = clamp(thickness, 0.02, 0.3);
             if (text == null) {
                 text = "";
@@ -517,6 +525,12 @@ public final class Spark {
                         case "order" -> s.order = word(v, ORDERS, "shot order");
                         case "model", "shape" -> s.model = word(v, MODELS, "shot model");
                         case "tilt" -> s.tilt = num(v, key);
+                        case "orient", "facingAs", "direction" -> s.orient = switch (String.valueOf(v).trim().toLowerCase(java.util.Locale.ROOT)) {
+                            case "가로", "horizontal", "wide", "across" -> "horizontal";
+                            case "세로", "vertical", "upright", "standing" -> "vertical";
+                            case "눕힘", "flat", "lying", "skim" -> "flat";
+                            default -> throw new IllegalArgumentException("shot orient must be 'horizontal' (가로), 'vertical' (세로) or 'flat', got '" + v + "'");
+                        };
                         case "thickness" -> s.thickness = num(v, key);
                         case "extra", "extras" -> {
                             List<?> list = v instanceof List<?> l ? l : List.of(v);
@@ -531,7 +545,7 @@ public final class Spark {
                             }
                         }
                         default -> throw new IllegalArgumentException("unknown shot setting '" + key
-                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks, opacity, text, order, extra, model, tilt, thickness");
+                            + "'; use kind, facing, hit, gravity, size, color, color2, width, ticks, opacity, text, order, extra, model, orient, tilt, thickness");
                     }
                 }
             }

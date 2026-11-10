@@ -773,7 +773,17 @@ public class AiController {
     /** What every equipment prompt says about style: make what was asked, in its own style. */
     static final String GEAR_STYLE = """
             STYLE (this decides the quality):
-            - PLAN FIRST: before the code, write short // comments listing its real parts and sizes, then build them.
+            - REQUEST CHECKLIST FIRST: before the code, list as // comments EVERY thing the request says - what it is,
+              each named part, materials, colours, decorations, size words (큰/거대한/작은/긴/짧은), mood words (귀여운,
+              낡은, 화려한, 사악한, 신성한), and anything it must NOT be - one line each, starting // REQ:. Then list its
+              real parts and sizes (// PART:). Build every REQ line; the request always beats the kind's typical shape
+              and the examples (a "sword" order that asks for a fish is a fish).
+            - WORDS IN ORDERS: 금/황금/금장식 gold_block or '#d4af37'; 은/은빛 iron_block or '#c8ccd4'; 흑요석/칠흑 obsidian or
+              '#1a1024'; 녹슨 '#8a4a2a' patches on dull iron; 피 묻은 '#7a0a0a' streaks; 얼음/서리 pale blue '#a8e0ff' and
+              packed_ice, see-through '#a8e0ff/50'; 불/불타는/화염 '#ff6a00' to '#ffd040' with glowstone or shroomlight;
+              어둠/저주/사악한 '#2a0a3a' with purple '#8a2be2'; 신성한/성스러운 white and gold with a soft aura;
+              나무/목재 planks or stripped logs; 뼈 bone_block or '#e8e0c8'; 보석/수정 a gem of turned boxes in a clear
+              colour; 룬/문양 thin bright strips standing out a little; 빛나는/발광 ai.glow on that group.
             - Make exactly what the request describes, in the style it implies (everyday, realistic, cute, toy, sci-fi,
               fantasy, a joke...). Do not add armour, gems or fantasy decoration it did not ask for.
             - Get the subject right first: its recognisable silhouette, proportions and colours. If it names a known
@@ -994,6 +1004,7 @@ public class AiController {
                 extras.color2 = plan.fx.shot.color2;
                 extras.model = plan.fx.shot.model;
                 extras.tilt = plan.fx.shot.tilt;
+                extras.orient = plan.fx.shot.orient;
                 extras.thickness = plan.fx.shot.thickness;
                 plan.fx.shot = extras.hasExtras() ? extras.clamped() : null;
             }
@@ -1047,7 +1058,11 @@ public class AiController {
                 facing: 'flight' (points where it flies, like an arrow; the default), 'spin' (turns FLAT like a thrown
                         shuriken or disc), 'tumble' (end over end: thrown axes, hammers), 'roll' (turns round its
                         flight like a drill or a spiralling bolt), 'fixed' (level, never turning: balls, bubbles, orbs)
-                tilt: degrees turned round its flight: 0 = lying flat (a horizontal wave, 가로), 90 = standing (세로)
+                orient: how a flat shape (a crescent, shuriken, disc, star, flat pieces) shows as it flies:
+                        'horizontal' (가로: it faces the way it goes, spread LEFT-RIGHT, so a 검기 is a wide arc seen
+                        from behind - use it for 가로 검기 and most sword waves), 'vertical' (세로: the same, spread
+                        UP-DOWN), 'flat' (lying flat like a skimming stone or a thrown disc; the default)
+                tilt: extra degrees turned round its flight (-90..90), e.g. 45 for a diagonal (대각선) wave
                 hit: 'stick' (stays where it hits, like an arrow; the default) or 'vanish' (pops with a small burst:
                      bubbles, fireballs, magic bolts, bullets)
                 gravity: true (falls in an arc, the default) or false (flies straight: magic, lasers, bullets)
@@ -1067,9 +1082,9 @@ public class AiController {
                    an invisible ray that strikes lightning: ai.shot([kind: 'beam', opacity: 0]) + ai.preset('attack', 'lightning')
                    a bubble wand: ai.shot([facing: 'fixed', hit: 'vanish', gravity: false, size: 0.7, color: '#c0f0ff'])
                    a shuriken: ai.shot([model: 'shuriken', facing: 'spin', size: 0.5, thickness: 0.05, color: '#c8ccd4'])
-                   a horizontal sword wave: ai.shot([model: 'crescent', facing: 'flight', size: 1.6, color: '#80d0ff',
-                                                     color2: '#ffffff', gravity: false, hit: 'vanish'])
-                   a vertical one: the same with tilt: 90
+                   a horizontal sword wave (가로 검기): ai.shot([model: 'crescent', orient: 'horizontal', facing: 'flight',
+                                                     size: 1.6, color: '#80d0ff', color2: '#ffffff', gravity: false, hit: 'vanish'])
+                   a vertical one (세로 검기): the same with orient: 'vertical'; a diagonal one: orient: 'horizontal', tilt: 45
                    a keyboard shooting random letters: ai.shot([text: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', facing: 'fixed',
                                                                 gravity: false, hit: 'vanish', size: 0.7, color: '#80ffea'])
             """;
@@ -1102,10 +1117,11 @@ public class AiController {
             검기, 날아가는 참격, 마법탄, 불꽃 구슬...): ai.shot([extra: [[count: 1, path: 'trail']], facing: 'spin',
               hit: 'vanish', gravity: false, size: 0.8]) - the extras leave with the swing and pass the one it hits
               directly. Their shape: pieces between ai.arrowStart(n)/arrowEnd() (pointing up, +Y) or text: '...'.
-              가로 (horizontal) means lying flat: tilt 0 for a shot, plane 'flat' for an effect; 세로 (vertical) means standing:
-              tilt 90, plane 'front'. Do not draw a flying wave with effect dots: use the shot below.
-              A sword wave (검기): ai.shot([extra: [[count: 1, path: 'trail']], model: 'crescent', gravity: false,
-                hit: 'vanish', size: 1.6, color: '#80d0ff', color2: '#ffffff'])  (tilt: 90 for an upright one)
+              가로 (horizontal) = spread left-right as the wielder sees it: orient 'horizontal' for a shot, plane 'front' for
+              an effect. 세로 (vertical) = spread up-down: orient 'vertical' for a shot, plane 'vertical' for an effect.
+              No direction asked: 가로. Do not draw a flying wave with effect dots: use the shot below.
+              A sword wave (검기): ai.shot([extra: [[count: 1, path: 'trail']], model: 'crescent', orient: 'horizontal',
+                gravity: false, hit: 'vanish', size: 1.6, color: '#80d0ff', color2: '#ffffff'])  (orient: 'vertical' for 세로)
               Thrown shurikens in a fan: ai.shot([extra: [[count: 3, path: 'spread', angle: 20]], model: 'shuriken',
                 facing: 'spin', size: 0.5, thickness: 0.05, color: '#c8ccd4'])
             """;
@@ -1181,9 +1197,10 @@ public class AiController {
                          'block.amethyst_block.chime', 'entity.player.attack.sweep', 'item.trident.riptide_1',
                          'block.fire.extinguish', 'entity.evoker.cast_spell'   volume: 0-2   pitch: 0.5-2
                   size: blocks (radius, 0.1-4)   count: dots (4-96; outlines 24-48, filled 40-80)   dot: dot size (0.02-0.3)
-                  plane: 'front' (stands UP like a wall facing the way it goes: a VERTICAL wave), 'flat' (lies flat: a
-                         HORIZONTAL / 가로 wave, ground circles, halos),
-                         'side' (stands along the way it goes: a sword arc seen from the side)
+                  plane: 'front' (faces the way it goes, like a picture in front of the wielder; slashes and swipes in it
+                         sweep LEFT-RIGHT: a 가로 베기, the usual one), 'vertical' (the same picture turned a quarter:
+                         slashes sweep UP-DOWN, a 세로 베기), 'flat' (lies on the ground: magic circles, shockwaves,
+                         halos), 'side' (stands along the way it goes: seen from behind it is only a thin line; rarely)
                   start (attack): 'weapon' (just in front of the wielder), 'target' (on what is hit), 'ground' (on the
                          ground under it), 'above' (over it), 'self' (around the wielder)
                   anchor (idle): 'item' (the held item), 'head' (over the head), 'body', 'back', 'feet', 'around'
@@ -1206,17 +1223,17 @@ public class AiController {
             Examples:
               // a fire slash: the blade's glowing band, sparks thrown off it that fall, and real flames
               ai.effect('attack', [form: 'swipe', colors: ['#ffffff', '#ffc040', '#ff3000'], size: 1.4, arc: 170,
-                                   width: 0.45, plane: 'side', start: 'weapon', ticks: 9, sound: 'entity.blaze.shoot',
+                                   width: 0.45, plane: 'front', start: 'weapon', ticks: 9, sound: 'entity.blaze.shoot',
                                    volume: 0.6])
               ai.effect('attack', [shape: 'slash', look: 'streak', colors: ['#ffffa0', '#ff6000'], size: 1.3, count: 40,
-                                   plane: 'side', start: 'weapon', moves: ['scatter', 'fade'], speed: 4, gravity: 5,
+                                   plane: 'front', start: 'weapon', moves: ['scatter', 'fade'], speed: 4, gravity: 5,
                                    drag: 0.3, vary: 0.6, ticks: 16])
               ai.effect('attack', [shape: 'burst', particle: 'flame', size: 0.6, count: 24, start: 'target',
                                    moves: ['scatter'], speed: 2, ticks: 10])
               ai.effect('attack', [shape: 'heart', fill: true, color: '#ff66cc', size: 0.45, count: 60, plane: 'front',
                                    start: 'weapon', moves: ['forward', 'pulse', 'fade'], speed: 7, ticks: 16])
               ai.effect('attack', [shape: 'slash', color: '#bfe8ff', color2: '#3060ff', size: 1.3, count: 64,
-                                   plane: 'side', start: 'weapon', moves: ['reveal', 'fade'], ticks: 8])
+                                   plane: 'vertical', start: 'weapon', moves: ['reveal', 'fade'], ticks: 8])   // 세로 베기
               ai.effect('attack', [form: 'disc', colors: ['#e0b0ff', '#7020ff'], size: 1.5, plane: 'flat',
                                    start: 'ground', moves: ['spin', 'fade'], speed: 0.4, ticks: 30])
               ai.effect('attack', [form: 'pillar', colors: ['#ffffff', '#ffe080'], size: 0.8, width: 0.3,
@@ -1308,9 +1325,17 @@ public class AiController {
         String system = pixel
             ? GEAR_SYSTEM.formatted(shapes, style, EXAMPLE_PIXEL_SWORD.strip(), EXAMPLE_PIXEL_STAFF.strip())
             : GEAR_SYSTEM.formatted(shapes, style, EXAMPLE_SWORD.strip(), EXAMPLE_AXE.strip());
-        String user = "Equipment kind: " + kind.id() + " (" + kind.korean + "). Typical shape for this kind "
-            + "(follow the request where it differs): " + kind.guide
-            + "\nRequest: " + userPrompt + "\nWrite the Groovy script for it now.";
+        StringBuilder known = new StringBuilder();
+        for (String parts : com.example.ai.build.GearAnatomy.forRequest(userPrompt)) {
+            known.append("\n- ").append(parts);
+        }
+        String user = "REQUEST (this decides what it is; it beats the typical shape and the examples): " + userPrompt
+            + (known.length() == 0 ? "" : "\nWHAT THE REQUEST NAMES IS MADE OF (build these recognisable parts, changed as the "
+                + "request says):" + known)
+            + "\nEquipment kind: " + kind.id() + " (" + kind.korean + "): it only sets the stats and the swing. Typical shape "
+            + "when the request says nothing about it: " + kind.guide
+            + "\nFirst the REQUEST CHECKLIST as // REQ: comments (see STYLE), then the parts, then the code."
+            + "\nWrite the Groovy script for it now.";
         return new AiPrompt(system, user);
     }
 

@@ -689,6 +689,8 @@ public final class SparkRenderer {
         return switch (s.plane) {
             case "flat" -> new Axes(d, flatRight, flatForward, upWorld, flatRight, flatForward);
             case "side" -> new Axes(d, d, up, right, flatRight, flatForward);
+            // Facing the way it goes like 'front', turned a quarter: arcs and slashes run up and down (세로).
+            case "vertical" -> new Axes(d, up, right.multiply(-1), d.multiply(-1), flatRight, flatForward);
             default -> new Axes(d, right, up, d.multiply(-1), flatRight, flatForward);
         };
     }

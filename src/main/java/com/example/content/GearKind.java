@@ -20,7 +20,7 @@ public enum GearKind {
             + "greatsword 1.8-3.2. Scythe: a long shaft (1.6-2.8) up from the hand; at the top a collar or ornament where a "
             + "big crescent blade starts, sweeping out to one side (+X or -X, 1.0-2.0 long), then tapering and curving "
             + "down to a point. The blade is wide and heavy: 0.25-0.5 at its widest, at least 0.06 thick; build it from "
-            + "a tapered tube (ai.addTube with r1 > r2) or several overlapping ellipsoids, never one thin curve; a bright "
+            + "a chain of 5-8 flat boxes, each turned a little more along the curve (never one thin curve or round pieces); a bright "
             + "metal cutting edge on the inner (lower) side and a darker back. Hammer or club: a shaft with a heavy "
             + "head at the top (a big hammer head 0.6-1.2 wide)."),
     AXE("도끼", Items.IRON_AXE, Items.IRON_AXE,
