@@ -93,23 +93,56 @@ public final class SmoothShapes implements SpecialModelRenderer<SmoothShapes.Loo
         }
     }
 
+    /** Rings x slices for a big, a middle and a small round piece (blocks across, as drawn). */
+    private static final int[][] LOD = { { STACKS, SLICES }, { 9, 16 }, { 6, 10 } };
+    /** Unit sphere and circle points per level, worked out once: {x, y, z} per vertex, and {cos, sin} per slice. */
+    private static final float[][][] SPHERE = new float[LOD.length][][];
+    private static final float[][][] CIRCLE = new float[LOD.length][][];
+
+    static {
+        for (int l = 0; l < LOD.length; l++) {
+            int st = LOD[l][0], sl = LOD[l][1];
+            float[][] pts = new float[(st + 1) * (sl + 1)][];
+            for (int i = 0; i <= st; i++) {
+                double t = Math.PI * i / st;
+                for (int j = 0; j <= sl; j++) {
+                    double f = 2 * Math.PI * j / sl;
+                    pts[i * (sl + 1) + j] = new float[] { (float) (Math.sin(t) * Math.cos(f)), (float) Math.cos(t), (float) (Math.sin(t) * Math.sin(f)) };
+                }
+            }
+            SPHERE[l] = pts;
+            float[][] c = new float[sl + 1][];
+            for (int j = 0; j <= sl; j++) {
+                double f = 2 * Math.PI * j / sl;
+                c[j] = new float[] { (float) Math.cos(f), (float) Math.sin(f) };
+            }
+            CIRCLE[l] = c;
+        }
+    }
+
+    /** Which level of detail: by how big the piece really is (its size times the matrix's scale). */
+    static int lod(MatrixStack.Entry e, float sx, float sy, float sz) {
+        org.joml.Vector3f scale = e.getPositionMatrix().getScale(new org.joml.Vector3f());
+        float size = Math.max(sx * scale.x, Math.max(sy * scale.y, sz * scale.z));
+        return size >= 0.45F ? 0 : size >= 0.14F ? 1 : 2;
+    }
+
     private static void sphere(MatrixStack.Entry e, VertexConsumer b, float sx, float sy, float sz, int argb, int light, int overlay,
                                float u, float v) {
-        float[][] p = new float[(STACKS + 1) * (SLICES + 1)][];
-        float[][] n = new float[p.length][];
-        for (int i = 0; i <= STACKS; i++) {
-            double t = Math.PI * i / STACKS;
-            for (int j = 0; j <= SLICES; j++) {
-                double f = 2 * Math.PI * j / SLICES;
-                float x = (float) (Math.sin(t) * Math.cos(f)), y = (float) Math.cos(t), z = (float) (Math.sin(t) * Math.sin(f));
-                p[i * (SLICES + 1) + j] = new float[] { x * sx / 2, y * sy / 2, z * sz / 2 };
-                // The normal of an ellipsoid: the sphere's, divided by the stretch.
-                n[i * (SLICES + 1) + j] = normal(x / sx, y / sy, z / sz);
-            }
+        int l = lod(e, sx, sy, sz);
+        int st = LOD[l][0], sl = LOD[l][1];
+        float[][] unit = SPHERE[l];
+        float[][] p = new float[unit.length][];
+        float[][] n = new float[unit.length][];
+        for (int k = 0; k < unit.length; k++) {
+            float x = unit[k][0], y = unit[k][1], z = unit[k][2];
+            p[k] = new float[] { x * sx / 2, y * sy / 2, z * sz / 2 };
+            // The normal of an ellipsoid: the sphere's, divided by the stretch.
+            n[k] = normal(x / sx, y / sy, z / sz);
         }
-        for (int i = 0; i < STACKS; i++) {
-            for (int j = 0; j < SLICES; j++) {
-                int a = i * (SLICES + 1) + j, c = a + SLICES + 1;
+        for (int i = 0; i < st; i++) {
+            for (int j = 0; j < sl; j++) {
+                int a = i * (sl + 1) + j, c = a + sl + 1;
                 quad(e, b, p[a], n[a], p[c], n[c], p[c + 1], n[c + 1], p[a + 1], n[a + 1], argb, light, overlay, u, v);
             }
         }
@@ -118,18 +151,20 @@ public final class SmoothShapes implements SpecialModelRenderer<SmoothShapes.Loo
     /** An upright cut cone: bottom radius 1/2, top radius taper/2 (a cylinder at taper 1), with its ends closed. */
     private static void frustum(MatrixStack.Entry e, VertexConsumer b, float taper, float sx, float sy, float sz, int argb, int light,
                                 int overlay, float u, float v) {
+        int l = lod(e, sx, sx > sz ? sx : sz, sz);
+        int sl = LOD[l][1];
+        float[][] circle = CIRCLE[l];
         float hy = sy / 2;
         float slope = (1 - taper) / 2 * Math.max(sx, sz) / Math.max(1e-4F, sy);
-        for (int j = 0; j < SLICES; j++) {
-            double f0 = 2 * Math.PI * j / SLICES, f1 = 2 * Math.PI * (j + 1) / SLICES;
-            float c0 = (float) Math.cos(f0), s0 = (float) Math.sin(f0), c1 = (float) Math.cos(f1), s1 = (float) Math.sin(f1);
+        float[] down = { 0, -1, 0 }, up = { 0, 1, 0 };
+        float[] cb = { 0, -hy, 0 }, ct = { 0, hy, 0 };
+        for (int j = 0; j < sl; j++) {
+            float c0 = circle[j][0], s0 = circle[j][1], c1 = circle[j + 1][0], s1 = circle[j + 1][1];
             float[] b0 = { c0 * sx / 2, -hy, s0 * sz / 2 }, b1 = { c1 * sx / 2, -hy, s1 * sz / 2 };
             float[] t0 = { c0 * sx / 2 * taper, hy, s0 * sz / 2 * taper }, t1 = { c1 * sx / 2 * taper, hy, s1 * sz / 2 * taper };
             float[] n0 = normal(c0 / sx, slope / Math.max(sx, sz), s0 / sz), n1 = normal(c1 / sx, slope / Math.max(sx, sz), s1 / sz);
             quad(e, b, b0, n0, t0, n0, t1, n1, b1, n1, argb, light, overlay, u, v);
             // The ends.
-            float[] down = { 0, -1, 0 }, up = { 0, 1, 0 };
-            float[] cb = { 0, -hy, 0 }, ct = { 0, hy, 0 };
             quad(e, b, cb, down, b0, down, b1, down, b1, down, argb, light, overlay, u, v);
             if (taper > 0) {
                 quad(e, b, ct, up, t1, up, t0, up, t0, up, argb, light, overlay, u, v);

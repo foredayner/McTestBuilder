@@ -35,6 +35,8 @@ public final class AiBuilderConfig {
     public int keepAliveMinutes = 30;
     /** This player's own choice: big hits shake the view a little (equipment effects). */
     public boolean screenShake = true;
+    /** This player's own choice: how damage numbers look (classic, flame or ice). */
+    public String damageStyle = "classic";
     /** This game has opened the AI 공방 before (the 가이드 opens first only the very first time). */
     public boolean guideSeen = false;
     /** 소품: 사용 — buildings and objects may use colours, smooth pieces and the furniture library (off: blocks only). */

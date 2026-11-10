@@ -1042,8 +1042,16 @@ public class MinecraftAI {
         return normalizeBlockId(blockName);
     }
 
+    /** Count a round piece (and its mirrored twin) for the round-piece limit. */
+    private static void round(double x) {
+        if (recorder != null) {
+            recorder.rounds += mirrorX != null && Math.abs(x - mirrorX) > 1e-6 ? 2 : 1;
+        }
+    }
+
     /** Upright cylinder: centre (cx, cz), bottom at y. */
     public static void addCylinder(String blockName, Number cx, Number y, Number cz, Number radius, Number height) {
+        round(toDouble(cx));
         double r = toDouble(radius);
         double h = toDouble(height);
         if (smooth(blockName, "cylinder", toDouble(cx), toDouble(y) + h / 2, toDouble(cz), 2 * r, h, 2 * r, 1, 0, 0)) {
@@ -1054,6 +1062,7 @@ public class MinecraftAI {
 
     /** Ball of radius r around (cx, cy, cz). */
     public static void addSphere(String blockName, Number cx, Number cy, Number cz, Number radius) {
+        round(toDouble(cx));
         double r = toDouble(radius);
         if (smooth(blockName, "sphere", toDouble(cx), toDouble(cy), toDouble(cz), 2 * r, 2 * r, 2 * r, 1, 0, 0)) {
             return;
@@ -1062,6 +1071,7 @@ public class MinecraftAI {
     }
 
     public static void addEllipsoid(String blockName, Number cx, Number cy, Number cz, Number rx, Number ry, Number rz) {
+        round(toDouble(cx));
         if (smooth(blockName, "sphere", toDouble(cx), toDouble(cy), toDouble(cz), 2 * toDouble(rx), 2 * toDouble(ry), 2 * toDouble(rz), 1, 0, 0)) {
             return;
         }
@@ -1075,6 +1085,7 @@ public class MinecraftAI {
 
     /** Upright cut cone: bottom radius, top radius. */
     public static void addCone(String blockName, Number cx, Number y, Number cz, Number bottomRadius, Number topRadius, Number height) {
+        round(toDouble(cx));
         double r1 = toDouble(bottomRadius), r2 = toDouble(topRadius), h = toDouble(height);
         double big = Math.max(r1, r2);
         // Wider at the top: the same cone turned upside down.
@@ -1092,6 +1103,7 @@ public class MinecraftAI {
     /** Rounded rod from (x1,y1,z1) with radius r1 to (x2,y2,z2) with radius r2. */
     public static void addCapsule(String blockName, Number x1, Number y1, Number z1, Number x2, Number y2, Number z2,
                                   Number r1, Number r2) {
+        round((toDouble(x1) + toDouble(x2)) / 2);
         if (smoothable(blockName)) {
             // Smooth: a rod (a cylinder, or a cut cone when the ends differ) and a ball at each end.
             double ax = toDouble(x1), ay = toDouble(y1), az = toDouble(z1), bx = toDouble(x2), by = toDouble(y2), bz = toDouble(z2);
@@ -1129,6 +1141,7 @@ public class MinecraftAI {
 
     /** Smooth curve through 2-16 points [[x,y,z], ...], radius r1 at the start to r2 at the end. */
     public static void addTube(String blockName, List<?> points, Number r1, Number r2) {
+        round(points != null && !points.isEmpty() && points.get(0) instanceof List<?> p0 && !p0.isEmpty() ? toDouble((Number) p0.get(0)) : 0);
         List<double[]> list = new ArrayList<>();
         if (points != null) {
             for (Object o : points) {

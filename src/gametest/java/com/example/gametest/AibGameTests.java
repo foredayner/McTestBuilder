@@ -442,6 +442,7 @@ public class AibGameTests implements FabricGameTest {
             BuildPlan plan = Demo.plan(world, origin, player, example);
             check(plan.ops.isEmpty() && !plan.parts.isEmpty(), "an object");
             check(plan.parts.size() <= BuildPlan.MAX_PARTS, "within the part limit: " + plan.parts.size());
+            check(com.example.ai.AiController.roundProblem(plan, null) == null, "within the round-piece limit: " + plan.rounds);
             check("south".equals(plan.facing), "objects are designed facing south (+Z), got " + plan.facing);
             double[] b = plan.partBounds();
             check(Math.abs((b[0] + b[3]) / 2) < 0.2, "centred on x = 0: " + b[0] + ".." + b[3]);
@@ -459,7 +460,15 @@ public class AibGameTests implements FabricGameTest {
             BuildPlan plan = Demo.plan(world, origin, player, example, true);
             String problem = com.example.ai.AiController.gearProblem(plan);
             check(problem == null, "example fits the hand: " + problem);
+            check(com.example.ai.AiController.roundProblem(plan, com.example.content.GearKind.SWORD) == null, "a few round pieces: " + plan.rounds);
+            check(plan.parts.stream().filter(q -> q.shape != null).count() <= 1, "a blade of boxes, at most a round pommel");
         }
+        StringBuilder balls = new StringBuilder(com.example.ai.AiController.EXAMPLE_SWORD);
+        for (int i = 0; i < 13; i++) {
+            balls.append("ai.addSphere('#ffcc00', 0, ").append(0.3 + i * 0.06).append(", 0, 0.03)\n");
+        }
+        BuildPlan beads = Demo.plan(world, origin, player, balls.toString(), true);
+        check(com.example.ai.AiController.roundProblem(beads, com.example.content.GearKind.SWORD) != null, "too many round pieces are sent back");
         BuildPlan sword = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_SWORD);
         BuildRecord record = BuildRecord.create("long sword", "TEST", "script", sword);
         record.kind = "gear";
@@ -481,6 +490,7 @@ public class AibGameTests implements FabricGameTest {
         check(stack.getMaxCount() == 1, "does not stack");
         // Worn equipment: the examples stay on the head / torso; a helmet is a head item with iron armour.
         BuildPlan helmet = Demo.plan(world, origin, player, com.example.ai.AiController.EXAMPLE_HELMET, true);
+        check(com.example.ai.AiController.roundProblem(helmet, com.example.content.GearKind.HELMET) == null, "mascot head rounds: " + helmet.rounds);
         check(com.example.ai.AiController.gearProblem(helmet, com.example.content.GearKind.HELMET) == null,
             "helmet example fits: " + com.example.ai.AiController.gearProblem(helmet, com.example.content.GearKind.HELMET));
         check(helmet.parts.size() <= BuildPlan.MAX_PARTS, "mask within the part limit: " + helmet.parts.size());

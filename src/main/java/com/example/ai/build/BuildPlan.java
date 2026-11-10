@@ -176,6 +176,8 @@ public final class BuildPlan {
 
     public List<Op> ops = new ArrayList<>();
     public List<Part> parts = new ArrayList<>();
+    /** Round pieces the script asked for (spheres, cylinders, cones, capsules, tubes; mirrored twins too). Not kept. */
+    public transient int rounds;
     public String facing = "north";
     /** Equipment: movements of part groups (only when the order asked for an effect). */
     public List<Anim> anims = new ArrayList<>();

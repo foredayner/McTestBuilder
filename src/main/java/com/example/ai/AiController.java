@@ -403,6 +403,12 @@ public class AiController {
                 AiNetworking.sendLog(player, note);
             }
         }
+        if (failure == null && (gear != null || "object".equals(req.mode()))) {
+            failure = roundProblem(plan, gear);
+            if (failure != null) {
+                AiNetworking.sendLog(player, "[Review] " + failure);
+            }
+        }
         if (failure == null && gear != null) {
             failure = gearProblem(plan, gear);
             if (failure == null) {
@@ -594,18 +600,18 @@ public class AiController {
     public static final String EXAMPLE_DUCK = """
         // rubber duck with a top hat, about 1.5 blocks tall; it looks at the player (-Z)
         def z = 2.6
-        ai.addEllipsoid('yellow_concrete', 0, 0.42, z + 0.15, 0.42, 0.34, 0.55)      // body
-        ai.addEllipsoid('yellow_terracotta', 0, 0.16, z + 0.15, 0.34, 0.1, 0.45)     // darker underside
-        ai.addCone('yellow_concrete', 0, 0.45, z + 0.62, 0.16, 0.0, 0.32)          // tail
-        ai.addSphere('yellow_concrete', 0, 0.98, z - 0.12, 0.3)                      // big head
+        ai.addEllipsoid('#f7d33c', 0, 0.42, z + 0.15, 0.42, 0.34, 0.55)              // body (round: a smooth colour)
+        ai.addEllipsoid('#d9a92a', 0, 0.16, z + 0.15, 0.34, 0.1, 0.45)               // darker underside
+        ai.addCone('#f7d33c', 0, 0.45, z + 0.62, 0.16, 0.0, 0.32)                  // tail
+        ai.addSphere('#f7d33c', 0, 0.98, z - 0.12, 0.3)                              // big head
         ai.addRoundBox('orange_concrete', -0.13, 0.84, z - 0.56, 0.26, 0.1, 0.2, 0.04) // beak
-        ai.addCylinder('black_concrete', 0, 1.24, z - 0.12, 0.22, 0.03)              // hat brim
-        ai.addCylinder('black_concrete', 0, 1.26, z - 0.12, 0.14, 0.26)              // hat
-        ai.addCylinder('red_concrete', 0, 1.29, z - 0.12, 0.145, 0.05)               // hat band
+        ai.addCylinder('#1e1e22', 0, 1.24, z - 0.12, 0.22, 0.03)                     // hat brim
+        ai.addCylinder('#1e1e22', 0, 1.26, z - 0.12, 0.14, 0.26)                     // hat
+        ai.addCylinder('#c0392b', 0, 1.29, z - 0.12, 0.145, 0.05)                    // hat band
         ai.mirrorOn()
-        ai.addSphere('black_concrete', 0.13, 1.04, z - 0.38, 0.06)                   // eyes
-        ai.addSphere('white_concrete', 0.11, 1.07, z - 0.43, 0.02)                   // eye shine
-        ai.addEllipsoid('yellow_terracotta', 0.4, 0.48, z + 0.2, 0.07, 0.18, 0.3)    // wings
+        ai.addSphere('#1e1e22', 0.13, 1.04, z - 0.38, 0.06)                          // eyes
+        ai.addSphere('#ffffff', 0.11, 1.07, z - 0.43, 0.02)                          // eye shine
+        ai.addEllipsoid('#d9a92a', 0.4, 0.48, z + 0.2, 0.07, 0.18, 0.3)              // wings
         ai.addRoundBox('orange_concrete', 0.1, 0, z - 0.15, 0.16, 0.05, 0.2, 0.02)   // feet
         ai.mirrorOff()
         """;
@@ -723,24 +729,45 @@ public class AiController {
         return problems.isEmpty() ? null : PLAN_PROBLEMS + "\n- " + String.join("\n- ", problems);
     }
 
+    /** Most round pieces (spheres, cylinders, cones, capsules, tubes) an object, a worn and a held item may have. */
+    public static final int MAX_ROUNDS_OBJECT = 30, MAX_ROUNDS_WORN = 24, MAX_ROUNDS_HELD = 12;
+
+    /** Too many round pieces: they bend straight and flat things out of shape and slow the game. Null when fine. */
+    public static String roundProblem(BuildPlan plan, GearKind kind) {
+        int max = kind == null ? MAX_ROUNDS_OBJECT : kind.worn() ? MAX_ROUNDS_WORN : MAX_ROUNDS_HELD;
+        if (plan.rounds <= max) {
+            return null;
+        }
+        return PLAN_PROBLEMS + "\n- it uses " + plan.rounds + " round pieces (spheres, ellipsoids, cylinders, cones, capsules, tubes; "
+            + "mirrored ones count twice); at most " + max + ". Round pieces are ONLY for really round parts (heads, balls, "
+            + "fruit, knobs, gems, wheels). Build blades, boards, plates, handles of tools, frames and everything flat, "
+            + "straight or angular from boxes (ai.addPart / ai.addRoundBox).";
+    }
+
     public static final String EXAMPLE_SWORD = """
         // plain steel sword, about 1.45 long; the hand holds it at (0, 0, 0), blade up (+Y), flat side facing -Z
-        ai.addCapsule('dark_oak_planks', 0, -0.12, 0, 0, 0.22, 0, 0.045)            // grip
-        ai.addSphere('gold_block', 0, -0.15, 0, 0.06)                               // pommel
+        // all boxes: a blade is flat and straight; only the pommel ball is round (in a colour, so it is smooth)
+        ai.addPart('dark_oak_planks', -0.04, -0.12, -0.04, 0.08, 0.34, 0.08)       // grip: a square rod
+        ai.addPart('brown_wool', -0.045, -0.04, -0.045, 0.09, 0.03, 0.09)         // leather bands round the grip
+        ai.addPart('brown_wool', -0.045, 0.1, -0.045, 0.09, 0.03, 0.09)
+        ai.addSphere('#d4af37', 0, -0.15, 0, 0.055)                                  // pommel
         ai.addRoundBox('gold_block', -0.2, 0.22, -0.05, 0.4, 0.07, 0.1, 0.02)      // cross guard
-        ai.addRoundBox('iron_block', -0.075, 0.29, -0.025, 0.15, 0.95, 0.05, 0.01) // blade
-        ai.addRoundBox('light_gray_concrete', -0.02, 0.32, -0.03, 0.04, 0.85, 0.06, 0)  // groove down the blade
-        ai.addCone('iron_block', 0, 1.24, 0, 0.075, 0.16)                           // tip
+        ai.addPart('iron_block', -0.07, 0.29, -0.02, 0.14, 0.8, 0.04)              // blade
+        ai.addPart('light_gray_concrete', -0.015, 0.32, -0.025, 0.03, 0.74, 0.05)  // groove down the blade
+        ai.addPart('iron_block', -0.05, 1.09, -0.02, 0.1, 0.06, 0.04)              // the blade narrowing
+        ai.addPart('iron_block', -0.05, 1.1, -0.02, 0.1, 0.1, 0.04, 0, 0, 45)       // the point: a box turned 45 degrees
         """;
 
     public static final String EXAMPLE_AXE = """
-        // red fire axe, about 1.2 long; hand at (0, 0, 0), handle up (+Y), blade out to +X
-        ai.addCapsule('red_concrete', 0, -0.1, 0, 0, 1.15, 0, 0.04)                 // painted handle
-        ai.addRoundBox('black_concrete', -0.05, -0.05, -0.05, 0.1, 0.3, 0.1, 0.03)  // rubber grip
+        // red fire axe, about 1.2 long; hand at (0, 0, 0), handle up (+Y), blade out to +X; all boxes
+        ai.addPart('red_concrete', -0.04, -0.1, -0.04, 0.08, 1.2, 0.08)            // painted handle
+        ai.addRoundBox('black_concrete', -0.05, -0.05, -0.05, 0.1, 0.3, 0.1, 0.02)  // rubber grip
         ai.addRoundBox('red_concrete', -0.08, 0.88, -0.06, 0.18, 0.2, 0.12, 0.02)   // head socket
-        ai.addEllipsoid('red_concrete', 0.24, 0.98, 0, 0.16, 0.16, 0.03)            // blade
-        ai.addEllipsoid('iron_block', 0.36, 0.98, 0, 0.06, 0.15, 0.032)             // sharpened steel edge
-        ai.addCone('red_concrete', -0.1, 0.98, 0, 0.05, 0.14)                       // back spike (pointing up is fine)
+        ai.addPart('red_concrete', 0.1, 0.9, -0.025, 0.13, 0.16, 0.05)             // the blade's cheek
+        ai.addPart('red_concrete', 0.22, 0.85, -0.025, 0.08, 0.26, 0.05)           // the blade widening toward its edge
+        ai.addPart('iron_block', 0.3, 0.82, -0.02, 0.05, 0.32, 0.04)               // sharpened steel edge
+        ai.addPart('red_concrete', -0.19, 0.93, -0.025, 0.11, 0.1, 0.05)           // back spike
+        ai.addPart('red_concrete', -0.24, 0.94, -0.02, 0.08, 0.08, 0.04, 0, 0, 45)  // its point
         """;
 
     /** What every equipment prompt says about style: make what was asked, in its own style. */
@@ -759,7 +786,11 @@ public class AiController {
               (eyes). ai.searchBlocks(keyword) finds others.
             - One darker shade for undersides and creases, one lighter shade for highlights.
             - Overlap pieces slightly so nothing floats (a floating thing hangs on a thin string or rod).
-            - Keep parts at least 0.03 thick. Prefer a few smooth shapes over many tiny boxes. At most 400 pieces after merging.
+            - Keep parts at least 0.03 thick. At most 400 pieces after merging.
+            - BUILD IT OF BOXES (ai.addPart, ai.addRoundBox): blades, axe and spear heads, hammer heads, handles and
+              hafts, guards, plates, straps, frames are flat or straight, so they are boxes (a point: a box turned 45
+              degrees with roll). Round pieces ONLY for really round parts (a pommel ball, a gem, a knob, a round lens),
+              in a colour ('#rrggbb') so they are smooth; at most 12 in a held item, 24 in a worn one.
             """;
 
     /** Added to the request when web search is on: look the thing up and build what was found. */
@@ -822,18 +853,19 @@ public class AiController {
 
     public static final String EXAMPLE_HELMET = """
         // bear mascot head, bigger than the head, face toward -Z; the head is the box x -0.25..0.25, y 0..0.5, z -0.25..0.25
-        ai.addEllipsoid('brown_terracotta', 0, 0.3, 0, 0.4, 0.38, 0.38)             // round head around the wearer's head
-        ai.addCylinder('brown_concrete', 0, -0.1, 0, 0.27, 0.08)                     // darker neck rim
-        ai.addEllipsoid('white_terracotta', 0, 0.2, -0.33, 0.17, 0.12, 0.1)         // muzzle standing out
-        ai.addEllipsoid('black_concrete', 0, 0.26, -0.43, 0.06, 0.04, 0.03)         // nose
-        ai.addCapsule('black_concrete', -0.05, 0.15, -0.42, 0.05, 0.15, -0.42, 0.015)  // mouth line
+        // round parts in smooth colours (a mascot head is round); 18 round pieces, under the 24 for worn things
+        ai.addEllipsoid('#8a5a3a', 0, 0.3, 0, 0.4, 0.38, 0.38)                      // round head around the wearer's head
+        ai.addCylinder('#6e4428', 0, -0.1, 0, 0.27, 0.08)                            // darker neck rim
+        ai.addEllipsoid('#efe3d0', 0, 0.2, -0.33, 0.17, 0.12, 0.1)                  // muzzle standing out
+        ai.addEllipsoid('#1e1e22', 0, 0.26, -0.43, 0.06, 0.04, 0.03)                // nose
+        ai.addPart('#1e1e22', -0.05, 0.14, -0.44, 0.1, 0.02, 0.03)                  // mouth line
         ai.mirrorOn()
-        ai.addSphere('white_concrete', 0.14, 0.4, -0.31, 0.065)                     // eye
-        ai.addSphere('black_concrete', 0.14, 0.4, -0.355, 0.04)                     // pupil
-        ai.addSphere('white_concrete', 0.155, 0.415, -0.39, 0.014)                  // shine
-        ai.addEllipsoid('pink_terracotta', 0.24, 0.24, -0.3, 0.05, 0.03, 0.025)     // cheek
-        ai.addSphere('brown_terracotta', 0.3, 0.62, 0, 0.12)                        // ear
-        ai.addEllipsoid('pink_terracotta', 0.3, 0.62, -0.1, 0.07, 0.07, 0.03)       // inside of the ear
+        ai.addSphere('#ffffff', 0.14, 0.4, -0.31, 0.065)                            // eye
+        ai.addSphere('#1e1e22', 0.14, 0.4, -0.355, 0.04)                            // pupil
+        ai.addSphere('#ffffff', 0.155, 0.415, -0.39, 0.014)                         // shine
+        ai.addEllipsoid('#e89aa8', 0.24, 0.24, -0.3, 0.05, 0.03, 0.025)             // cheek
+        ai.addSphere('#8a5a3a', 0.3, 0.62, 0, 0.12)                                 // ear
+        ai.addEllipsoid('#e89aa8', 0.3, 0.62, -0.1, 0.07, 0.07, 0.03)               // inside of the ear
         ai.mirrorOff()
         """;
 
@@ -851,10 +883,11 @@ public class AiController {
         // white bird wings on a harness; the torso is the box x -0.25..0.25, y -0.75..0, z -0.125..0.125, back toward +Z
         ai.addRoundBox('brown_terracotta', -0.27, -0.45, -0.15, 0.54, 0.06, 0.32, 0.02)  // harness around the chest
         ai.mirrorOn()
-        ai.addEllipsoid('white_wool', 0.45, -0.2, 0.22, 0.4, 0.18, 0.05)                 // upper wing
-        ai.addEllipsoid('white_wool', 0.55, -0.42, 0.24, 0.35, 0.14, 0.04)               // lower feathers
-        ai.addEllipsoid('light_gray_wool', 0.75, -0.5, 0.24, 0.2, 0.08, 0.045)           // feather tips (shadow tone)
-        ai.addCapsule('white_concrete', 0.12, -0.15, 0.17, 0.85, 0.0, 0.22, 0.04)        // wing bone
+        // wings are flat: boxes, the feathers in rows getting shorter downward
+        ai.addPart('white_concrete', 0.1, -0.1, 0.18, 0.78, 0.08, 0.06, 0, 0, 10)       // wing bone
+        ai.addRoundBox('white_wool', 0.1, -0.3, 0.19, 0.8, 0.22, 0.04, 0.02)            // upper feathers
+        ai.addRoundBox('white_wool', 0.14, -0.5, 0.2, 0.66, 0.2, 0.04, 0.02)            // middle feathers
+        ai.addRoundBox('light_gray_wool', 0.2, -0.66, 0.21, 0.48, 0.16, 0.04, 0.02)     // feather tips (shadow tone)
         ai.mirrorOff()
         """;
 
@@ -1332,7 +1365,12 @@ public class AiController {
             SMOOTH SHAPES (on the grid; a later shape paints over earlier ones where they overlap):
               In a solid colour ('#rrggbb') a sphere, ellipsoid, cylinder, cone or capsule is drawn perfectly smooth (one round
               piece, not steps); overlapping round pieces simply show together (the one further out is seen). In a block or a
-              see-through colour it is built of small steps. Use colours for round, toy-like things (fruit, balls, ducks).
+              see-through colour it is built of small steps (many pieces: slow, and rough). Use colours for round,
+              toy-like things (fruit, balls, ducks).
+              ROUND PIECES ARE ONLY FOR REALLY ROUND THINGS (heads and bodies of animals, fruit, balls, pots, wheels, knobs,
+              gems, lamps). Flat, straight or angular things - blades, boards, planks, panels, screens, books, boxes,
+              furniture, tables, frames, walls, handles of tools - are boxes (addPart / addRoundBox). At most 30 round
+              pieces in an object (mirrored ones count twice).
               ai.addSphere(block, cx, cy, cz, r)
               ai.addEllipsoid(block, cx, cy, cz, rx, ry, rz)
               ai.addCylinder(block, cx, bottomY, cz, r, height)                 // upright
@@ -1374,7 +1412,8 @@ public class AiController {
               (horn, hat, mane, ears, tail).
             - Faces (eyes, mouth) only on characters and animals, or when the request asks for one. Food, plants,
               furniture, tools and decorations stay realistic: get their shape and colours right instead.
-            - Round things (fruit, pots, heads, bodies) are spheres, ellipsoids, cylinders and cones, not boxes.
+            - Round things (fruit, pots, heads, bodies) are spheres, ellipsoids, cylinders and cones, not boxes; everything
+              flat or straight is boxes, not round pieces.
             - Keep parts at least 0.03 thick (one grid pixel); thinner ones are drawn one pixel thick.
             - 3-5 main colours. Use a darker shade for undersides and creases and a lighter one for highlights
               (e.g. yellow_concrete body + yellow_terracotta underside; white_concrete + light_gray_concrete).
@@ -1383,7 +1422,7 @@ public class AiController {
               concrete for eyes. Materials: oak/spruce/dark_oak_planks, stripped_*_log, stone, mossy_cobblestone, iron_block,
               gold_block, glass, glowstone, quartz_block.
             - Put the main sizes and positions in variables and build from them.
-            - Prefer a few smooth shapes over many tiny boxes. At most 400 pieces after merging.
+            - Flat and straight parts are boxes; round pieces only for really round parts. At most 400 pieces after merging.
 
             CODE RULES:
             - Block names and colours are quoted strings: 'white_concrete', '#c0392b'.

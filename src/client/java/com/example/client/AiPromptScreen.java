@@ -381,6 +381,12 @@ public class AiPromptScreen extends Screen {
                 com.example.config.AiBuilderConfig.save();
                 rebuild();
             });
+            // This player's own choice: how damage numbers look.
+            bx -= 4 + 72;
+            button("숫자: " + DamagePopups.korean(DamagePopups.style()), bx, top(), 72, b -> {
+                DamagePopups.cycleStyle();
+                rebuild();
+            });
         }
 
         int y = bottom() - 42;
