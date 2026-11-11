@@ -1543,6 +1543,32 @@ public class AiController {
               bars, flat or low-pitched roofs of slate or tin (iron or grey blocks), signs painted on walls, alley walls of
               cement blocks.
 
+            SMALL BUILDS (a lamp post, a pillar, a gate, a fountain, a well, a statue base, a sign, a bench...):
+            - Same rule as a building: a base, a body and a top, each a different shape, so it reads as made.
+              Base: a wider block or a stair ring (stone bricks, polished stone, a wall block); body: a thinner post;
+              top: a cap, a cornice or an arm. Nothing is one plain column of one block.
+            - Lamp posts (3-5 high): base of a stone wall or chiseled block, post of fence, wall or iron bars, an arm or
+              crossbar at the top (fence, trapdoor or stair) with a lantern HANGING from it on a chain, or a lantern standing
+              on the post under a small roof of slabs or trapdoors. By period: medieval - dark oak fence, chain, lantern,
+              a stone base; Victorian / 1920s - black (polished blackstone or deepslate) wall post, a crossbar with two
+              lanterns; Korean old - a stone lantern (석등: stone base, a wall block, a lantern framed by trapdoors, a slab
+              cap) or a wooden post with a paper lantern (a lantern in white trapdoors); modern - a slim iron or grey post
+              (iron bars, andesite wall) with an end rod, froglight or sea_lantern head under a slab; a street lamp hangs
+              its light out over the road on a long arm.
+            - Pillars and columns: a base wider than the shaft (stairs or slabs around it), a shaft (quartz pillar, stripped
+              logs, stone brick wall or polished stone), a capital wider again at the top (upside-down stairs round it);
+              a row of pillars is evenly spaced and carries a beam. Wooden posts sit on a flat stone (주춧돌) in Korean
+              buildings.
+            - Lights indoors: lanterns on chains from the ceiling, a chandelier (a chain down to a ring of fences or
+              trapdoors with candles or lanterns), wall lights (a lantern on a fence stub or a torch between trapdoors),
+              hidden light (glowstone, sea_lantern or froglight under carpet, behind trapdoors or leaves, in the ceiling
+              between beams), lamps on tables (a candle or a lantern on a flower pot or a fence). No bare torches on walls
+              in fine rooms.
+            - Decorations: flower pots and window boxes, banners on walls and posts, item frames with items, barrels and
+              crates in groups of 2-3 by doors, wells (a ring of stone, two posts, a roof of slabs, a chain and a bucket),
+              fountains (a stone basin of stairs and slabs, water, a pillar with a top), benches (stairs with trapdoor arms),
+              fences and gates with posts every 3-4 blocks that are taller or capped.
+
             """;
 
     /** A small modern house using the helpers and props (in the prompt as a style reference, and built in the tests). */
