@@ -147,6 +147,13 @@ public final class AiBuildApi {
      */
     public static final String BLOCKS_ONLY = AiController.BLOCKS_ONLY_NOTE.strip();
 
+    /**
+     * Put this in a request's {@code extra} for an outdoor scene: blocks past the site's edges (a
+     * tree crown or a rock leaning over) are trimmed at the edge instead of the design being sent back.
+     */
+    public static final String TRIM_TO_SITE = "TRIMMED AT THE EDGES: leaves, rocks or anything else reaching past the site are cut off"
+        + " at its edges, so keep the important things well inside.";
+
     /** Design frame of a building: the designer stands at (0, 0, 0) looking north (-Z). */
     private static final float DESIGN_YAW = 180f;
 
@@ -180,6 +187,7 @@ public final class AiBuildApi {
             user.append("\n").append(req.extra().trim()).append("\n");
         }
         boolean blocksOnly = req.extra() != null && req.extra().contains(BLOCKS_ONLY);
+        boolean trim = req.extra() != null && req.extra().contains(TRIM_TO_SITE);
         if (req.propEra() != null && !blocksOnly) {
             String catalog = com.example.ai.build.PropLibrary.catalog(req.propEra());
             if (catalog.isEmpty()) {
@@ -201,6 +209,12 @@ public final class AiBuildApi {
             AiController.Evaluation eval = AiController.evaluate(world, near, DESIGN_YAW, null, code, false);
             if (!eval.ok()) {
                 return eval.failure();
+            }
+            if (trim) {
+                int cut = trim(eval.plan(), site);
+                if (cut > 0 && log != null) {
+                    log.accept("Trimmed " + cut + " pieces at the site's edges");
+                }
             }
             String problem = siteProblem(eval.plan(), site);
             if (problem == null) {
@@ -249,6 +263,64 @@ public final class AiBuildApi {
             }
         }
         return problems.isEmpty() ? null : "The building leaves its site:\n- " + String.join("\n- ", problems);
+    }
+
+    /**
+     * Cut every block op to what the site check allows (a hollow or outline fill is split into its
+     * faces first, so no new wall appears along the cut). Returns how many ops were cut or dropped.
+     */
+    static int trim(BuildPlan plan, Site site) {
+        int loX = -1, hiX = site.width(), loY = -2, hiY = site.maxHeight() + 2, loZ = -site.depth() - 1, hiZ = 0;
+        List<BuildPlan.Op> out = new ArrayList<>(plan.ops.size());
+        int cut = 0;
+        for (BuildPlan.Op op : plan.ops) {
+            int minX = Math.min(op.x1, op.x2), maxX = Math.max(op.x1, op.x2);
+            int minY = Math.min(op.y1, op.y2), maxY = Math.max(op.y1, op.y2);
+            int minZ = Math.min(op.z1, op.z2), maxZ = Math.max(op.z1, op.z2);
+            if (minX >= loX && maxX <= hiX && minY >= loY && maxY <= hiY && minZ >= loZ && maxZ <= hiZ) {
+                out.add(op);
+                continue;
+            }
+            cut++;
+            List<BuildPlan.Op> pieces = new ArrayList<>();
+            boolean hollow = "hollow".equals(op.mode), outline = "outline".equals(op.mode);
+            if ("fill".equals(op.kind) && (hollow || outline)) {
+                int[][] faces = {
+                    { minX, minY, minZ, minX, maxY, maxZ }, { maxX, minY, minZ, maxX, maxY, maxZ },
+                    { minX, minY, minZ, maxX, minY, maxZ }, { minX, maxY, minZ, maxX, maxY, maxZ },
+                    { minX, minY, minZ, maxX, maxY, minZ }, { minX, minY, maxZ, maxX, maxY, maxZ } };
+                if (hollow && maxX - minX > 1 && maxY - minY > 1 && maxZ - minZ > 1) {
+                    pieces.add(new BuildPlan.Op("fill", minX + 1, minY + 1, minZ + 1, maxX - 1, maxY - 1, maxZ - 1, "minecraft:air", "replace"));
+                }
+                for (int[] f : faces) {
+                    pieces.add(new BuildPlan.Op("fill", f[0], f[1], f[2], f[3], f[4], f[5], op.block, "replace"));
+                }
+            } else {
+                pieces.add(op);
+            }
+            for (BuildPlan.Op p : pieces) {
+                int x1 = Math.max(loX, Math.min(p.x1, p.x2)), x2 = Math.min(hiX, Math.max(p.x1, p.x2));
+                int y1 = Math.max(loY, Math.min(p.y1, p.y2)), y2 = Math.min(hiY, Math.max(p.y1, p.y2));
+                int z1 = Math.max(loZ, Math.min(p.z1, p.z2)), z2 = Math.min(hiZ, Math.max(p.z1, p.z2));
+                if (x1 > x2 || y1 > y2 || z1 > z2) {
+                    continue;
+                }
+                if (p == op) {
+                    p.x1 = x1; p.x2 = x2; p.y1 = y1; p.y2 = y2; p.z1 = z1; p.z2 = z2;
+                    out.add(p);
+                } else {
+                    out.add(new BuildPlan.Op(p.kind, x1, y1, z1, x2, y2, z2, p.block, p.mode));
+                }
+            }
+        }
+        plan.ops.clear();
+        plan.ops.addAll(out);
+        return cut;
+    }
+
+    /** Tests: the trim. */
+    public static int trimForTests(BuildPlan plan, Site site) {
+        return trim(plan, site);
     }
 
     /** Tests: the site check. */
