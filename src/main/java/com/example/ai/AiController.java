@@ -1498,6 +1498,51 @@ public class AiController {
             - Inside: floors, a ceiling under the roof, room walls with doorways, light in every room, furniture that fits each
               room. In modern and contemporary buildings use the library props (ai.prop) for what blocks cannot show well.
 
+            TECHNIQUES (what good Minecraft builders do):
+            - Proportions: a storey is 4-5 blocks floor to floor (3 of air inside at least); doors 2 high (3 for a grand
+              entrance); the roof about as tall as one storey, or more for steep styles; a building wider than it is tall
+              unless it is a tower.
+            - Roof: darker than the walls (dark_oak, spruce, deepslate tiles, dark prismarine, brick, mud bricks for straw).
+              The eave edge is a row of upside-down stairs or slabs under the overhang; the ridge gets a slab or wall cap;
+              gable ends get a trim board (planks or stairs) along their slopes. Break a long roofline: a cross gable, a
+              dormer, a lower wing, a tower or a chimney so the outline is not one straight line.
+            - Wall depth with the trim, not the wall block: posts and beams 1 block proud, window frames of stairs or slabs
+              (upside-down stairs as a lintel above, a slab or stair sill below), shutters of trapdoors beside the panes,
+              flower boxes (a trapdoor face with flowers or leaves) under some windows.
+            - Base: the plinth plus a step or two at the door (stairs); the door set 1 block back into the wall or under a
+              porch roof held on posts; posts under every balcony and wide overhang (nothing big floats).
+            - Small details at the edges only: fence posts with lanterns, buttons and levers as hardware, chains for hanging
+              lights, banners, signs over shops, barrels and crates by a side door, vines or leaves climbing a corner.
+              Leave the middle of the walls plain (negative space) so the windows, door and frame read clearly.
+            - Around it: a path to the door (gravel, dirt_path or stone), bushes and flowers by the walls, a fence or low wall
+              where a yard is.
+            - Check the look from 20 blocks away in your head: door, windows, roofline and frame must stand out.
+
+            BY STYLE (when the request or its period names one):
+            - Medieval European: timber frame (dark_oak or spruce logs, posts and diagonal braces) filled with a light wall
+              (white_terracotta, calcite, mud_bricks or plaster-like white concrete), a stone ground floor (cobblestone,
+              stone bricks) with the upper floor jutting out 1 block over it on beams, steep gable roofs of spruce or dark_oak
+              stairs, small windows, a stone chimney.
+            - Victorian / 1920s Western: brick or painted wood siding, tall narrow windows in rows with white frames, bay
+              windows, porches with turned posts and a railing, decorative trim under the eaves, steep roofs with dormers,
+              shop fronts with big windows, a sign board and an awning at street level.
+            - Modern / contemporary: clean white, light grey or concrete walls with dark or wood accents, big glass areas
+              (panes in long strips), flat roofs with a thin parapet or a shallow slope, cantilevers held on slim posts,
+              little ornament; garages, decks and planters.
+            - Korean traditional (hanok, 조선): a stone base platform (stone bricks or smooth stone, 1-2 high) under the house;
+              round or square wooden pillars at the corners and along the front; white walls between dark wood frames;
+              a wooden veranda floor (대청마루, maru) along the front; a dark grey tile roof (deepslate tiles, dark
+              prismarine or polished blackstone stairs) whose eaves overhang 2 blocks and curve up at the corners (the last
+              stairs at each corner one block higher); a ridge cap; paper-like doors and windows of birch trapdoors or
+              light panes in a grid; a mud-and-stone wall (돌담) round the yard with a tiled top. A straw-roof house (초가집)
+              has a round, thick, light-brown roof (hay blocks or mud bricks), mud walls and a low profile.
+            - Japanese traditional: a raised wooden floor on posts, dark wood frame with white paper panels (birch
+              trapdoors or white panes in a grid), deep overhanging roofs of dark tiles with gently curved ends, an engawa
+              veranda round the house, a stone lantern and gravel garden.
+            - Postwar / older Korean town (전후, 근대 시가지): plain cement or red brick walls, small square windows with iron
+              bars, flat or low-pitched roofs of slate or tin (iron or grey blocks), signs painted on walls, alley walls of
+              cement blocks.
+
             """;
 
     /** A small modern house using the helpers and props (in the prompt as a style reference, and built in the tests). */
