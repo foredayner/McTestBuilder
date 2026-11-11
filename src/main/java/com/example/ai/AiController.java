@@ -1485,6 +1485,11 @@ public class AiController {
             - Palette of 3-4 materials: main wall, frame/trim (logs or a darker stone), roof, one accent. Every wall face is
               ONE block (the main wall block): no mixing and no random blocks in it. The other materials go only on the
               trim: corner posts, the foundation plinth, beam lines, window frames and sills, the door surround.
+              EXCEPT a building the request calls old, worn, abandoned, ruined, haunted or weathered (낡은, 버려진, 폐허,
+              오래된, 흉가): then texture its walls (ai.wallMix) - one main block with 2-3 near-colour blocks in PATCHES,
+              not evenly sprinkled (white: white_concrete + calcite + bone_block + a little white_wool; stone: stone_bricks
+              + stone + cobblestone + andesite; wood: planks + stripped logs of the same wood), the cracked and mossy
+              ones low down near the ground and under the eaves, darker at the bottom and lighter toward the top.
             - Foundation: a plinth 1 block wider than the walls, of a darker or rougher stone, at the ground line.
             - Frame: corner posts of logs or pillars, and a beam line along the top of each storey's walls, so the
               structure shows on the outside. Where the style allows, posts stick out 1 block from the wall.
@@ -1543,6 +1548,29 @@ public class AiController {
               bars, flat or low-pitched roofs of slate or tin (iron or grey blocks), signs painted on walls, alley walls of
               cement blocks.
 
+            MORE ROOFS:
+            - Curved roof (hanok, temples, fantasy): stairs at the eave, then slabs set half a block in, then blocks and
+              slabs in turn up to the ridge, upside-down stairs underneath; the corners lifted one step higher than the
+              middle of the eave.
+            - Layered eaves (Japanese, pagodas): slabs stacked outward in steps with upside-down stairs under each layer,
+              the corners reaching a little further; a pagoda is the same roof repeated smaller on each storey, ridges of
+              walls or fences.
+            - Towers: a cone of stairs, each ring set one block in, or a dome of stairs turning a little each layer.
+            - Modern flat roofs: slabs, a parapet of walls or blocks around the edge, light hidden under trapdoors.
+            - Roof palettes: oak + spruce (soft), dark oak + stone bricks (medieval), deepslate tiles (gothic), mangrove
+              (red accent), blackstone (fortress), prismarine (sea). A roof over a balcony or a tower is a smaller, lower
+              second roof.
+
+            INSIDE (when it has an inside):
+            - Floors with a pattern (stripes or a checkerboard of two planks, a glazed terracotta rug in the middle of a
+              room, carpets); walls with bookshelves, trapdoor shelves, barrels as cupboards, paintings and item frames.
+            - Big rooms (halls, libraries, churches, shops) have high ceilings (5+) with beams across and big lights.
+            - Plants: flower pots, small leaf-block topiaries, vines or glow berries hanging in corners.
+            - Lights: a chandelier (a chain from the ceiling to a frame of fences, iron bars or end rods with lanterns,
+              candles or sea lanterns at the ends; medieval: chains, iron bars, fences, lanterns; modern: end rods and
+              sea lanterns, symmetrical; rustic: wood and candles), lantern clusters at different heights, lights set
+              into the ceiling between beams, a lamp of a fence or a flower pot with a candle on a table.
+
             SMALL BUILDS (a lamp post, a pillar, a gate, a fountain, a well, a statue base, a sign, a bench...):
             - Same rule as a building: a base, a body and a top, each a different shape, so it reads as made.
               Base: a wider block or a stair ring (stone bricks, polished stone, a wall block); body: a thinner post;
@@ -1568,6 +1596,34 @@ public class AiController {
               crates in groups of 2-3 by doors, wells (a ring of stone, two posts, a roof of slabs, a chain and a bucket),
               fountains (a stone basin of stairs and slabs, water, a pillar with a top), benches (stairs with trapdoor arms),
               fences and gates with posts every 3-4 blocks that are taller or capped.
+            - Fountains: a basin of stairs and slabs (2-3 high rim), tiers that get smaller upward, each tier a different
+              block (chiseled stone bricks, polished andesite, stone bricks; sandstone in hot lands; copper stairs for
+              a bronze look), water falling from each tier into the next, lanterns on small pillars at the corners.
+            - More lamp posts: one arm (a stone brick wall post, a spruce fence arm with stairs and a slab, a chain and a
+              lantern); double (two arms with a lantern each, a flower pot on top); desert (sandstone wall, birch fence and
+              trapdoors); medieval with a seat (deepslate walls, iron bars, dark oak fence, a bench around the foot).
+
+            OUTDOOR BUILDS (gardens, parks, paths, bridges, trees, ponds, squares, stalls):
+            - Nothing natural is straight: paths, hedges, banks and garden edges turn at least every 7 blocks; paths are
+              2-3 wide, follow the ground, have edges of a different block (walls, slabs, coarse dirt) and widen at
+              crossings and doors. Wear: some grass turned to coarse dirt, gravel or dirt_path where people walk.
+            - Banks of water: dirt and mud with granite and gravel patches, seagrass and lily pads, reeds (sugar cane),
+              a few stones in the water.
+            - Trees by hand (when no ai.tree helper): a trunk that leans a little (shifted a block every few blocks up),
+              thicker at the foot (3x3 for big trees) with roots of logs running out into the ground; branches from 3
+              blocks up in different directions and heights, stairs and slabs at bends to look thicker, fences as twigs;
+              round leaf clusters on each branch end, merged into one crown, fuller on top than underneath; vines for
+              willows; pink leaves for cherry.
+            - Bridges: stone with arches and pillars under them (an arch repeated for a long bridge), a railing of walls
+              or fences with lanterns on the posts, flower boxes in the railing; wooden ones of logs, slabs and fences;
+              covered bridges with a roof; rope bridges of fences, chains and slabs hanging a little lower in the middle.
+            - Gardens: hedges of leaves, flower beds edged with stone or trapdoors, a pond with a small bridge, a gazebo
+              (a round or six-sided roof on 4-6 posts, benches inside), terraces stepping up a slope, a greenhouse of
+              glass panes, a zen garden (raked gravel, rocks, moss, a stone lantern).
+            - Squares and markets: paving in a pattern with a border, a fountain or a monument in the middle, benches
+              (stairs with trapdoor arms), stalls (4 posts, a cloth roof of wool or banners, a counter of slabs, barrels
+              and crates of goods), lamp posts on the edges.
+            - Picnic and rest spots: tables of fences and slabs or trapdoors, benches of stairs, a tree for shade.
 
             """;
 
