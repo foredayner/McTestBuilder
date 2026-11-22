@@ -189,14 +189,18 @@ public class MinecraftAI {
 
     /** Set the helper's blocks; every block it names must exist (e.g. there are no "glass_stairs"). */
     private static void placeCells(String what, List<BuildingHelpers.Cell> cells) {
+        placeCells(what, cells, "give a material that has stairs, slabs or trapdoors, e.g. 'spruce', 'dark_oak', 'stone_brick',"
+            + " 'deepslate_tile'");
+    }
+
+    private static void placeCells(String what, List<BuildingHelpers.Cell> cells, String hint) {
         java.util.Set<String> checked = new java.util.HashSet<>();
         for (BuildingHelpers.Cell c : cells) {
             String id = c.block();
             int open = id.indexOf('[');
             String name = normalizeBlockId(open < 0 ? id : id.substring(0, open));
             if (checked.add(name) && !Registries.BLOCK.containsId(Identifier.of(name))) {
-                throw new IllegalArgumentException(what + ": there is no block " + name + " (give a material that has stairs, slabs or"
-                    + " trapdoors, e.g. 'spruce', 'dark_oak', 'stone_brick', 'deepslate_tile')");
+                throw new IllegalArgumentException(what + ": there is no block " + name + " (" + hint + ")");
             }
         }
         for (BuildingHelpers.Cell c : cells) {
@@ -242,20 +246,36 @@ public class MinecraftAI {
         return out;
     }
 
+    /**
+     * The outdoor pieces: one that cannot be made (a block or kind that does not exist) is left out
+     * on its own, with a note in the log, instead of failing the whole design.
+     */
+    private static void nature(String what, java.util.function.Supplier<List<Map.Entry<int[], String>>> make, String hint) {
+        try {
+            placeCells(what, cells(make.get()), hint);
+        } catch (IllegalArgumentException e) {
+            com.example.AiBuildAssistantMod.LOGGER.warn("ai.{} left out: {}", what, e.getMessage());
+        }
+    }
+
     public static void tree(Number x, Number y, Number z, Number height, String kind, Number trunk) {
-        placeCells("tree", cells(NatureHelpers.tree(toInt(x), toInt(y), toInt(z), toInt(height), kind, trunk == null ? 0 : toInt(trunk))));
+        nature("tree", () -> NatureHelpers.tree(toInt(x), toInt(y), toInt(z), toInt(height), kind, trunk == null ? 0 : toInt(trunk)),
+            "kind: one of " + NatureHelpers.TREES);
     }
 
     public static void rock(Number x, Number y, Number z, Number w, Number h, Number l, String kind) {
-        placeCells("rock", cells(NatureHelpers.rock(toInt(x), toInt(y), toInt(z), toInt(w), toInt(h), toInt(l), kind)));
+        nature("rock", () -> NatureHelpers.rock(toInt(x), toInt(y), toInt(z), toInt(w), toInt(h), toInt(l), kind),
+            "kind: stone, mossy, granite, sandstone or dark");
     }
 
     public static void bush(Number x, Number y, Number z, Number w, Number h, Number l, String leaves) {
-        placeCells("bush", cells(NatureHelpers.bush(toInt(x), toInt(y), toInt(z), toInt(w), toInt(h), toInt(l), leaves)));
+        nature("bush", () -> NatureHelpers.bush(toInt(x), toInt(y), toInt(z), toInt(w), toInt(h), toInt(l), leaves),
+            "leaves: one of " + NatureHelpers.LEAVES);
     }
 
     public static void mound(Number x, Number y, Number z, Number w, Number h, Number l, String top) {
-        placeCells("mound", cells(NatureHelpers.mound(toInt(x), toInt(y), toInt(z), toInt(w), toInt(h), toInt(l), top)));
+        nature("mound", () -> NatureHelpers.mound(toInt(x), toInt(y), toInt(z), toInt(w), toInt(h), toInt(l), top),
+            "top: a ground block such as grass_block, moss_block, podzol, coarse_dirt");
     }
 
     /** Most library props one building may have (each is a few dozen display pieces). */

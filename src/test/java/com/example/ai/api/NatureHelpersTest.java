@@ -60,6 +60,14 @@ class NatureHelpersTest {
         assertThrows(IllegalArgumentException.class, () -> NatureHelpers.rock(0, 0, 0, 3, 3, 3, "lava"));
         var bush = NatureHelpers.bush(0, 0, 0, 3, 2, 3, null);
         assertTrue(bush.stream().allMatch(e -> e.getValue().startsWith("oak_leaves[persistent=true]")));
+        // Loose leaf names: a kind, a block, a namespaced block; not leaves at all is oak.
+        assertEquals("spruce_leaves", NatureHelpers.bushLeaves("spruce"));
+        assertEquals("oak_leaves", NatureHelpers.bushLeaves("oak_leaves"));
+        assertEquals("birch_leaves", NatureHelpers.bushLeaves("minecraft:birch_leaves"));
+        assertEquals("azalea_leaves", NatureHelpers.bushLeaves("azalea"));
+        assertEquals("oak_leaves", NatureHelpers.bushLeaves("fern"));
+        assertEquals("oak_leaves", NatureHelpers.bushLeaves("fern_leaves"));
+        assertTrue(NatureHelpers.bush(0, 0, 0, 2, 1, 2, "fern_leaves").stream().allMatch(e -> e.getValue().startsWith("oak_leaves")));
         var mound = NatureHelpers.mound(0, 0, 0, 7, 3, 7, "grass_block");
         assertEquals(2, box(mound, "")[4], "a mound 3 high");
         assertTrue(mound.stream().anyMatch(e -> e.getValue().equals("dirt")), "earth inside");

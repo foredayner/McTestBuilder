@@ -1695,7 +1695,7 @@ public class AiController {
               ai.rock(x, y, z, width, height, length) | ai.rock(..., kind)
                 // a rough boulder of mixed stone filling about that box from (x, y, z) up; kind = stone, mossy, granite,
                 // sandstone or dark. Several overlapping rocks of different sizes make a rock pile, a crag or a cliff.
-              ai.bush(x, y, z, width, height, length) | ai.bush(..., leavesBlock)   // a rounded bush of leaves
+              ai.bush(x, y, z, width, height, length) | ai.bush(..., leaves)   // a rounded bush of leaves (oak, spruce, birch, dark_oak, azalea...; default oak)
               ai.mound(x, y, z, width, height, length) | ai.mound(..., topBlock)    // a rounded heap of earth (a hill, a burial mound)
             """;
 

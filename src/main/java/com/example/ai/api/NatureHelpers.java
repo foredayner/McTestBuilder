@@ -197,12 +197,35 @@ public final class NatureHelpers {
         return out.list();
     }
 
+    /** The leaves there are (as blocks). */
+    public static final List<String> LEAVES = List.of("oak_leaves", "spruce_leaves", "birch_leaves", "jungle_leaves", "acacia_leaves",
+        "dark_oak_leaves", "mangrove_leaves", "cherry_leaves", "azalea_leaves", "flowering_azalea_leaves", "pale_oak_leaves");
+
+    /**
+     * A bush's leaves from a loose name: "spruce", "oak_leaves", "minecraft:birch_leaves", "azalea"; anything
+     * that is not a kind of leaves ("fern", "fern_leaves", "hedge") is oak leaves.
+     */
+    public static String bushLeaves(String in) {
+        String n = in == null ? "" : in.trim().toLowerCase(Locale.ROOT).replace("minecraft:", "");
+        int open = n.indexOf('[');
+        if (open >= 0) {
+            n = n.substring(0, open);
+        }
+        if (LEAVES.contains(n)) {
+            return n;
+        }
+        if (LEAVES.contains(n + "_leaves")) {
+            return n + "_leaves";
+        }
+        if (n.equals("pine")) {
+            return "spruce_leaves";
+        }
+        return "oak_leaves";
+    }
+
     /** A rounded bush of leaves about w x h x l from (x, y, z) up. */
     public static List<Map.Entry<int[], String>> bush(int x, int y, int z, int w, int h, int l, String leavesIn) {
-        String leaves = leavesIn == null || leavesIn.isBlank() ? "oak_leaves" : leavesIn.trim().toLowerCase(Locale.ROOT).replace("minecraft:", "");
-        if (!leaves.endsWith("_leaves") && !leaves.contains("azalea")) {
-            leaves = leaves + "_leaves";
-        }
+        String leaves = bushLeaves(leavesIn);
         Cells out = new Cells();
         double rx = Math.max(1, w) / 2.0, ry = Math.max(1, h), rz = Math.max(1, l) / 2.0;
         ellipsoidBase(out, x + rx - 0.5, y, z + rz - 0.5, rx + 0.3, ry, rz + 0.3, leaves + "[persistent=true]", 31);
